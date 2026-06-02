@@ -1,0 +1,1147 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Control de Producción — GVIP</title>
+<style>
+  :root{
+    --bg:#0f1419; --panel:#1a212b; --panel2:#222b38; --line:#2e3a4a;
+    --ink:#e9eef5; --muted:#93a1b3; --accent:#2dd4a7; --accent2:#1d9e75;
+    --warn:#f0b429; --danger:#e25555; --radius:12px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+    background:var(--bg);color:var(--ink);line-height:1.5;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:1000px;margin:0 auto;padding:20px 16px 60px}
+
+  header.top{display:flex;align-items:center;justify-content:space-between;gap:12px;
+    margin-bottom:20px;flex-wrap:wrap}
+  .brand{display:flex;align-items:center;gap:12px}
+  .logo{width:42px;height:42px;border-radius:11px;background:linear-gradient(135deg,var(--accent),var(--accent2));
+    display:flex;align-items:center;justify-content:center;font-size:22px}
+  .brand h1{font-size:18px;font-weight:600;letter-spacing:-.2px}
+  .brand p{font-size:12px;color:var(--muted)}
+
+  .clock{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);
+    padding:10px 16px;text-align:right;min-width:200px}
+  .clock .date{font-size:12px;color:var(--muted);text-transform:capitalize}
+  .clock .time{font-size:22px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:.5px}
+
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);
+    padding:18px;margin-bottom:16px}
+  .card h2{font-size:14px;font-weight:600;margin-bottom:14px;display:flex;align-items:center;gap:8px}
+  .card h2 .ic{color:var(--accent)}
+
+  .grid{display:grid;gap:12px}
+  .g2{grid-template-columns:repeat(2,1fr)}
+  .g3{grid-template-columns:repeat(3,1fr)}
+  .g4{grid-template-columns:repeat(4,1fr)}
+  @media(max-width:680px){.g3,.g4{grid-template-columns:1fr 1fr}}
+
+  label{display:block;font-size:11px;color:var(--muted);margin-bottom:5px;
+    text-transform:uppercase;letter-spacing:.5px;font-weight:600}
+  input,select{width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink);
+    border-radius:8px;padding:10px 12px;font-size:14px;font-family:inherit;outline:none;transition:.15s}
+  input:focus,select:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(45,212,167,.15)}
+  input[readonly]{color:var(--muted)}
+
+  .big-btn{width:100%;background:linear-gradient(135deg,var(--accent),var(--accent2));
+    color:#06241c;border:none;border-radius:var(--radius);padding:20px;font-size:18px;
+    font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:12px;
+    transition:.15s;letter-spacing:.3px}
+  .big-btn:hover{filter:brightness(1.07)}
+  .big-btn:active{transform:scale(.99)}
+  .big-btn .bclock{font-size:14px;font-weight:500;opacity:.8;font-variant-numeric:tabular-nums}
+  .big-btn[disabled]{background:var(--panel2);color:var(--muted);cursor:not-allowed;filter:none}
+
+  .btn{background:var(--panel2);border:1px solid var(--line);color:var(--ink);border-radius:8px;
+    padding:9px 16px;font-size:13px;font-weight:600;cursor:pointer;transition:.15s;font-family:inherit}
+  .btn:hover{border-color:var(--accent)}
+  .btn.primary{background:var(--accent);color:#06241c;border-color:var(--accent)}
+  .btn.warn{color:var(--warn)}
+  .btn.warn:hover{border-color:var(--warn)}
+  .btn.danger{color:var(--danger)}
+  .btn.danger:hover{border-color:var(--danger)}
+  .btn-row{display:flex;gap:10px;flex-wrap:wrap}
+
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th,td{padding:9px 10px;text-align:right;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums}
+  th:first-child,td:first-child{text-align:left}
+  th{font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);font-weight:600}
+  tbody tr:hover{background:var(--panel2)}
+  .out-range{color:var(--danger);font-weight:700}
+  .in-range{color:var(--accent)}
+  .empty{text-align:center;color:var(--muted);padding:28px;font-size:13px}
+
+  .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:4px}
+  @media(max-width:680px){.stats{grid-template-columns:1fr 1fr}}
+  .stat{background:var(--panel2);border-radius:8px;padding:12px}
+  .stat .v{font-size:20px;font-weight:700;font-variant-numeric:tabular-nums}
+  .stat .l{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-top:2px}
+
+  .range-pill{display:inline-block;background:var(--panel2);border:1px solid var(--line);
+    border-radius:20px;padding:4px 12px;font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+  .range-pill b{color:var(--ink)}
+
+  .progress-wrap{margin-top:14px}
+  .progress-top{display:flex;justify-content:space-between;font-size:12px;margin-bottom:6px}
+  .progress-top b{font-variant-numeric:tabular-nums}
+  .bar{height:14px;background:var(--panel2);border-radius:20px;overflow:hidden;border:1px solid var(--line)}
+  .bar span{display:block;height:100%;background:var(--accent);
+    width:0;transition:width .4s, background .3s;border-radius:20px}
+
+  .day-group{margin-bottom:18px}
+  .day-head{display:flex;align-items:center;justify-content:space-between;
+    background:var(--panel2);border-radius:8px 8px 0 0;padding:10px 14px;font-size:13px;font-weight:600;
+    flex-wrap:wrap;gap:8px}
+  .day-head .meta{font-size:11px;color:var(--muted);font-weight:500;display:flex;gap:14px;flex-wrap:wrap;align-items:center}
+  .day-head .meta b{color:var(--ink)}
+  .day-head.closed{border-left:3px solid var(--accent)}
+  .lock-tag{font-size:10px;background:rgba(45,212,167,.15);color:var(--accent);
+    padding:2px 9px;border-radius:20px;font-weight:600}
+  .mini-btn{background:transparent;border:1px solid var(--line);color:var(--muted);
+    border-radius:6px;padding:4px 10px;font-size:11px;font-weight:600;cursor:pointer;transition:.15s}
+  .mini-btn:hover{border-color:var(--accent);color:var(--ink)}
+
+  .parciales-box{background:rgba(240,180,41,.06);border:1px solid rgba(240,180,41,.25);
+    border-radius:8px;padding:8px 12px;margin:0 0 2px}
+  .parciales-box .ph{font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:var(--warn);
+    font-weight:700;margin-bottom:6px;display:flex;align-items:center;gap:6px}
+  .parcial-row{display:flex;align-items:center;justify-content:space-between;gap:10px;
+    font-size:12px;padding:4px 0;border-bottom:1px dashed rgba(240,180,41,.2)}
+  .parcial-row:last-child{border-bottom:none}
+  .parcial-row .pc{font-variant-numeric:tabular-nums}
+  .parcial-row .pc b{color:var(--ink)}
+  .parcial-row .ph-time{color:var(--muted);font-variant-numeric:tabular-nums}
+  .parcial-row .px{background:transparent;border:none;color:var(--danger);cursor:pointer;
+    font-size:13px;padding:0 4px;opacity:.7}
+  .parcial-row .px:hover{opacity:1}
+  .parciales-box .ptot{font-size:12px;font-weight:700;color:var(--warn);
+    margin-top:6px;padding-top:6px;border-top:1px solid rgba(240,180,41,.3);
+    display:flex;justify-content:space-between;font-variant-numeric:tabular-nums}
+
+  .modal-bg{position:fixed;inset:0;background:rgba(8,11,15,.78);display:none;
+    align-items:center;justify-content:center;padding:16px;z-index:50;backdrop-filter:blur(3px)}
+  .modal-bg.show{display:flex}
+  .modal{background:var(--panel);border:1px solid var(--line);border-radius:16px;
+    width:100%;max-width:440px;padding:22px;max-height:92vh;overflow:auto}
+  .modal h3{font-size:16px;margin-bottom:4px}
+  .modal .sub{font-size:12px;color:var(--muted);margin-bottom:18px}
+  .modal .row{margin-bottom:14px}
+  .modal .calc{background:var(--panel2);border-radius:8px;padding:12px;margin:6px 0 16px;
+    font-size:13px;display:flex;justify-content:space-between;align-items:center}
+  .modal .calc b{font-variant-numeric:tabular-nums;font-size:16px}
+  .modal .calc .status{font-size:11px;padding:3px 10px;border-radius:20px}
+  .modal .actions{display:flex;gap:10px;margin-top:4px}
+  .modal .actions .btn{flex:1;text-align:center;padding:12px}
+  .hint{font-size:11px;color:var(--muted);margin-top:4px}
+  .alert{background:rgba(226,85,85,.12);border:1px solid rgba(226,85,85,.4);color:#ffb4b4;
+    border-radius:8px;padding:9px 12px;font-size:12px;margin-bottom:14px;display:none}
+  .alert.show{display:block}
+
+  #printArea{display:none}
+
+  .connbar{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);
+    padding:14px 16px;margin-bottom:16px;display:flex;gap:14px;align-items:flex-end;flex-wrap:wrap}
+  .connbar .field{flex:1;min-width:160px}
+  .connbar .dot{display:inline-flex;align-items:center;gap:7px;font-size:12px;color:var(--muted);
+    padding:7px 12px;background:var(--panel2);border-radius:8px;white-space:nowrap}
+  .connbar .dot i{width:9px;height:9px;border-radius:50%;background:var(--muted);display:inline-block}
+  .dot.ok i{background:var(--accent)} .dot.ok{color:var(--accent)}
+  .dot.bad i{background:var(--danger)} .dot.bad{color:#ffb4b4}
+  .dot.sync i{background:var(--warn);animation:pulse 1s infinite} .dot.sync{color:var(--warn)}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+  .toggle{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted);cursor:pointer;user-select:none}
+  .toggle input{width:auto;margin:0}
+  .sup-banner{background:rgba(240,180,41,.12);border:1px solid rgba(240,180,41,.4);color:#f0b429;
+    border-radius:var(--radius);padding:10px 16px;margin-bottom:16px;font-size:13px;font-weight:600;display:none}
+  .sup-banner.show{display:block}
+  .rol-tag{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;
+    padding:7px 14px;border-radius:8px;background:var(--panel2);color:var(--muted);white-space:nowrap}
+  .rol-tag.sup{background:rgba(240,180,41,.15);color:var(--warn)}
+  body.supervisor .big-btn,
+  body.supervisor #btnLimpiar,
+  body.supervisor .day-head .mini-btn:not(.btn-reabrir),
+  body.supervisor .parcial-row .px,
+  body.supervisor .btn.danger{display:none !important}
+  /* El supervisor VE los datos de la orden pero no puede editarlos */
+  body.supervisor input:not(#fCodigo):not(#tabCodigos){pointer-events:none;opacity:.85;background:var(--panel)}
+  body.supervisor #fCodigo{pointer-events:auto;opacity:1}
+  body.supervisor #tabCodigos{pointer-events:auto;opacity:1;background:var(--panel2)}
+  /* Imprimir y CSV: solo visibles para el supervisor */
+  #btnImprimir, #btnCSV{display:none}
+  body.supervisor #btnImprimir, body.supervisor #btnCSV{display:inline-block !important}
+  /* Vista supervisor simplificada: ocultar rango/objetivo, tarjetas de stats y pill de rango */
+  body.supervisor #filaRango,
+  body.supervisor .stats,
+  body.supervisor #rangePillWrap{display:none !important}
+
+  /* ===== Tablero multi-orden del supervisor ===== */
+  #tablero{display:none}
+  body.tablero #tablero{display:block}
+  /* en modo tablero ocultamos toda la interfaz de orden única */
+  body.tablero .connbar,
+  body.tablero .sup-banner,
+  body.tablero .wrap > .card,
+  body.tablero .big-btn,
+  body.tablero #diaCerradoAviso{display:none !important}
+  .tab-toolbar{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);
+    padding:16px;margin-bottom:16px}
+  .tab-toolbar label{margin-bottom:8px}
+  .tab-input-row{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end}
+  .tab-input-row .field{flex:1;min-width:220px}
+  .tab-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px}
+  .ord-card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);
+    padding:16px;display:flex;flex-direction:column;gap:10px}
+  .ord-card.miss{opacity:.6;border-style:dashed}
+  .ord-card .oc-top{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
+  .ord-card .oc-code{font-size:15px;font-weight:700;letter-spacing:.3px}
+  .ord-card .oc-prod{font-size:12px;color:var(--muted);margin-top:2px}
+  .ord-card .oc-meta{font-size:11px;color:var(--muted);display:flex;gap:12px;flex-wrap:wrap}
+  .ord-card .oc-meta b{color:var(--ink)}
+  .est-pill{font-size:10px;font-weight:700;padding:3px 10px;border-radius:20px;white-space:nowrap;text-transform:uppercase;letter-spacing:.5px}
+  .est-pill.proc{background:rgba(240,180,41,.15);color:var(--warn)}
+  .est-pill.cerr{background:rgba(45,212,167,.15);color:var(--accent)}
+  .est-pill.sin{background:var(--panel2);color:var(--muted)}
+  .ord-card .oc-prog-top{display:flex;justify-content:space-between;font-size:12px;margin-bottom:5px}
+  .ord-card .oc-prog-top b{font-variant-numeric:tabular-nums}
+  .ord-card .oc-rm{background:transparent;border:none;color:var(--muted);cursor:pointer;font-size:14px;opacity:.6;padding:0 2px}
+  .ord-card .oc-rm:hover{opacity:1;color:var(--danger)}
+  .ord-card .oc-avance{font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+  .ord-card .oc-avance b{color:var(--warn)}
+  .tab-empty{text-align:center;color:var(--muted);padding:34px;font-size:13px;
+    background:var(--panel);border:1px dashed var(--line);border-radius:var(--radius)}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="top">
+    <div class="brand">
+      <div class="logo" style="font-size:14px;font-weight:800;letter-spacing:.5px;color:#06241c">GVIP</div>
+      <div>
+        <h1>Control de Producción</h1>
+        <p>Programa de prueba · desarrollado por Oscar Navarro</p>
+      </div>
+    </div>
+    <div class="clock">
+      <div class="date" id="liveDate">—</div>
+      <div class="time" id="liveTime">--:--:--</div>
+    </div>
+  </header>
+
+  <!-- ===== Tablero multi-orden (modo supervisor con ?tablero=1) ===== -->
+  <div id="tablero">
+    <div class="tab-toolbar">
+      <label>Códigos de órdenes a monitorear (separados por coma o espacio)</label>
+      <div class="tab-input-row">
+        <div class="field">
+          <input id="tabCodigos" placeholder="Ej. OP-8891, OP-8892, OP-8900" style="text-transform:uppercase">
+        </div>
+        <button class="btn primary" id="tabCargar">Mostrar</button>
+        <div class="dot" id="tabDot"><i></i><span id="tabTxt">—</span></div>
+      </div>
+      <div class="hint" style="margin-top:8px">El tablero se actualiza solo cada 5 segundos. La lista se recuerda en este dispositivo.</div>
+    </div>
+    <div id="tabGrid" class="tab-grid"></div>
+    <div id="tabEmpty" class="tab-empty">Escribe uno o más códigos de orden y presiona "Mostrar" para ver su avance en vivo.</div>
+  </div>
+
+  <!-- Barra de conexión / código de orden -->
+  <div class="connbar">
+    <div class="field">
+      <label>Código de la orden</label>
+      <input id="fCodigo" placeholder="Ej. OP-8891" style="text-transform:uppercase">
+    </div>
+    <span class="rol-tag" id="rolTag">👷 Operador</span>
+    <button class="mini-btn" id="btnRefrescar" style="padding:7px 12px">↻ Actualizar</button>
+    <div class="dot" id="connDot"><i></i><span id="connTxt">Sin conectar</span></div>
+  </div>
+
+  <div class="sup-banner" id="supBanner">👁️ Modo supervisor activo — vista de solo lectura. Los cambios están deshabilitados.</div>
+
+  <!-- Datos de la orden -->
+  <div class="card">
+    <h2><span class="ic">📋</span> Datos de la orden</h2>
+    <div class="grid g3">
+      <div><label>Producto</label><input id="fProducto" placeholder="Ej. Vitamina C 500mg"></div>
+      <div><label>N° Batch</label><input id="fLote" placeholder="Ej. B-2026-0142"></div>
+      <div><label>Room</label><input id="fOrden" placeholder="Ej. Room 3"></div>
+    </div>
+    <div class="grid g3" style="margin-top:12px" id="filaRango">
+      <div>
+        <label>Peso mínimo por cápsula (mg)</label>
+        <input id="fMin" type="number" step="0.1" placeholder="Ej. 490">
+        <div class="hint">Límite inferior del rango</div>
+      </div>
+      <div>
+        <label>Peso máximo por cápsula (mg)</label>
+        <input id="fMax" type="number" step="0.1" placeholder="Ej. 510">
+        <div class="hint">Límite superior del rango</div>
+      </div>
+      <div>
+        <label>Objetivo total cápsulas</label>
+        <input id="fMetaCaps" type="number" step="1" placeholder="Ej. 500000">
+        <div class="hint">Meta de producción de la orden</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Botón grande de registro -->
+  <button class="big-btn" id="btnNuevo">
+    <span id="btnNuevoTxt">➕ Registrar muestra</span>
+    <span class="bclock" id="btnClock">--:--:--</span>
+  </button>
+  <div id="diaCerradoAviso" style="display:none;font-size:12px;color:var(--warn);text-align:center;margin-top:8px">
+    🔒 El día de hoy está cerrado. No se pueden registrar muestras hasta que el supervisor lo reabra o inicie un nuevo día.
+  </div>
+  <div style="height:16px"></div>
+
+  <!-- Resumen -->
+  <div class="card">
+    <h2><span class="ic">📊</span> Resumen de la orden</h2>
+    <div class="stats">
+      <div class="stat"><div class="v" id="sCount">0</div><div class="l">Muestras</div></div>
+      <div class="stat"><div class="v" id="sProm">—</div><div class="l">Prom. cápsula (mg)</div></div>
+      <div class="stat"><div class="v" id="sFuera">0</div><div class="l">Fuera de rango</div></div>
+      <div class="stat"><div class="v" id="sProd">0</div><div class="l">Producción acum. (cáps)</div></div>
+    </div>
+    <div style="margin-top:12px" id="rangePillWrap"><span class="range-pill" id="rangePill">Rango: definir min/máx en datos de orden</span></div>
+    <div class="progress-wrap" id="progWrap" style="display:none">
+      <div class="progress-top">
+        <span>Avance de producción</span>
+        <b id="progTxt">0 / 0 cáps · 0%</b>
+      </div>
+      <div class="bar"><span id="progBar"></span></div>
+    </div>
+  </div>
+
+  <!-- Registros -->
+  <div class="card">
+    <h2><span class="ic">🗂️</span> Registros por día</h2>
+    <div id="records"><div class="empty">Aún no hay muestras registradas. Presione "Registrar muestra" para comenzar.</div></div>
+  </div>
+
+  <!-- Acciones finales -->
+  <div class="card">
+    <h2><span class="ic">🏁</span> Finalizar orden</h2>
+    <p style="font-size:13px;color:var(--muted);margin-bottom:14px">
+      Al finalizar se genera la hoja con formato preestablecido lista para imprimir o exportar.</p>
+    <div class="btn-row">
+      <button class="btn primary" id="btnImprimir">🖨️ Imprimir hoja de orden</button>
+      <button class="btn" id="btnCSV">📥 Exportar CSV (Excel)</button>
+      <button class="btn danger" id="btnLimpiar">🗑️ Limpiar orden</button>
+    </div>
+  </div>
+
+</div>
+
+<!-- Modal de ingreso de muestra -->
+<div class="modal-bg" id="modal">
+  <div class="modal">
+    <h3>Nueva muestra</h3>
+    <div class="sub" id="mStamp">—</div>
+    <div class="alert" id="mAlert"></div>
+    <div class="row">
+      <label>Peso de 10 cápsulas (g)</label>
+      <input id="mDiez" type="number" step="0.0001" inputmode="decimal" placeholder="0.0000">
+      <div class="hint" id="mRangeHint">Rango por cápsula: —</div>
+    </div>
+    <div class="calc">
+      <span>Peso por cápsula (mg)</span>
+      <span style="display:flex;align-items:center;gap:10px">
+        <b id="mPromedio">—</b>
+        <span class="status" id="mStatus" style="display:none"></span>
+      </span>
+    </div>
+    <div class="row">
+      <label>Iniciales del operador</label>
+      <input id="mOper" maxlength="5" placeholder="Ej. JPM" style="text-transform:uppercase">
+    </div>
+    <div class="actions">
+      <button class="btn" id="mCancel">Cancelar</button>
+      <button class="btn primary" id="mSave">Guardar muestra</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal avance del día -->
+<div class="modal-bg" id="modalParcial">
+  <div class="modal" style="max-width:400px">
+    <h3>Actualizar avance del día</h3>
+    <div class="sub" id="pStamp">—</div>
+    <div class="alert" id="pAlert"></div>
+    <div class="row">
+      <label>Cápsulas producidas hasta ahora</label>
+      <input id="pProd" type="number" step="1" inputmode="numeric" placeholder="Ej. 24500">
+      <div class="hint">Sustituye el valor anterior. Actualízalo cuantas veces quieras durante el día.</div>
+    </div>
+    <div class="actions">
+      <button class="btn" id="pCancel">Cancelar</button>
+      <button class="btn primary" id="pSave">Guardar avance</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal cerrar día -->
+<div class="modal-bg" id="modalDay">
+  <div class="modal" style="max-width:420px">
+    <h3>Cerrar día</h3>
+    <div class="sub" id="dStamp">—</div>
+    <div class="row">
+      <label>Producción total de cápsulas del día</label>
+      <input id="dProd" type="number" step="1" inputmode="numeric" placeholder="Ej. 84500">
+      <div class="hint">Cantidad final del día. Se suma a la producción acumulada de la orden.</div>
+    </div>
+    <div class="grid g2">
+      <div class="row">
+        <label>Barriles llenos</label>
+        <input id="dBarriles" type="number" step="1" inputmode="numeric" placeholder="Ej. 12">
+      </div>
+      <div class="row">
+        <label>Parcial: peso (kg)</label>
+        <input id="dParcial" type="number" step="0.01" inputmode="decimal" placeholder="Ej. 18.5">
+        <div class="hint">Déjalo vacío si no hay parcial.</div>
+      </div>
+    </div>
+    <div class="actions">
+      <button class="btn" id="dCancel">Cancelar</button>
+      <button class="btn primary" id="dSave">Cerrar día</button>
+    </div>
+  </div>
+</div>
+
+<div id="printArea"></div>
+
+<script>
+/* ===================== CONFIGURACIÓN DE LA NUBE ===================== */
+/* Pega aquí los dos datos de tu proyecto Supabase (ver GUIA-configuracion-nube.md) */
+const SUPABASE_URL = "https://ureozunpfqmhetiaxdoj.supabase.co";
+const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVyZW96dW5wZnFtaGV0aWF4ZG9qIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAyNDgxMTcsImV4cCI6MjA5NTgyNDExN30.oTAAiObEF0NKhqX5lMQJUPdTMOjB3PmYfYemFBHjoNI";
+/* =================================================================== */
+
+let state={ orden:{producto:'',lote:'',orden:'',min:'',max:'',metaCaps:''}, registros:[], dias:{} };
+let codigo='', supervisor=false, lastPush=0, pollTimer=null;
+
+const CONFIGURED = !SUPABASE_URL.includes("PEGA_AQUI") && !SUPABASE_KEY.includes("PEGA_AQUI");
+const REST = SUPABASE_URL.replace(/\/$/,'') + '/rest/v1/ordenes';
+const HEADERS = { 'apikey':SUPABASE_KEY, 'Authorization':'Bearer '+SUPABASE_KEY, 'Content-Type':'application/json' };
+
+function setConn(cls,txt){ const d=$('connDot'); d.className='dot '+cls; $('connTxt').textContent=txt; }
+
+function initSupabase(){
+  if(!CONFIGURED){ setConn('bad','Falta configurar la nube'); return false; }
+  setConn('ok','Conectado · sin orden'); return true;
+}
+
+function normalizar(d){ d=d||{}; d.orden=d.orden||{producto:'',lote:'',orden:'',min:'',max:'',metaCaps:''};
+  d.registros=d.registros||[]; d.dias=d.dias||{};
+  return d; }
+
+/* Leer la orden por código (GET REST) */
+async function leerOrden(){
+  const url = REST + '?codigo=eq.' + encodeURIComponent(codigo) + '&select=data';
+  const r = await fetch(url,{ headers: HEADERS });
+  if(!r.ok) throw new Error('HTTP '+r.status);
+  const arr = await r.json();
+  return (arr && arr.length) ? arr[0].data : null;
+}
+
+/* Leer varias órdenes a la vez (para el tablero). Devuelve { CODIGO: data } */
+async function leerVarias(codigos){
+  if(!codigos.length) return {};
+  const lista = codigos.map(c=>'"'+c.replace(/"/g,'')+'"').join(',');
+  const url = REST + '?codigo=in.(' + encodeURIComponent(lista) + ')&select=codigo,data';
+  const r = await fetch(url,{ headers: HEADERS });
+  if(!r.ok) throw new Error('HTTP '+r.status);
+  const arr = await r.json();
+  const out={};
+  arr.forEach(row=>{ out[(row.codigo||'').toUpperCase()] = row.data; });
+  return out;
+}
+
+/* Abrir orden: carga inicial + arranca sondeo en vivo */
+async function abrirOrden(cod){
+  codigo=(cod||'').trim().toUpperCase();
+  if(pollTimer){ clearInterval(pollTimer); pollTimer=null; }
+  if(!CONFIGURED || !codigo){ return; }
+  setConn('sync','Cargando orden…');
+  try{
+    const d = await leerOrden();
+    if(d){ state=normalizar(d); }
+    else if(!supervisor){
+      state={ orden:{producto:'',lote:'',orden:'',min:'',max:'',metaCaps:''}, registros:[], dias:{} };
+      await pushNow();
+    } else {
+      state={ orden:{producto:'',lote:'',orden:'',min:'',max:'',metaCaps:''}, registros:[], dias:{} };
+    }
+    fillOrden(); render();
+    setConn('ok', supervisor?('Vista: '+codigo):('Orden '+codigo+' lista'));
+    /* sondeo cada 4s para ver cambios de otros dispositivos */
+    pollTimer=setInterval(sondear, 4000);
+  }catch(e){ setConn('bad','No se pudo cargar'); }
+}
+
+/* Sondeo: si pasó suficiente tiempo desde mi último guardado, refresco desde la nube */
+async function sondear(){
+  if(!codigo || Date.now()-lastPush < 3000) return;
+  try{
+    const d = await leerOrden();
+    if(d){ state=normalizar(d); fillOrden(); render();
+      setConn('ok',(supervisor?'Vista: ':'Orden ')+codigo+' · actualizado'); }
+  }catch(e){ /* silencioso, reintenta en el próximo ciclo */ }
+}
+
+/* Guardar (upsert vía POST con resolución de conflicto en 'codigo') */
+async function pushNow(){
+  if(!CONFIGURED || !codigo || supervisor) return;
+  await escribirNube();
+}
+
+/* Escritura permitida también al supervisor para acciones puntuales (reabrir día) */
+async function escribirNube(){
+  if(!CONFIGURED || !codigo) return;
+  setConn('sync','Guardando…'); lastPush=Date.now();
+  try{
+    const r = await fetch(REST + '?on_conflict=codigo',{
+      method:'POST',
+      headers: Object.assign({}, HEADERS, {'Prefer':'resolution=merge-duplicates,return=minimal'}),
+      body: JSON.stringify({ codigo: codigo, data: state, actualizado: new Date().toISOString() })
+    });
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    setConn('ok',(supervisor?'Vista: ':'Orden ')+codigo+' · guardado');
+  }catch(e){ setConn('bad','Error al guardar'); }
+}
+let saveTimer=null;
+function save(){ if(saveTimer) clearTimeout(saveTimer); saveTimer=setTimeout(pushNow,500); }
+function load(){ /* la carga real ocurre en abrirOrden() */ }
+
+const $=id=>document.getElementById(id);
+const meses=['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+const dias=['domingo','lunes','martes','miércoles','jueves','viernes','sábado'];
+function fmtDate(d){return `${dias[d.getDay()]}, ${d.getDate()} de ${meses[d.getMonth()]} de ${d.getFullYear()}`;}
+function fmtTime(d){return d.toLocaleTimeString('es',{hour12:false});}
+function dayKey(d){return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;}
+
+function tick(){ const n=new Date(); $('liveDate').textContent=fmtDate(n); $('liveTime').textContent=fmtTime(n); $('btnClock').textContent=fmtTime(n); }
+setInterval(tick,1000); tick();
+
+['producto','lote','orden','min','max','metaCaps'].forEach(k=>{
+  const el=$('f'+k.charAt(0).toUpperCase()+k.slice(1));
+  el.addEventListener('input',()=>{ state.orden[k]=el.value; save(); render(); });
+});
+function fillOrden(){ $('fProducto').value=state.orden.producto||''; $('fLote').value=state.orden.lote||'';
+  $('fOrden').value=state.orden.orden||''; $('fMin').value=state.orden.min||'';
+  $('fMax').value=state.orden.max||''; $('fMetaCaps').value=state.orden.metaCaps||''; }
+
+function getRange(){ return {min:parseFloat(state.orden.min), max:parseFloat(state.orden.max)}; }
+function inRange(prom){ const {min,max}=getRange(); if(!(min>0)||!(max>0))return null; return prom>=min&&prom<=max; }
+
+/* Producción acumulada de una orden.
+   Regla: cada día cerrado aporta su total final (prod); cada día abierto aporta su avance en vivo.
+   Así nunca se cuenta dos veces y la barra se mueve en tiempo real durante el día abierto.
+   - dias: objeto de días de la orden
+   - incluirAvance=true (por defecto) suma el avance de días abiertos (para barras/tablero en vivo)
+     incluirAvance=false cuenta solo días cerrados (para reportes/impresión: producción confirmada). */
+function prodAcumulada(dias, incluirAvance){
+  if(incluirAvance===undefined) incluirAvance=true;
+  dias=dias||{};
+  return Object.values(dias).reduce((s,d)=>{
+    if(!d) return s;
+    if(d.closed) return s + (d.prod ? d.prod : 0);
+    if(incluirAvance && d.avance!=null) return s + d.avance;
+    return s;
+  },0);
+}
+
+/* ---- modal muestra ---- */
+const modal=$('modal');
+function hoyCerrado(){
+  const hoy=dayKey(new Date());
+  const info=state.dias[hoy];
+  return !!(info && info.closed);
+}
+function openModal(){
+  if(hoyCerrado()){
+    alert('El día de hoy está cerrado. No se pueden registrar muestras hasta que el supervisor lo reabra o inicie un nuevo día.');
+    return;
+  }
+  const n=new Date();
+  modal.dataset.ts=n.toISOString();
+  $('mStamp').textContent=`${fmtDate(n)} · ${fmtTime(n)}`;
+  $('mDiez').value=''; $('mPromedio').textContent='—';
+  $('mStatus').style.display='none';
+  $('mAlert').classList.remove('show'); $('mAlert').textContent='';
+  const {min,max}=getRange();
+  $('mRangeHint').textContent = (min>0&&max>0)?`Rango por cápsula: ${min.toFixed(1)} – ${max.toFixed(1)} mg`:'Rango por cápsula: (defina min/máx en datos de orden)';
+  modal.classList.add('show'); setTimeout(()=>$('mDiez').focus(),50);
+}
+function closeModal(){ modal.classList.remove('show'); }
+$('btnNuevo').addEventListener('click',openModal);
+$('mCancel').addEventListener('click',closeModal);
+modal.addEventListener('click',e=>{if(e.target===modal)closeModal();});
+
+$('mDiez').addEventListener('input',()=>{
+  const v=parseFloat($('mDiez').value);
+  const st=$('mStatus');
+  if(v>0){
+    const prom=v*100;
+    $('mPromedio').textContent=prom.toFixed(1)+' mg';
+    const ir=inRange(prom);
+    if(ir===null){ st.style.display='none'; }
+    else if(ir){ st.style.display='inline-block'; st.textContent='✓ En rango';
+      st.style.background='rgba(45,212,167,.18)'; st.style.color='var(--accent)'; }
+    else { st.style.display='inline-block'; st.textContent='✗ Fuera de rango';
+      st.style.background='rgba(226,85,85,.18)'; st.style.color='var(--danger)'; }
+  } else { $('mPromedio').textContent='—'; st.style.display='none'; }
+});
+
+$('mSave').addEventListener('click',()=>{
+  if(hoyCerrado()){ closeModal(); render();
+    alert('El día de hoy se cerró. No se puede guardar la muestra.'); return; }
+  const diez=parseFloat($('mDiez').value);
+  const oper=($('mOper').value||'').trim().toUpperCase();
+  const al=$('mAlert');
+  if(!(diez>0)){al.textContent='Ingrese el peso de la muestra de 10 cápsulas.';al.classList.add('show');return;}
+  if(!oper){al.textContent='Ingrese las iniciales del operador.';al.classList.add('show');$('mOper').focus();return;}
+  const ts=modal.dataset.ts;
+  state.registros.push({ ts, diez, prom:diez*100, oper });
+  save(); closeModal(); render();
+});
+
+/* ---- modal avance del día ---- */
+const modalParcial=$('modalParcial');
+function getDia(key){
+  if(!state.dias[key]) state.dias[key]={closed:false, prod:null, barriles:null, parcial:null, avance:null};
+  return state.dias[key];
+}
+function openParcialModal(key){
+  if(supervisor){ return; }
+  const info=state.dias[key];
+  if(info && info.closed){ alert('Este día está cerrado. No se puede actualizar el avance.'); return; }
+  modalParcial.dataset.key=key;
+  const n=new Date();
+  $('pStamp').textContent=`${fmtDate(new Date(key+'T12:00:00'))} · ${fmtTime(n)}`;
+  $('pProd').value = (info && info.avance!=null) ? info.avance : '';
+  $('pAlert').classList.remove('show'); $('pAlert').textContent='';
+  modalParcial.classList.add('show'); setTimeout(()=>$('pProd').focus(),50);
+}
+$('pCancel').addEventListener('click',()=>modalParcial.classList.remove('show'));
+modalParcial.addEventListener('click',e=>{if(e.target===modalParcial)modalParcial.classList.remove('show');});
+$('pSave').addEventListener('click',()=>{
+  const key=modalParcial.dataset.key;
+  const info=state.dias[key];
+  if(info && info.closed){ modalParcial.classList.remove('show'); render();
+    alert('Este día se cerró. No se puede actualizar el avance.'); return; }
+  const prod=parseFloat($('pProd').value);
+  const al=$('pAlert');
+  if(!(prod>=0)){al.textContent='Ingrese las cápsulas producidas hasta ahora.';al.classList.add('show');return;}
+  const dia=getDia(key);
+  dia.avance = prod;              /* sustituye el valor anterior */
+  dia.avanceTs = new Date().toISOString();
+  save(); modalParcial.classList.remove('show'); render();
+});
+
+/* ---- modal cerrar día ---- */
+const modalDay=$('modalDay');
+function openDayModal(key){
+  if(supervisor){ return; } /* el supervisor no cierra días */
+  modalDay.dataset.key=key;
+  const d=new Date(key+'T12:00:00');
+  $('dStamp').textContent=fmtDate(d);
+  const info=state.dias[key]||{};
+  /* precargar: el total ya guardado, o el último avance del día como sugerencia */
+  if(info.prod!=null) $('dProd').value=info.prod;
+  else if(info.avance!=null) $('dProd').value=info.avance;
+  else $('dProd').value='';
+  $('dBarriles').value = info.barriles!=null ? info.barriles : '';
+  $('dParcial').value  = info.parcial!=null  ? info.parcial  : '';
+  modalDay.classList.add('show'); setTimeout(()=>$('dProd').focus(),50);
+}
+$('dCancel').addEventListener('click',()=>modalDay.classList.remove('show'));
+modalDay.addEventListener('click',e=>{if(e.target===modalDay)modalDay.classList.remove('show');});
+$('dSave').addEventListener('click',()=>{
+  const key=modalDay.dataset.key;
+  const prod=parseFloat($('dProd').value);
+  const barrilesRaw=$('dBarriles').value, parcialRaw=$('dParcial').value;
+  if(!(prod>=0)){alert('Ingrese la producción de cápsulas del día.');return;}
+  const barriles = barrilesRaw!=='' ? parseFloat(barrilesRaw) : null;
+  const parcial  = parcialRaw!==''  ? parseFloat(parcialRaw)  : null;
+  if(barrilesRaw!=='' && !(barriles>=0)){alert('Barriles inválido.');return;}
+  if(parcialRaw!==''  && !(parcial>=0)){alert('Peso parcial inválido.');return;}
+  /* preservar el avance registrado durante el día */
+  const prev=state.dias[key]||{};
+  state.dias[key]={closed:true, prod:prod, barriles:barriles, parcial:parcial, avance:prev.avance!=null?prev.avance:null, avanceTs:prev.avanceTs||null};
+  save(); modalDay.classList.remove('show'); render();
+});
+function reopenDay(key){
+  if(!supervisor){ alert('Solo el supervisor puede reabrir un día.'); return; }
+  if(confirm('¿Reabrir este día? Quedará abierto hasta que el operador lo cierre de nuevo.')){
+    if(state.dias[key]){ state.dias[key].closed=false; }
+    render();
+    escribirNube();
+  }
+}
+
+/* ---- render ---- */
+function render(){
+  const {min,max}=getRange();
+  const meta=parseFloat(state.orden.metaCaps);
+  const recs=state.registros.slice().sort((a,b)=>new Date(a.ts)-new Date(b.ts));
+
+  /* Bloqueo del botón de registro si el día de hoy está cerrado */
+  const cerradoHoy=hoyCerrado();
+  const btn=$('btnNuevo');
+  if(btn){
+    btn.disabled=cerradoHoy;
+    $('btnNuevoTxt').textContent = cerradoHoy ? '🔒 Día cerrado' : '➕ Registrar muestra';
+    $('diaCerradoAviso').style.display = cerradoHoy ? 'block' : 'none';
+  }
+
+  $('sCount').textContent=recs.length;
+  if(recs.length){
+    const pc=recs.reduce((s,r)=>s+r.prom,0)/recs.length;
+    $('sProm').textContent=pc.toFixed(1);
+  }else $('sProm').textContent='—';
+
+  let fuera=0;
+  recs.forEach(r=>{ const ir=inRange(r.prom); if(ir===false) fuera++; });
+  $('sFuera').textContent=fuera;
+  $('sFuera').style.color = fuera>0 ? 'var(--danger)' : '';
+
+  $('rangePill').innerHTML = (min>0&&max>0)
+    ? `Rango por cápsula: <b>${min.toFixed(1)}</b> – <b>${max.toFixed(1)} mg</b>`
+    : 'Rango: definir min/máx en datos de orden';
+
+  const prodTotal=prodAcumulada(state.dias, true);
+  $('sProd').textContent=prodTotal.toLocaleString('es');
+
+  if(meta>0){
+    $('progWrap').style.display='block';
+    const pctReal=prodTotal/meta*100;
+    const pct=Math.min(100,pctReal);
+    const barra=$('progBar');
+    barra.style.width=pct+'%';
+    let color;
+    if(pctReal<=30) color='var(--danger)';
+    else if(pctReal<=70) color='var(--warn)';
+    else color='var(--accent)';
+    barra.style.background=color;
+    $('progTxt').textContent=`${prodTotal.toLocaleString('es')} / ${meta.toLocaleString('es')} cáps · ${pct.toFixed(1)}%`;
+  }else $('progWrap').style.display='none';
+
+  const box=$('records');
+  if(!recs.length && Object.keys(state.dias).length===0){
+    box.innerHTML='<div class="empty">Aún no hay muestras registradas. Presione "Registrar muestra" para comenzar.</div>'; return; }
+
+  const groups={};
+  recs.forEach(r=>{ const k=dayKey(new Date(r.ts)); (groups[k]=groups[k]||[]).push(r); });
+  Object.keys(state.dias).forEach(k=>{ if(!groups[k]) groups[k]=[]; });
+
+  let html='';
+  Object.keys(groups).sort().forEach(k=>{
+    const list=groups[k]; const d=new Date(k+'T12:00:00');
+    const dinfo=state.dias[k]||{}; const closed=!!dinfo.closed;
+    let btnDia='';
+    if(closed){
+      btnDia = supervisor ? `<button class="mini-btn btn-reabrir" onclick="reopenDay('${k}')">↩︎ Reabrir</button>` : '';
+      btnDia += ` <button class="mini-btn btn-reabrir" onclick="imprimirDia('${k}')">🖨️ Imprimir día</button>`;
+    } else {
+      btnDia = supervisor ? '' :
+        `<button class="mini-btn" onclick="openParcialModal('${k}')">📈 Actualizar avance</button>
+         <button class="mini-btn" onclick="openDayModal('${k}')">🔒 Cerrar día</button>`;
+    }
+    /* avance en vivo: solo se muestra en días abiertos que tengan un avance registrado */
+    const mostrarAvance = !closed && dinfo.avance!=null;
+    html+=`<div class="day-group"><div class="day-head${closed?' closed':''}">
+      <span>${fmtDate(d)} ${closed?'<span class="lock-tag">🔒 Cerrado</span>':'<span class="lock-tag" style="background:rgba(240,180,41,.15);color:var(--warn)">Abierto</span>'}</span>
+      <span class="meta">
+        <span>${list.length} muestra(s)</span>
+        ${mostrarAvance?`<span>Avance: <b>${Number(dinfo.avance).toLocaleString('es')}</b> cáps${dinfo.avanceTs?` <span style="color:var(--muted)">(${fmtTime(new Date(dinfo.avanceTs))})</span>`:''}</span>`:''}
+        ${dinfo.prod!=null?`<span>Cáps: <b>${Number(dinfo.prod).toLocaleString('es')}</b></span>`:''}
+        ${dinfo.barriles!=null?`<span>Barriles: <b>${dinfo.barriles}</b></span>`:''}
+        ${dinfo.parcial!=null?`<span>Parcial: <b>${dinfo.parcial} kg</b></span>`:''}
+        ${btnDia}
+      </span></div>`;
+
+    /* Banda de avance en vivo (día abierto con avance) */
+    if(mostrarAvance){
+      html+=`<div class="parciales-box"><div class="parcial-row" style="border:none;padding:2px 0">
+          <span class="ph">📈 Avance del día (en proceso)</span>
+          <span class="pc"><b style="font-size:15px">${Number(dinfo.avance).toLocaleString('es')}</b> cáps${dinfo.avanceTs?` <span class="ph-time">· act. ${fmtTime(new Date(dinfo.avanceTs))}</span>`:''}</span>
+        </div></div>`;
+    }
+
+    html+='<table><thead><tr><th>Hora</th><th>Peso 10 cáps (g)</th><th>Peso/cáps (mg)</th><th>Estado</th><th>Operador</th><th></th></tr></thead><tbody>';
+    if(!list.length){ html+='<tr><td colspan="6" class="empty">Sin muestras este día.</td></tr>'; }
+    list.forEach(r=>{
+      const ir=inRange(r.prom);
+      let estado='—', promCls='';
+      if(ir===true){ estado='<span class="in-range">✓ En rango</span>'; promCls='in-range'; }
+      else if(ir===false){ estado='<span class="out-range">✗ Fuera</span>'; promCls='out-range'; }
+      const idx=state.registros.indexOf(r);
+      const delBtn=closed?'' :`<button class="btn danger" style="padding:3px 9px;font-size:11px" onclick="delRec(${idx})">✕</button>`;
+      html+=`<tr><td>${fmtTime(new Date(r.ts))}</td><td>${r.diez.toFixed(4)}</td><td class="${promCls}">${r.prom.toFixed(1)}</td><td>${estado}</td><td>${r.oper}</td><td style="text-align:right">${delBtn}</td></tr>`;
+    });
+    html+='</tbody></table></div>';
+  });
+  box.innerHTML=html;
+}
+function delRec(i){ if(confirm('¿Eliminar esta muestra?')){ state.registros.splice(i,1); save(); render(); } }
+
+$('btnLimpiar').addEventListener('click',()=>{
+  if(confirm('Esto borra todos los registros, días y datos de la orden actual. ¿Continuar?')){
+    state={orden:{producto:'',lote:'',orden:'',min:'',max:'',metaCaps:''},registros:[],dias:{}};
+    save(); fillOrden(); render();
+  }
+});
+
+/* ---- CSV ---- */
+$('btnCSV').addEventListener('click',()=>{
+  if(!supervisor){ alert('Solo el supervisor puede exportar.'); return; }
+  const o=state.orden, {min,max}=getRange();
+  let rows=[['Producto',o.producto],['N° Batch',o.lote],['Room',o.orden],
+    ['Peso mínimo/cáps (mg)',o.min],['Peso máximo/cáps (mg)',o.max],['Objetivo total cápsulas',o.metaCaps],[],
+    ['Fecha','Hora','Peso 10 cáps (g)','Peso/cáps (mg)','Estado','Operador']];
+  state.registros.slice().sort((a,b)=>new Date(a.ts)-new Date(b.ts)).forEach(r=>{
+    const d=new Date(r.ts); const ir=inRange(r.prom);
+    const est = ir===true?'En rango':(ir===false?'FUERA DE RANGO':'');
+    rows.push([dayKey(d),fmtTime(d),r.diez.toFixed(4),r.prom.toFixed(1),est,r.oper]);
+  });
+  rows.push([]); rows.push(['PRODUCCIÓN POR DÍA']); rows.push(['Fecha','Cápsulas','Barriles llenos','Parcial (kg)','Estado']);
+  Object.keys(state.dias).sort().forEach(k=>{const dd=state.dias[k];
+    rows.push([k, dd.prod!=null?dd.prod:'', dd.barriles!=null?dd.barriles:'', dd.parcial!=null?dd.parcial:'', dd.closed?'Cerrado':'Abierto']);});
+  const prodTotal=prodAcumulada(state.dias, false); /* CSV: solo producción confirmada */
+  const barrTotal=Object.values(state.dias).reduce((s,d)=>s+(d&&d.barriles?d.barriles:0),0);
+  rows.push([]); rows.push(['TOTAL',prodTotal,barrTotal,'','']);
+  const csv='\uFEFF'+rows.map(r=>r.map(c=>`"${(c??'').toString().replace(/"/g,'""')}"`).join(';')).join('\n');
+  const blob=new Blob([csv],{type:'text/csv;charset=utf-8'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
+  a.download=`control_capsulas_${o.orden||'orden'}.csv`; a.click();
+});
+
+/* ---- imprimir ---- */
+/* Abre la hoja en una ventana nueva con su propia previsualización de impresión.
+   Es más confiable que el truco de visibility:hidden y muestra bien la vista previa. */
+function abrirVistaPrevia(htmlInterior, titulo){
+  const win=window.open('', '_blank');
+  if(!win){
+    alert('El navegador bloqueó la ventana de impresión. Permite las ventanas emergentes para este sitio e inténtalo de nuevo.');
+    return;
+  }
+  win.document.open();
+  win.document.write(`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">
+    <title>${titulo||'Impresión'}</title>
+    <style>
+      body{margin:0;background:#525659;font-family:Arial,sans-serif}
+      .toolbar{position:sticky;top:0;background:#323639;color:#fff;padding:10px 16px;
+        display:flex;gap:10px;align-items:center;justify-content:flex-end;box-shadow:0 2px 6px rgba(0,0,0,.4)}
+      .toolbar .ttl{margin-right:auto;font-size:14px;font-weight:600}
+      .toolbar button{background:#2dd4a7;color:#06241c;border:none;border-radius:6px;
+        padding:9px 18px;font-size:13px;font-weight:700;cursor:pointer}
+      .toolbar button.sec{background:#5a5e63;color:#fff}
+      .hoja{background:#fff;max-width:820px;margin:20px auto;padding:0;box-shadow:0 4px 20px rgba(0,0,0,.5)}
+      @media print{
+        body{background:#fff}
+        .toolbar{display:none}
+        .hoja{box-shadow:none;margin:0;max-width:100%}
+      }
+    </style></head><body>
+    <div class="toolbar">
+      <span class="ttl">${titulo||'Vista previa de impresión'}</span>
+      <button onclick="window.print()">🖨️ Imprimir</button>
+      <button class="sec" onclick="window.close()">Cerrar</button>
+    </div>
+    <div class="hoja">${htmlInterior}</div>
+    </body></html>`);
+  win.document.close();
+  win.focus();
+  /* dar un instante a que renderice antes de abrir el diálogo de impresión */
+  setTimeout(()=>{ try{ win.print(); }catch(e){} }, 350);
+}
+
+/* Estatus de la orden: Cerrada si TODOS los días están cerrados; si no, En proceso.
+   Acepta un estado opcional (para el tablero); por defecto usa el estado global. */
+function estatusOrden(st){
+  const dd=(st||state).dias||{};
+  const claves=Object.keys(dd);
+  if(!claves.length) return 'Sin días';
+  const todosCerrados=claves.every(k=>dd[k] && dd[k].closed);
+  return todosCerrados ? 'CERRADA' : 'EN PROCESO';
+}
+
+/* Imprimir el parte de UN día (solo totales, sin lista de muestras) */
+function imprimirDia(key){
+  const o=state.orden;
+  const dd=state.dias[key]||{};
+  const d=new Date(key+'T12:00:00');
+  const estO=estatusOrden();
+  const cuerpo=`
+    <div style="font-family:Arial,sans-serif;color:#000;padding:24px;font-size:12px">
+      <div style="display:flex;justify-content:space-between;border-bottom:2px solid #000;padding-bottom:10px;margin-bottom:16px">
+        <div><h2 style="margin:0;font-size:18px">PARTE DIARIO DE PRODUCCIÓN</h2>
+        <div style="font-size:11px;color:#444">Control de Producción — GVIP</div></div>
+        <div style="text-align:right;font-size:11px">Impreso:<br>${fmtDate(new Date())}<br>${fmtTime(new Date())}</div>
+      </div>
+      <table style="width:100%;font-size:12px;margin-bottom:18px">
+        <tr><td style="padding:3px 0;width:50%"><b>Producto:</b> ${o.producto||'________________'}</td>
+            <td style="padding:3px 0"><b>N° Batch:</b> ${o.lote||'____________'}</td></tr>
+        <tr><td style="padding:3px 0"><b>Room:</b> ${o.orden||'____________'}</td>
+            <td style="padding:3px 0"><b>Estatus de la orden:</b> ${estO}</td></tr>
+      </table>
+      <table style="width:75%;border-collapse:collapse;font-size:13px">
+        <tr><td style="border:1px solid #999;padding:9px;background:#eee;width:55%"><b>Fecha del día</b></td>
+            <td style="border:1px solid #999;padding:9px;text-align:right">${fmtDate(d)}</td></tr>
+        <tr><td style="border:1px solid #999;padding:9px;background:#eee"><b>Total cápsulas del día</b></td>
+            <td style="border:1px solid #999;padding:9px;text-align:right">${dd.prod!=null?Number(dd.prod).toLocaleString('es'):'—'}</td></tr>
+        <tr><td style="border:1px solid #999;padding:9px;background:#eee"><b>Total barriles del día</b></td>
+            <td style="border:1px solid #999;padding:9px;text-align:right">${dd.barriles!=null?dd.barriles:'—'}</td></tr>
+        <tr><td style="border:1px solid #999;padding:9px;background:#eee"><b>Peso del parcial</b></td>
+            <td style="border:1px solid #999;padding:9px;text-align:right">${dd.parcial!=null?dd.parcial+' kg':'— (sin parcial)'}</td></tr>
+        <tr><td style="border:1px solid #999;padding:9px;background:#eee"><b>Estado del día</b></td>
+            <td style="border:1px solid #999;padding:9px;text-align:right">${dd.closed?'Cerrado':'Abierto'}</td></tr>
+      </table>
+      <div style="display:flex;justify-content:space-between;margin-top:56px;font-size:11px">
+        <div style="border-top:1px solid #000;padding-top:5px;width:40%;text-align:center">Operador responsable</div>
+        <div style="border-top:1px solid #000;padding-top:5px;width:40%;text-align:center">Supervisor QC</div>
+      </div>
+    </div>`;
+  abrirVistaPrevia(cuerpo, 'Parte diario — '+fmtDate(d));
+}
+
+$('btnImprimir').addEventListener('click',()=>{
+  if(!supervisor){ alert('Solo el supervisor puede imprimir.'); return; }
+  const o=state.orden, {min,max}=getRange(), meta=parseFloat(o.metaCaps);
+  const recs=state.registros.slice().sort((a,b)=>new Date(a.ts)-new Date(b.ts));
+  const pc=recs.length?recs.reduce((s,r)=>s+r.prom,0)/recs.length:0;
+  let fuera=0; recs.forEach(r=>{ if(inRange(r.prom)===false) fuera++; });
+  const prodTotal=prodAcumulada(state.dias, false); /* Impresión: solo producción confirmada */
+  const pct=meta>0?(prodTotal/meta*100).toFixed(1)+'%':'—';
+
+  let rowsHtml='';
+  recs.forEach(r=>{ const d=new Date(r.ts); const ir=inRange(r.prom);
+    const est = ir===true?'En rango':(ir===false?'FUERA':'—');
+    const rowBg = ir===false?'background:#fde2e2':'';
+    rowsHtml+=`<tr style="${rowBg}"><td style="border:1px solid #999;padding:5px">${dayKey(d)}</td><td style="border:1px solid #999;padding:5px">${fmtTime(d)}</td><td style="border:1px solid #999;padding:5px;text-align:right">${r.diez.toFixed(4)}</td><td style="border:1px solid #999;padding:5px;text-align:right">${r.prom.toFixed(1)}</td><td style="border:1px solid #999;padding:5px;text-align:center">${est}</td><td style="border:1px solid #999;padding:5px;text-align:center">${r.oper}</td></tr>`;
+  });
+  let dayRows='';
+  Object.keys(state.dias).sort().forEach(k=>{const dd=state.dias[k];
+    dayRows+=`<tr><td style="border:1px solid #999;padding:5px">${k}</td><td style="border:1px solid #999;padding:5px;text-align:right">${dd.prod!=null?Number(dd.prod).toLocaleString('es'):'—'}</td><td style="border:1px solid #999;padding:5px;text-align:right">${dd.barriles!=null?dd.barriles:'—'}</td><td style="border:1px solid #999;padding:5px;text-align:right">${dd.parcial!=null?dd.parcial+' kg':'—'}</td><td style="border:1px solid #999;padding:5px;text-align:center">${dd.closed?'Cerrado':'Abierto'}</td></tr>`;});
+  const barrTotalP=Object.values(state.dias).reduce((s,d)=>s+(d&&d.barriles?d.barriles:0),0);
+
+  const rangoTxt = (min>0&&max>0)?`${min.toFixed(1)} – ${max.toFixed(1)} mg`:'_______';
+
+  const cuerpo=`
+    <div style="font-family:Arial,sans-serif;color:#000;padding:24px;font-size:12px">
+      <div style="display:flex;justify-content:space-between;border-bottom:2px solid #000;padding-bottom:10px;margin-bottom:16px">
+        <div><h2 style="margin:0;font-size:18px">CONTROL DE PRODUCCIÓN</h2>
+        <div style="font-size:11px;color:#444">GVIP · Registro de muestreo QC — 10 cápsulas por toma</div></div>
+        <div style="text-align:right;font-size:11px">Impreso:<br>${fmtDate(new Date())}<br>${fmtTime(new Date())}</div>
+      </div>
+      <table style="width:100%;font-size:12px;margin-bottom:16px">
+        <tr><td style="padding:3px 0;width:50%"><b>Producto:</b> ${o.producto||'________________'}</td>
+            <td style="padding:3px 0"><b>N° Batch:</b> ${o.lote||'____________'}</td></tr>
+        <tr><td style="padding:3px 0"><b>Room:</b> ${o.orden||'____________'}</td>
+            <td style="padding:3px 0"><b>Rango por cápsula:</b> ${rangoTxt}</td></tr>
+        <tr><td style="padding:3px 0"><b>Objetivo total:</b> ${meta?meta.toLocaleString('es')+' cáps':'_______'}</td>
+            <td style="padding:3px 0"><b>Producción acum.:</b> ${prodTotal.toLocaleString('es')} cáps (${pct})</td></tr>
+        <tr><td style="padding:3px 0"><b>Estatus de la orden:</b> ${estatusOrden()}</td><td></td></tr>
+      </table>
+      <table style="width:100%;border-collapse:collapse;font-size:11px">
+        <thead><tr style="background:#eee">
+          ${['Fecha','Hora','Peso 10 cáps (g)','Peso/cáps (mg)','Estado','Operador'].map(h=>`<th style="border:1px solid #999;padding:6px">${h}</th>`).join('')}
+        </tr></thead>
+        <tbody>${rowsHtml||'<tr><td colspan="6" style="border:1px solid #999;padding:10px;text-align:center">Sin registros</td></tr>'}</tbody>
+      </table>
+      <h3 style="font-size:13px;margin:18px 0 8px">Producción por día</h3>
+      <table style="width:85%;border-collapse:collapse;font-size:11px">
+        <thead><tr style="background:#eee">
+          <th style="border:1px solid #999;padding:6px;text-align:left">Fecha</th>
+          <th style="border:1px solid #999;padding:6px">Cápsulas</th>
+          <th style="border:1px solid #999;padding:6px">Barriles llenos</th>
+          <th style="border:1px solid #999;padding:6px">Parcial (kg)</th>
+          <th style="border:1px solid #999;padding:6px">Estado</th>
+        </tr></thead>
+        <tbody>${dayRows||'<tr><td colspan="5" style="border:1px solid #999;padding:8px;text-align:center">Sin días registrados</td></tr>'}
+        <tr style="background:#f5f5f5;font-weight:bold"><td style="border:1px solid #999;padding:6px">TOTAL</td><td style="border:1px solid #999;padding:6px;text-align:right">${prodTotal.toLocaleString('es')}</td><td style="border:1px solid #999;padding:6px;text-align:right">${barrTotalP}</td><td style="border:1px solid #999;padding:6px"></td><td style="border:1px solid #999;padding:6px"></td></tr></tbody>
+      </table>
+      <table style="width:100%;font-size:12px;margin-top:16px;border-top:1px solid #000">
+        <tr><td style="padding:6px 0"><b>Total muestras:</b> ${recs.length}</td>
+            <td style="padding:6px 0"><b>Prom. cápsula:</b> ${pc?pc.toFixed(1)+' mg':'—'}</td>
+            <td style="padding:6px 0"><b>Muestras fuera de rango:</b> ${fuera}</td></tr>
+      </table>
+      <div style="display:flex;justify-content:space-between;margin-top:48px;font-size:11px">
+        <div style="border-top:1px solid #000;padding-top:5px;width:40%;text-align:center">Operador responsable</div>
+        <div style="border-top:1px solid #000;padding-top:5px;width:40%;text-align:center">Supervisor QC</div>
+      </div>
+    </div>`;
+  abrirVistaPrevia(cuerpo, 'Control de Producción — '+(o.orden||'orden'));
+});
+
+/* ---- código de orden y modo supervisor ---- */
+let codigoTimer=null;
+$('fCodigo').addEventListener('input',()=>{
+  if(codigoTimer) clearTimeout(codigoTimer);
+  const v=$('fCodigo').value;
+  codigoTimer=setTimeout(()=>abrirOrden(v),600);
+});
+
+/* ===================== CLAVE DE SUPERVISOR ===================== */
+/* El supervisor entra con un enlace que incluye ?rol=sup&clave=ESTA_CLAVE
+   El operador entra con el enlace normal y NO puede cambiar de rol. */
+const CLAVE_SUPERVISOR = "super2026";
+/* ============================================================== */
+
+/* Enlaces:
+   - Operador:   ...tusitio.netlify.app/?orden=OP-8891
+   - Supervisor: ...tusitio.netlify.app/?orden=OP-8891&rol=sup&clave=super2026 */
+/* ===================== TABLERO MULTI-ORDEN ===================== */
+let tableroOn=false, tabCodigos=[], tabTimer=null;
+const TAB_LS_KEY='qc_tablero_codigos';
+
+function parseCodigos(txt){
+  return (txt||'').toUpperCase().split(/[\s,;]+/).map(s=>s.trim()).filter(Boolean)
+    .filter((v,i,a)=>a.indexOf(v)===i); /* sin duplicados */
+}
+
+function setTabConn(cls,txt){ const d=$('tabDot'); d.className='dot '+cls; $('tabTxt').textContent=txt; }
+
+async function refrescarTablero(){
+  if(!tableroOn) return;
+  const grid=$('tabGrid'), empty=$('tabEmpty');
+  if(!tabCodigos.length){ grid.innerHTML=''; empty.style.display='block'; setTabConn('','—'); return; }
+  empty.style.display='none';
+  setTabConn('sync','Actualizando…');
+  let datos={};
+  try{ datos=await leerVarias(tabCodigos); setTabConn('ok','Actualizado · '+fmtTime(new Date())); }
+  catch(e){ setTabConn('bad','Error al actualizar'); return; }
+
+  let html='';
+  tabCodigos.forEach(cod=>{
+    const d=datos[cod];
+    if(!d){
+      html+=`<div class="ord-card miss">
+        <div class="oc-top"><div><div class="oc-code">${cod}</div>
+          <div class="oc-prod">Orden no encontrada</div></div>
+          <button class="oc-rm" onclick="quitarTab('${cod}')" title="Quitar">✕</button></div>
+        <div class="oc-meta">Sin datos en la nube todavía.</div></div>`;
+      return;
+    }
+    const o=d.orden||{};
+    const dias=d.dias||{};
+    const meta=parseFloat(o.metaCaps);
+    const prodTotal=prodAcumulada(dias, true);
+    const est=estatusOrden(d);
+    const estCls = est==='CERRADA'?'cerr':(est==='EN PROCESO'?'proc':'sin');
+
+    /* último avance del día: del día abierto más reciente con avance */
+    let avanceTxt='—';
+    const clavesAbiertas=Object.keys(dias).filter(k=>dias[k] && !dias[k].closed && dias[k].avance!=null).sort();
+    if(clavesAbiertas.length){
+      const k=clavesAbiertas[clavesAbiertas.length-1];
+      const a=dias[k].avance;
+      const t=dias[k].avanceTs?` · ${fmtTime(new Date(dias[k].avanceTs))}`:'';
+      avanceTxt=`<b>${Number(a).toLocaleString('es')}</b> cáps${t}`;
+    }
+
+    let prog='';
+    if(meta>0){
+      const pctReal=prodTotal/meta*100, pct=Math.min(100,pctReal);
+      let color = pctReal<=30?'var(--danger)':(pctReal<=70?'var(--warn)':'var(--accent)');
+      prog=`<div>
+        <div class="oc-prog-top"><span>Avance de producción</span>
+          <b>${pct.toFixed(1)}%</b></div>
+        <div class="bar"><span style="width:${pct}%;background:${color}"></span></div>
+        <div class="oc-prog-top" style="margin-top:5px;margin-bottom:0">
+          <span style="color:var(--muted)">${prodTotal.toLocaleString('es')} / ${meta.toLocaleString('es')} cáps</span></div>
+      </div>`;
+    } else {
+      prog=`<div class="oc-meta">Producción acum.: <b>${prodTotal.toLocaleString('es')}</b> cáps (sin objetivo definido)</div>`;
+    }
+
+    html+=`<div class="ord-card">
+      <div class="oc-top">
+        <div>
+          <div class="oc-code">${cod}</div>
+          <div class="oc-prod">${o.producto||'(sin producto)'}</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <span class="est-pill ${estCls}">${est}</span>
+          <button class="oc-rm" onclick="quitarTab('${cod}')" title="Quitar">✕</button>
+        </div>
+      </div>
+      <div class="oc-meta">
+        ${o.lote?`<span>Batch: <b>${o.lote}</b></span>`:''}
+        ${o.orden?`<span>Room: <b>${o.orden}</b></span>`:''}
+      </div>
+      ${prog}
+      <div class="oc-avance">Último avance del día: ${avanceTxt}</div>
+    </div>`;
+  });
+  grid.innerHTML=html;
+}
+
+function aplicarCodigosTablero(txt, guardar){
+  tabCodigos=parseCodigos(txt);
+  $('tabCodigos').value=tabCodigos.join(', ');
+  if(guardar){ try{ localStorage.setItem(TAB_LS_KEY, tabCodigos.join(',')); }catch(e){} }
+  refrescarTablero();
+}
+function quitarTab(cod){
+  tabCodigos=tabCodigos.filter(c=>c!==cod);
+  aplicarCodigosTablero(tabCodigos.join(','), true);
+}
+
+function iniciarTablero(){
+  tableroOn=true;
+  document.body.classList.add('tablero');
+  /* recuperar lista guardada en este dispositivo */
+  let guardados='';
+  try{ guardados=localStorage.getItem(TAB_LS_KEY)||''; }catch(e){}
+  if(guardados){ aplicarCodigosTablero(guardados, false); }
+  $('tabCargar').addEventListener('click',()=>aplicarCodigosTablero($('tabCodigos').value, true));
+  $('tabCodigos').addEventListener('keydown',e=>{ if(e.key==='Enter'){ aplicarCodigosTablero($('tabCodigos').value, true); }});
+  if(tabTimer) clearInterval(tabTimer);
+  tabTimer=setInterval(refrescarTablero, 5000);
+  refrescarTablero();
+}
+/* =============================================================== */
+
+function applyURL(){
+  const p=new URLSearchParams(location.search);
+  const cod=p.get('orden');
+  const rol=p.get('rol'); const clave=p.get('clave');
+  if(rol==='sup' && clave===CLAVE_SUPERVISOR){
+    supervisor=true;
+    document.body.classList.add('supervisor');
+    $('supBanner').classList.add('show');
+    $('rolTag').textContent='👁️ Supervisor';
+    $('rolTag').classList.add('sup');
+    /* bloquear edición de los campos de la orden (siguen visibles) */
+    ['fProducto','fLote','fOrden','fMin','fMax','fMetaCaps'].forEach(id=>{
+      const el=$(id); if(el) el.setAttribute('readonly','readonly');
+    });
+  } else {
+    supervisor=false;
+    $('rolTag').textContent='👷 Operador';
+  }
+  if(cod){ $('fCodigo').value=cod.toUpperCase(); }
+  /* modo tablero: solo para supervisor y con ?tablero=1 */
+  const quiereTablero = supervisor && (p.get('tablero')==='1' || p.get('tablero')==='si');
+  return { cod, tablero: quiereTablero };
+}
+
+$('btnRefrescar').addEventListener('click',()=>{ if(codigo) abrirOrden(codigo); });
+
+initSupabase();
+const initInfo=applyURL();
+fillOrden(); render();
+if(initInfo.tablero){
+  iniciarTablero();
+} else if(initInfo.cod){
+  abrirOrden(initInfo.cod);
+}
+</script>
+</body>
+</html>
