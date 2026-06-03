@@ -344,6 +344,11 @@
     <div class="sub" id="mStamp">—</div>
     <div class="alert" id="mAlert"></div>
     <div class="row">
+      <label>Hora de la toma</label>
+      <input id="mHora" type="time" step="1">
+      <div class="hint">Se toma la hora del sistema por defecto. Puede modificarla manualmente.</div>
+    </div>
+    <div class="row">
       <label>Peso de 10 cápsulas (g)</label>
       <input id="mDiez" type="number" step="0.0001" inputmode="decimal" placeholder="0.0000">
       <div class="hint" id="mRangeHint">Rango por cápsula: —</div>
@@ -423,6 +428,8 @@ const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZ
 
 let state={ orden:{producto:'',lote:'',orden:'',min:'',max:'',metaCaps:''}, registros:[], dias:{} };
 let codigo='', supervisor=false, lastPush=0, pollTimer=null;
+let diasExpandidos={}; /* { dayKey: true } días con todas las muestras desplegadas */
+const TOPE_MUESTRAS=3; /* muestras visibles por día antes de "Ver todas" */
 
 const CONFIGURED = !SUPABASE_URL.includes("PEGA_AQUI") && !SUPABASE_KEY.includes("PEGA_AQUI");
 const REST = SUPABASE_URL.replace(/\/$/,'') + '/rest/v1/ordenes';
@@ -570,6 +577,8 @@ function openModal(){
   const n=new Date();
   modal.dataset.ts=n.toISOString();
   $('mStamp').textContent=`${fmtDate(n)} · ${fmtTime(n)}`;
+  /* hora del sistema por defecto, editable manualmente */
+  $('mHora').value=`${String(n.getHours()).padStart(2,'0')}:${String(n.getMinutes()).padStart(2,'0')}:${String(n.getSeconds()).padStart(2,'0')}`;
   $('mDiez').value=''; $('mPromedio').textContent='—';
   $('mStatus').style.display='none';
   $('mAlert').classList.remove('show'); $('mAlert').textContent='';
@@ -605,7 +614,16 @@ $('mSave').addEventListener('click',()=>{
   const al=$('mAlert');
   if(!(diez>0)){al.textContent='Ingrese el peso de la muestra de 10 cápsulas.';al.classList.add('show');return;}
   if(!oper){al.textContent='Ingrese las iniciales del operador.';al.classList.add('show');$('mOper').focus();return;}
-  const ts=modal.dataset.ts;
+  /* combinar la fecha del modal con la hora indicada (sistema o manual) */
+  let ts=modal.dataset.ts;
+  const horaTxt=($('mHora').value||'').trim();
+  if(horaTxt){
+    const partes=horaTxt.split(':');
+    const hh=parseInt(partes[0],10)||0, mm=parseInt(partes[1],10)||0, ss=parseInt(partes[2],10)||0;
+    const base=new Date(modal.dataset.ts);
+    base.setHours(hh,mm,ss,0);
+    ts=base.toISOString();
+  }
   state.registros.push({ ts, diez, prom:diez*100, oper });
   save(); closeModal(); render();
 });
@@ -775,7 +793,11 @@ function render(){
 
     html+='<table><thead><tr><th>Hora</th><th>Peso 10 cáps (g)</th><th>Peso/cáps (mg)</th><th>Estado</th><th>Operador</th><th></th></tr></thead><tbody>';
     if(!list.length){ html+='<tr><td colspan="6" class="empty">Sin muestras este día.</td></tr>'; }
-    list.forEach(r=>{
+    /* mostrar solo las últimas TOPE_MUESTRAS tomas salvo que el día esté expandido */
+    const expandido=!!diasExpandidos[k];
+    const ocultas=Math.max(0, list.length-TOPE_MUESTRAS);
+    const visibles=(expandido||ocultas===0) ? list : list.slice(-TOPE_MUESTRAS);
+    visibles.forEach(r=>{
       const ir=inRange(r.prom);
       let estado='—', promCls='';
       if(ir===true){ estado='<span class="in-range">✓ En rango</span>'; promCls='in-range'; }
@@ -784,11 +806,18 @@ function render(){
       const delBtn=closed?'' :`<button class="btn danger" style="padding:3px 9px;font-size:11px" onclick="delRec(${idx})">✕</button>`;
       html+=`<tr><td>${fmtTime(new Date(r.ts))}</td><td>${r.diez.toFixed(4)}</td><td class="${promCls}">${r.prom.toFixed(1)}</td><td>${estado}</td><td>${r.oper}</td><td style="text-align:right">${delBtn}</td></tr>`;
     });
-    html+='</tbody></table></div>';
+    html+='</tbody></table>';
+    if(ocultas>0){
+      html+=`<div style="text-align:center;padding:8px 0">
+        <button class="mini-btn" onclick="toggleDia('${k}')">${expandido?'▲ Mostrar solo las últimas 3':`▼ Ver todas las muestras del día (${list.length})`}</button>
+      </div>`;
+    }
+    html+='</div>';
   });
   box.innerHTML=html;
 }
 function delRec(i){ if(confirm('¿Eliminar esta muestra?')){ state.registros.splice(i,1); save(); render(); } }
+function toggleDia(k){ diasExpandidos[k]=!diasExpandidos[k]; render(); }
 
 $('btnLimpiar').addEventListener('click',()=>{
   if(confirm('Esto borra todos los registros, días y datos de la orden actual. ¿Continuar?')){
@@ -1045,6 +1074,26 @@ async function refrescarTablero(){
       avanceTxt=`<b>${Number(a).toLocaleString('es')}</b> cáps${t}`;
     }
 
+    /* producción del cierre del día anterior: último día CERRADO con total */
+    let cierreAntTxt='—', cierreAntFecha='';
+    const clavesCerradas=Object.keys(dias).filter(k=>dias[k] && dias[k].closed && dias[k].prod!=null).sort();
+    if(clavesCerradas.length){
+      const kc=clavesCerradas[clavesCerradas.length-1];
+      cierreAntTxt=`<b>${Number(dias[kc].prod).toLocaleString('es')}</b> cáps`;
+      cierreAntFecha=` <span style="color:var(--muted)">(${kc})</span>`;
+    }
+
+    /* producción parcial del día actual: avance del día abierto de HOY */
+    let parcialHoyTxt='—';
+    const hoyKey=dayKey(new Date());
+    const dHoy=dias[hoyKey];
+    if(dHoy && !dHoy.closed && dHoy.avance!=null){
+      const t=dHoy.avanceTs?` · ${fmtTime(new Date(dHoy.avanceTs))}`:'';
+      parcialHoyTxt=`<b>${Number(dHoy.avance).toLocaleString('es')}</b> cáps${t}`;
+    } else if(dHoy && dHoy.closed && dHoy.prod!=null){
+      parcialHoyTxt=`<b>${Number(dHoy.prod).toLocaleString('es')}</b> cáps <span style="color:var(--accent)">(día cerrado)</span>`;
+    }
+
     let prog='';
     if(meta>0){
       const pctReal=prodTotal/meta*100, pct=Math.min(100,pctReal);
@@ -1077,6 +1126,8 @@ async function refrescarTablero(){
       </div>
       ${prog}
       <div class="oc-avance">Último avance del día: ${avanceTxt}</div>
+      <div class="oc-avance">Cierre día anterior: ${cierreAntTxt}${cierreAntFecha}</div>
+      <div class="oc-avance">Producción parcial de hoy: ${parcialHoyTxt}</div>
     </div>`;
   });
   grid.innerHTML=html;
