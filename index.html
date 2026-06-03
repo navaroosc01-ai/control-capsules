@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="es">
+<html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Control de Producción — GVIP</title>
+<title>Production Control — GVIP</title>
 <style>
   :root{
     --bg:#0f1419; --panel:#1a212b; --panel2:#222b38; --line:#2e3a4a;
@@ -16,17 +16,26 @@
   .wrap{max-width:1000px;margin:0 auto;padding:20px 16px 60px}
 
   header.top{display:flex;align-items:center;justify-content:space-between;gap:12px;
-    margin-bottom:20px;flex-wrap:wrap}
-  .brand{display:flex;align-items:center;gap:12px}
+    margin-bottom:20px;flex-wrap:nowrap}
+  .brand{display:flex;align-items:center;gap:12px;min-width:0;flex:1 1 auto}
+  .brand > div:last-child{min-width:0}
   .logo{width:42px;height:42px;border-radius:11px;background:linear-gradient(135deg,var(--accent),var(--accent2));
-    display:flex;align-items:center;justify-content:center;font-size:22px}
-  .brand h1{font-size:18px;font-weight:600;letter-spacing:-.2px}
-  .brand p{font-size:12px;color:var(--muted)}
+    display:flex;align-items:center;justify-content:center;font-size:22px;flex:0 0 auto}
+  .brand h1{font-size:18px;font-weight:600;letter-spacing:-.2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .brand p{font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .head-right{display:flex;align-items:center;gap:12px;flex:0 0 auto}
 
   .clock{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);
-    padding:10px 16px;text-align:right;min-width:200px}
-  .clock .date{font-size:12px;color:var(--muted);text-transform:capitalize}
+    padding:10px 16px;text-align:right;min-width:200px;flex:0 0 auto}
+  .clock .date{font-size:12px;color:var(--muted);text-transform:capitalize;white-space:nowrap}
   .clock .time{font-size:22px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:.5px}
+
+  @media(max-width:560px){
+    header.top{flex-wrap:wrap}
+    .brand{flex:1 1 100%}
+    .head-right{flex:1 1 100%;justify-content:space-between}
+    .clock{min-width:0;flex:1 1 auto}
+  }
 
   .card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);
     padding:18px;margin-bottom:16px}
@@ -221,97 +230,103 @@
     <div class="brand">
       <div class="logo" style="font-size:14px;font-weight:800;letter-spacing:.5px;color:#06241c">GVIP</div>
       <div>
-        <h1>Control de Producción</h1>
-        <p>Programa de prueba · desarrollado por Oscar Navarro</p>
+        <h1 data-i18n="appTitle">Production Control</h1>
+        <p data-i18n="appSub">Test program · developed by Oscar Navarro</p>
       </div>
     </div>
-    <div class="clock">
-      <div class="date" id="liveDate">—</div>
-      <div class="time" id="liveTime">--:--:--</div>
+    <div class="head-right">
+      <select id="langSel" style="width:auto;min-width:96px;padding:8px 10px;font-size:13px">
+        <option value="en">English</option>
+        <option value="es">Español</option>
+      </select>
+      <div class="clock">
+        <div class="date" id="liveDate">—</div>
+        <div class="time" id="liveTime">--:--:--</div>
+      </div>
     </div>
   </header>
 
   <!-- ===== Tablero multi-orden (modo supervisor con ?tablero=1) ===== -->
   <div id="tablero">
     <div class="tab-toolbar">
-      <label>Códigos de órdenes a monitorear (separados por coma o espacio)</label>
+      <label data-i18n="tabLabel">Order codes to monitor (separated by comma or space)</label>
       <div class="tab-input-row">
         <div class="field">
-          <input id="tabCodigos" placeholder="Ej. OP-8891, OP-8892, OP-8900" style="text-transform:uppercase">
+          <input id="tabCodigos" placeholder="Ex. OP-8891, OP-8892, OP-8900" data-i18n-ph="tabCodesPh" style="text-transform:uppercase">
         </div>
-        <button class="btn primary" id="tabCargar">Mostrar</button>
+        <button class="btn primary" id="tabCargar" data-i18n="show">Show</button>
         <div class="dot" id="tabDot"><i></i><span id="tabTxt">—</span></div>
       </div>
-      <div class="hint" style="margin-top:8px">El tablero se actualiza solo cada 5 segundos. La lista se recuerda en este dispositivo.</div>
+      <div class="hint" style="margin-top:8px" data-i18n="tabHint">The board refreshes automatically every 5 seconds. The list is remembered on this device.</div>
     </div>
     <div id="tabGrid" class="tab-grid"></div>
-    <div id="tabEmpty" class="tab-empty">Escribe uno o más códigos de orden y presiona "Mostrar" para ver su avance en vivo.</div>
+    <div id="tabEmpty" class="tab-empty" data-i18n="tabEmpty">Type one or more order codes and press "Show" to see their live progress.</div>
   </div>
 
   <!-- Barra de conexión / código de orden -->
   <div class="connbar">
     <div class="field">
-      <label>Código de la orden</label>
-      <input id="fCodigo" placeholder="Ej. OP-8891" style="text-transform:uppercase">
+      <label data-i18n="orderCode">Order code</label>
+      <input id="fCodigo" placeholder="Ex. OP-8891" data-i18n-ph="orderCodePh" style="text-transform:uppercase">
     </div>
-    <span class="rol-tag" id="rolTag">👷 Operador</span>
-    <button class="mini-btn" id="btnRefrescar" style="padding:7px 12px">↻ Actualizar</button>
-    <div class="dot" id="connDot"><i></i><span id="connTxt">Sin conectar</span></div>
+    <span class="rol-tag" id="rolTag">👷 Operator</span>
+    <button class="mini-btn" id="btnRefrescar" style="padding:7px 12px" data-i18n="refresh">↻ Refresh</button>
+    <div class="dot" id="connDot"><i></i><span id="connTxt" data-i18n="notConnected">Not connected</span></div>
   </div>
 
-  <div class="sup-banner" id="supBanner">👁️ Modo supervisor activo — vista de solo lectura. Los cambios están deshabilitados.</div>
+  <div class="sup-banner" id="supBanner" data-i18n="supBanner">👁️ Supervisor mode active — read-only view. Changes are disabled.</div>
 
   <!-- Datos de la orden -->
   <div class="card">
-    <h2><span class="ic">📋</span> Datos de la orden</h2>
+    <h2><span class="ic">📋</span> <span data-i18n="orderData">Order data</span></h2>
     <div class="grid g3">
-      <div><label>Producto</label><input id="fProducto" placeholder="Ej. Vitamina C 500mg"></div>
-      <div><label>N° Batch</label><input id="fLote" placeholder="Ej. B-2026-0142"></div>
-      <div><label>Room</label><input id="fOrden" placeholder="Ej. Room 3"></div>
+      <div><label data-i18n="product">Product</label><input id="fProducto" placeholder="Ex. Vitamin C 500mg" data-i18n-ph="productPh"></div>
+      <div><label data-i18n="batch">Batch No.</label><input id="fLote" placeholder="Ex. B-2026-0142" data-i18n-ph="batchPh"></div>
+      <div><label>Room</label><input id="fOrden" placeholder="Ex. Room 3" data-i18n-ph="roomPh"></div>
     </div>
     <div class="grid g3" style="margin-top:12px" id="filaRango">
       <div>
-        <label>Peso mínimo por cápsula (mg)</label>
-        <input id="fMin" type="number" step="0.1" placeholder="Ej. 490">
-        <div class="hint">Límite inferior del rango</div>
+        <label data-i18n="minWeight">Min weight per capsule (mg)</label>
+        <input id="fMin" type="number" step="0.1" placeholder="Ex. 490" data-i18n-ph="minPh">
+        <div class="hint" data-i18n="minHint">Lower limit of the range</div>
       </div>
       <div>
-        <label>Peso máximo por cápsula (mg)</label>
-        <input id="fMax" type="number" step="0.1" placeholder="Ej. 510">
-        <div class="hint">Límite superior del rango</div>
+        <label data-i18n="maxWeight">Max weight per capsule (mg)</label>
+        <input id="fMax" type="number" step="0.1" placeholder="Ex. 510" data-i18n-ph="maxPh">
+        <div class="hint" data-i18n="maxHint">Upper limit of the range</div>
       </div>
       <div>
-        <label>Objetivo total cápsulas</label>
-        <input id="fMetaCaps" type="number" step="1" placeholder="Ej. 500000">
-        <div class="hint">Meta de producción de la orden</div>
+        <label data-i18n="targetCaps">Total capsule target</label>
+        <input id="fMetaCaps" type="number" step="1" placeholder="Ex. 500000" data-i18n-ph="targetPh">
+        <div class="hint" data-i18n="targetHint">Production goal of the order</div>
       </div>
     </div>
   </div>
 
   <!-- Botón grande de registro -->
   <button class="big-btn" id="btnNuevo">
-    <span id="btnNuevoTxt">➕ Registrar muestra</span>
+    <span id="btnNuevoTxt" data-i18n="registerSample">➕ Register sample</span>
     <span class="bclock" id="btnClock">--:--:--</span>
   </button>
-  <div id="diaCerradoAviso" style="display:none;font-size:12px;color:var(--warn);text-align:center;margin-top:8px">
-    🔒 El día de hoy está cerrado. No se pueden registrar muestras hasta que el supervisor lo reabra o inicie un nuevo día.
+  <div id="diaCerradoAviso" style="display:none;font-size:12px;color:var(--warn);text-align:center;margin-top:8px" data-i18n="dayClosedNotice">
+    🔒 Today is closed. Samples cannot be registered until the supervisor reopens it or starts a new day.
   </div>
   <div style="height:16px"></div>
 
   <!-- Resumen -->
   <div class="card">
-    <h2><span class="ic">📊</span> Resumen de la orden</h2>
+    <h2><span class="ic">📊</span> <span data-i18n="orderSummary">Order summary</span></h2>
     <div class="stats">
-      <div class="stat"><div class="v" id="sCount">0</div><div class="l">Muestras</div></div>
-      <div class="stat"><div class="v" id="sProm">—</div><div class="l">Prom. cápsula (mg)</div></div>
-      <div class="stat"><div class="v" id="sFuera">0</div><div class="l">Fuera de rango</div></div>
-      <div class="stat"><div class="v" id="sProd">0</div><div class="l">Producción acum. (cáps)</div></div>
+      <div class="stat"><div class="v" id="sCount">0</div><div class="l" data-i18n="samples">Samples</div></div>
+      <div class="stat"><div class="v" id="sProm">—</div><div class="l" data-i18n="avgCap">Avg. capsule (mg)</div></div>
+      <div class="stat"><div class="v" id="sFuera">0</div><div class="l" data-i18n="outOfRange">Out of range</div></div>
+      <div class="stat"><div class="v" id="sProd">0</div><div class="l" data-i18n="accumProd">Accum. production (caps)</div></div>
     </div>
-    <div style="margin-top:12px" id="rangePillWrap"><span class="range-pill" id="rangePill">Rango: definir min/máx en datos de orden</span></div>
+    <div style="margin-top:12px" id="rangePillWrap"><span class="range-pill" id="rangePill" data-i18n="rangeUndef">Range: set min/max in order data</span></div>
     <div class="progress-wrap" id="progWrap" style="display:none">
       <div class="progress-top">
-        <span>Avance de producción</span>
-        <b id="progTxt">0 / 0 cáps · 0%</b>
+        <span data-i18n="prodProgress">Production progress</span>
+        <b id="progTxt">0 / 0 caps · 0%</b>
       </div>
       <div class="bar"><span id="progBar"></span></div>
     </div>
@@ -319,19 +334,19 @@
 
   <!-- Registros -->
   <div class="card">
-    <h2><span class="ic">🗂️</span> Registros por día</h2>
-    <div id="records"><div class="empty">Aún no hay muestras registradas. Presione "Registrar muestra" para comenzar.</div></div>
+    <h2><span class="ic">🗂️</span> <span data-i18n="recordsByDay">Records by day</span></h2>
+    <div id="records"><div class="empty" data-i18n="noSamples">No samples registered yet. Press "Register sample" to begin.</div></div>
   </div>
 
   <!-- Acciones finales -->
   <div class="card">
-    <h2><span class="ic">🏁</span> Finalizar orden</h2>
-    <p style="font-size:13px;color:var(--muted);margin-bottom:14px">
-      Al finalizar se genera la hoja con formato preestablecido lista para imprimir o exportar.</p>
+    <h2><span class="ic">🏁</span> <span data-i18n="finishOrder">Finish order</span></h2>
+    <p style="font-size:13px;color:var(--muted);margin-bottom:14px" data-i18n="finishDesc">
+      When finished, a preformatted sheet is generated, ready to print or export.</p>
     <div class="btn-row">
-      <button class="btn primary" id="btnImprimir">🖨️ Imprimir hoja de orden</button>
-      <button class="btn" id="btnCSV">📥 Exportar CSV (Excel)</button>
-      <button class="btn danger" id="btnLimpiar">🗑️ Limpiar orden</button>
+      <button class="btn primary" id="btnImprimir" data-i18n="printSheet">🖨️ Print order sheet</button>
+      <button class="btn" id="btnCSV" data-i18n="exportCsv">📥 Export CSV (Excel)</button>
+      <button class="btn danger" id="btnLimpiar" data-i18n="clearOrder">🗑️ Clear order</button>
     </div>
   </div>
 
@@ -340,33 +355,33 @@
 <!-- Modal de ingreso de muestra -->
 <div class="modal-bg" id="modal">
   <div class="modal">
-    <h3>Nueva muestra</h3>
+    <h3 data-i18n="newSample">New sample</h3>
     <div class="sub" id="mStamp">—</div>
     <div class="alert" id="mAlert"></div>
     <div class="row">
-      <label>Hora de la toma</label>
+      <label data-i18n="sampleTime">Sample time</label>
       <input id="mHora" type="time" step="1">
-      <div class="hint">Se toma la hora del sistema por defecto. Puede modificarla manualmente.</div>
+      <div class="hint" data-i18n="sampleTimeHint">The system time is used by default. You can change it manually.</div>
     </div>
     <div class="row">
-      <label>Peso de 10 cápsulas (g)</label>
+      <label data-i18n="weight10">Weight of 10 capsules (g)</label>
       <input id="mDiez" type="number" step="0.0001" inputmode="decimal" placeholder="0.0000">
-      <div class="hint" id="mRangeHint">Rango por cápsula: —</div>
+      <div class="hint" id="mRangeHint" data-i18n="capRange">Range per capsule: —</div>
     </div>
     <div class="calc">
-      <span>Peso por cápsula (mg)</span>
+      <span data-i18n="weightPerCap">Weight per capsule (mg)</span>
       <span style="display:flex;align-items:center;gap:10px">
         <b id="mPromedio">—</b>
         <span class="status" id="mStatus" style="display:none"></span>
       </span>
     </div>
     <div class="row">
-      <label>Iniciales del operador</label>
-      <input id="mOper" maxlength="5" placeholder="Ej. JPM" style="text-transform:uppercase">
+      <label data-i18n="operatorInitials">Operator initials</label>
+      <input id="mOper" maxlength="5" placeholder="Ex. JPM" data-i18n-ph="operatorPh" style="text-transform:uppercase">
     </div>
     <div class="actions">
-      <button class="btn" id="mCancel">Cancelar</button>
-      <button class="btn primary" id="mSave">Guardar muestra</button>
+      <button class="btn" id="mCancel" data-i18n="cancel">Cancel</button>
+      <button class="btn primary" id="mSave" data-i18n="saveSample">Save sample</button>
     </div>
   </div>
 </div>
@@ -374,17 +389,17 @@
 <!-- Modal avance del día -->
 <div class="modal-bg" id="modalParcial">
   <div class="modal" style="max-width:400px">
-    <h3>Actualizar avance del día</h3>
+    <h3 data-i18n="updateProgress">Update day progress</h3>
     <div class="sub" id="pStamp">—</div>
     <div class="alert" id="pAlert"></div>
     <div class="row">
-      <label>Cápsulas producidas hasta ahora</label>
-      <input id="pProd" type="number" step="1" inputmode="numeric" placeholder="Ej. 24500">
-      <div class="hint">Sustituye el valor anterior. Actualízalo cuantas veces quieras durante el día.</div>
+      <label data-i18n="capsProducedSoFar">Capsules produced so far</label>
+      <input id="pProd" type="number" step="1" inputmode="numeric" placeholder="Ex. 24500">
+      <div class="hint" data-i18n="progressHint">Replaces the previous value. Update it as many times as you want during the day.</div>
     </div>
     <div class="actions">
-      <button class="btn" id="pCancel">Cancelar</button>
-      <button class="btn primary" id="pSave">Guardar avance</button>
+      <button class="btn" id="pCancel" data-i18n="cancel">Cancel</button>
+      <button class="btn primary" id="pSave" data-i18n="saveProgress">Save progress</button>
     </div>
   </div>
 </div>
@@ -392,27 +407,27 @@
 <!-- Modal cerrar día -->
 <div class="modal-bg" id="modalDay">
   <div class="modal" style="max-width:420px">
-    <h3>Cerrar día</h3>
+    <h3 data-i18n="closeDay">Close day</h3>
     <div class="sub" id="dStamp">—</div>
     <div class="row">
-      <label>Producción total de cápsulas del día</label>
-      <input id="dProd" type="number" step="1" inputmode="numeric" placeholder="Ej. 84500">
-      <div class="hint">Cantidad final del día. Se suma a la producción acumulada de la orden.</div>
+      <label data-i18n="totalCapsDay">Total capsules for the day</label>
+      <input id="dProd" type="number" step="1" inputmode="numeric" placeholder="Ex. 84500">
+      <div class="hint" data-i18n="closeDayHint">Final amount for the day. Added to the order's accumulated production.</div>
     </div>
     <div class="grid g2">
       <div class="row">
-        <label>Barriles llenos</label>
-        <input id="dBarriles" type="number" step="1" inputmode="numeric" placeholder="Ej. 12">
+        <label data-i18n="fullBarrels">Full barrels</label>
+        <input id="dBarriles" type="number" step="1" inputmode="numeric" placeholder="Ex. 12">
       </div>
       <div class="row">
-        <label>Parcial: peso (kg)</label>
-        <input id="dParcial" type="number" step="0.01" inputmode="decimal" placeholder="Ej. 18.5">
-        <div class="hint">Déjalo vacío si no hay parcial.</div>
+        <label data-i18n="partialWeight">Partial: weight (kg)</label>
+        <input id="dParcial" type="number" step="0.01" inputmode="decimal" placeholder="Ex. 18.5">
+        <div class="hint" data-i18n="partialHint">Leave empty if there is no partial.</div>
       </div>
     </div>
     <div class="actions">
-      <button class="btn" id="dCancel">Cancelar</button>
-      <button class="btn primary" id="dSave">Cerrar día</button>
+      <button class="btn" id="dCancel" data-i18n="cancel">Cancel</button>
+      <button class="btn primary" id="dSave" data-i18n="closeDayBtn">Close day</button>
     </div>
   </div>
 </div>
@@ -438,8 +453,8 @@ const HEADERS = { 'apikey':SUPABASE_KEY, 'Authorization':'Bearer '+SUPABASE_KEY,
 function setConn(cls,txt){ const d=$('connDot'); d.className='dot '+cls; $('connTxt').textContent=txt; }
 
 function initSupabase(){
-  if(!CONFIGURED){ setConn('bad','Falta configurar la nube'); return false; }
-  setConn('ok','Conectado · sin orden'); return true;
+  if(!CONFIGURED){ setConn('bad',t('connMissing')); return false; }
+  setConn('ok',t('connNoOrder')); return true;
 }
 
 function normalizar(d){ d=d||{}; d.orden=d.orden||{producto:'',lote:'',orden:'',min:'',max:'',metaCaps:''};
@@ -473,7 +488,7 @@ async function abrirOrden(cod){
   codigo=(cod||'').trim().toUpperCase();
   if(pollTimer){ clearInterval(pollTimer); pollTimer=null; }
   if(!CONFIGURED || !codigo){ return; }
-  setConn('sync','Cargando orden…');
+  setConn('sync',t('connLoading'));
   try{
     const d = await leerOrden();
     if(d){ state=normalizar(d); }
@@ -484,10 +499,10 @@ async function abrirOrden(cod){
       state={ orden:{producto:'',lote:'',orden:'',min:'',max:'',metaCaps:''}, registros:[], dias:{} };
     }
     fillOrden(); render();
-    setConn('ok', supervisor?('Vista: '+codigo):('Orden '+codigo+' lista'));
+    setConn('ok', supervisor?(t('viewPrefix')+' '+codigo):(t('orderPrefix')+' '+codigo+' '+t('connLoaded')));
     /* sondeo cada 4s para ver cambios de otros dispositivos */
     pollTimer=setInterval(sondear, 4000);
-  }catch(e){ setConn('bad','No se pudo cargar'); }
+  }catch(e){ setConn('bad',t('connLoadErr')); }
 }
 
 /* Sondeo: si pasó suficiente tiempo desde mi último guardado, refresco desde la nube */
@@ -496,7 +511,7 @@ async function sondear(){
   try{
     const d = await leerOrden();
     if(d){ state=normalizar(d); fillOrden(); render();
-      setConn('ok',(supervisor?'Vista: ':'Orden ')+codigo+' · actualizado'); }
+      setConn('ok',(supervisor?t('viewPrefix'):t('orderPrefix'))+' '+codigo+' · '+t('connUpdated')); }
   }catch(e){ /* silencioso, reintenta en el próximo ciclo */ }
 }
 
@@ -509,7 +524,7 @@ async function pushNow(){
 /* Escritura permitida también al supervisor para acciones puntuales (reabrir día) */
 async function escribirNube(){
   if(!CONFIGURED || !codigo) return;
-  setConn('sync','Guardando…'); lastPush=Date.now();
+  setConn('sync',t('connSaving')); lastPush=Date.now();
   try{
     const r = await fetch(REST + '?on_conflict=codigo',{
       method:'POST',
@@ -517,18 +532,186 @@ async function escribirNube(){
       body: JSON.stringify({ codigo: codigo, data: state, actualizado: new Date().toISOString() })
     });
     if(!r.ok) throw new Error('HTTP '+r.status);
-    setConn('ok',(supervisor?'Vista: ':'Orden ')+codigo+' · guardado');
-  }catch(e){ setConn('bad','Error al guardar'); }
+    setConn('ok',(supervisor?t('viewPrefix'):t('orderPrefix'))+' '+codigo+' · '+t('connSaved'));
+  }catch(e){ setConn('bad',t('connSaveErr')); }
 }
 let saveTimer=null;
 function save(){ if(saveTimer) clearTimeout(saveTimer); saveTimer=setTimeout(pushNow,500); }
 function load(){ /* la carga real ocurre en abrirOrden() */ }
 
 const $=id=>document.getElementById(id);
-const meses=['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
-const dias=['domingo','lunes','martes','miércoles','jueves','viernes','sábado'];
-function fmtDate(d){return `${dias[d.getDay()]}, ${d.getDate()} de ${meses[d.getMonth()]} de ${d.getFullYear()}`;}
-function fmtTime(d){return d.toLocaleTimeString('es',{hour12:false});}
+
+/* ===================== INTERNACIONALIZACIÓN (i18n) ===================== */
+const I18N = {
+  en:{
+    appTitle:'Production Control', appSub:'Test program · developed by Oscar Navarro',
+    tabLabel:'Order codes to monitor (separated by comma or space)', tabCodesPh:'Ex. OP-8891, OP-8892, OP-8900',
+    show:'Show', tabHint:'The board refreshes automatically every 5 seconds. The list is remembered on this device.',
+    tabEmpty:'Type one or more order codes and press "Show" to see their live progress.',
+    orderCode:'Order code', orderCodePh:'Ex. OP-8891', refresh:'↻ Refresh', notConnected:'Not connected',
+    supBanner:'👁️ Supervisor mode active — read-only view. Changes are disabled.',
+    orderData:'Order data', product:'Product', productPh:'Ex. Vitamin C 500mg', batch:'Batch No.', batchPh:'Ex. B-2026-0142', roomPh:'Ex. Room 3',
+    minWeight:'Min weight per capsule (mg)', minPh:'Ex. 490', minHint:'Lower limit of the range',
+    maxWeight:'Max weight per capsule (mg)', maxPh:'Ex. 510', maxHint:'Upper limit of the range',
+    targetCaps:'Total capsule target', targetPh:'Ex. 500000', targetHint:'Production goal of the order',
+    registerSample:'➕ Register sample', dayClosedBtn:'🔒 Day closed',
+    dayClosedNotice:'🔒 Today is closed. Samples cannot be registered until the supervisor reopens it or starts a new day.',
+    orderSummary:'Order summary', samples:'Samples', avgCap:'Avg. capsule (mg)', outOfRange:'Out of range', accumProd:'Accum. production (caps)',
+    rangeUndef:'Range: set min/max in order data', prodProgress:'Production progress',
+    recordsByDay:'Records by day', noSamples:'No samples registered yet. Press "Register sample" to begin.',
+    finishOrder:'Finish order', finishDesc:'When finished, a preformatted sheet is generated, ready to print or export.',
+    printSheet:'🖨️ Print order sheet', exportCsv:'📥 Export CSV (Excel)', clearOrder:'🗑️ Clear order',
+    newSample:'New sample', sampleTime:'Sample time', sampleTimeHint:'The system time is used by default. You can change it manually.',
+    weight10:'Weight of 10 capsules (g)', weightPerCap:'Weight per capsule (mg)', operatorInitials:'Operator initials', operatorPh:'Ex. JPM',
+    cancel:'Cancel', saveSample:'Save sample',
+    updateProgress:'Update day progress', capsProducedSoFar:'Capsules produced so far', progressHint:'Replaces the previous value. Update it as many times as you want during the day.', saveProgress:'Save progress',
+    closeDay:'Close day', totalCapsDay:'Total capsules for the day', closeDayHint:"Final amount for the day. Added to the order's accumulated production.",
+    fullBarrels:'Full barrels', partialWeight:'Partial: weight (kg)', partialHint:'Leave empty if there is no partial.', closeDayBtn:'Close day',
+    /* dinámicos */
+    operator:'👷 Operator', supervisor:'👁️ Supervisor',
+    capRangePrefix:'Range per capsule:', capRangeUndef:'Range per capsule: (set min/max in order data)',
+    inRange:'✓ In range', outRangeShort:'✗ Out', outRangeFull:'✗ Out of range',
+    capsUnit:'caps', mg:'mg', kg:'kg',
+    connNoOrder:'Connected · no order', connMissing:'Cloud not configured', connLoading:'Loading order…',
+    connLoaded:'ready', connSaving:'Saving…', connSaved:'saved', connSaveErr:'Save error', connLoadErr:'Could not load',
+    connUpdated:'updated', viewPrefix:'View:', orderPrefix:'Order',
+    updating:'Updating…', updatedAt:'Updated', updateErr:'Update error',
+    orderNotFound:'Order not found', noCloudData:'No cloud data yet.', noProduct:'(no product)',
+    lastDayProgress:'Last day progress:', prevDayClose:'Previous day close:', todayPartial:"Today's partial production:",
+    dayClosedTag:'(day closed)', prodProgressLabel:'Production progress',
+    accumLabel:'Accum. production:', noTargetSet:'(no target set)', batchLabel:'Batch:', roomLabel:'Room:',
+    sampleCount:'sample(s)', advance:'Progress:', capsLabel:'Caps:', barrelsLabel:'Barrels:', partialLabel:'Partial:',
+    closedTag:'🔒 Closed', openTag:'Open', reopen:'↩︎ Reopen', printDay:'🖨️ Print day',
+    updateAdvance:'📈 Update progress', closeDayMini:'🔒 Close day',
+    advanceInProgress:'📈 Day progress (in process)', updatedShort:'upd.',
+    showOnly3:'▲ Show only the last 3', showAll:'▼ Show all samples of the day',
+    noSamplesDay:'No samples this day.',
+    thTime:'Time', thW10:'10-cap weight (g)', thWcap:'Weight/cap (mg)', thStatus:'Status', thOperator:'Operator',
+    alOnlySupExport:'Only the supervisor can export.', alOnlySupPrint:'Only the supervisor can print.',
+    alOnlySupReopen:'Only the supervisor can reopen a day.',
+    confReopen:'Reopen this day? It will stay open until the operator closes it again.',
+    confClear:'This deletes all records, days and data of the current order. Continue?',
+    confDelSample:'Delete this sample?',
+    alEnterWeight:'Enter the weight of the 10-capsule sample.', alEnterOper:'Enter the operator initials.',
+    alDayClosedSample:'Today is closed. The sample cannot be saved.',
+    alDayClosedReg:'Today is closed. Samples cannot be registered until the supervisor reopens it or starts a new day.',
+    alDayClosedAdv:'This day is closed. Progress cannot be updated.', alEnterCaps:'Enter the capsules produced so far.',
+    alEnterDayProd:'Enter the capsule production for the day.', alBarrelsInvalid:'Invalid barrels.', alPartialInvalid:'Invalid partial weight.',
+    alPopupBlocked:'The browser blocked the print window. Allow pop-ups for this site and try again.',
+    statusOrder:'Order status:', closedState:'Closed', openState:'Open',
+    noDays:'No days', closedOrder:'CLOSED', inProcess:'IN PROCESS', noState:'NO DATA',
+    /* impresión */
+    pDailyTitle:'DAILY PRODUCTION REPORT', pSubtitle:'Production Control — GVIP', pPrinted:'Printed:',
+    pDayDate:'Day date', pTotalCapsDay:'Total capsules for the day', pTotalBarrelsDay:'Total barrels for the day',
+    pPartialWeight:'Partial weight', pNoPartial:'— (no partial)', pDayState:'Day state',
+    pOperResp:'Responsible operator', pSupQC:'QC Supervisor',
+    pMainTitle:'PRODUCTION CONTROL', pMainSub:'GVIP · QC sampling log — 10 capsules per draw',
+    pProductLbl:'Product:', pBatchLbl:'Batch No.:', pRoomLbl:'Room:', pRangeLbl:'Range per capsule:',
+    pTargetLbl:'Total target:', pAccumLbl:'Accum. production:', pStatusLbl:'Order status:',
+    pProdByDay:'Production by day', pDate:'Date', pCapsules:'Capsules', pBarrels:'Full barrels', pPartial:'Partial (kg)', pState:'State',
+    pTotal:'TOTAL', pNoRecords:'No records', pNoDays:'No days registered',
+    pTotalSamples:'Total samples:', pAvgCap:'Avg. capsule:', pOutSamples:'Out-of-range samples:',
+    pInRange:'In range', pOut:'OUT', pClosed:'Closed', pOpen:'Open',
+    printPreview:'Print preview', printBtn:'🖨️ Print', closeBtn:'Close',
+    months:['January','February','March','April','May','June','July','August','September','October','November','December'],
+    weekdays:['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'],
+    dateFmt:(wd,da,mo,yr)=>`${wd}, ${mo} ${da}, ${yr}`, locale:'en'
+  },
+  es:{
+    appTitle:'Control de Producción', appSub:'Programa de prueba · desarrollado por Oscar Navarro',
+    tabLabel:'Códigos de órdenes a monitorear (separados por coma o espacio)', tabCodesPh:'Ej. OP-8891, OP-8892, OP-8900',
+    show:'Mostrar', tabHint:'El tablero se actualiza solo cada 5 segundos. La lista se recuerda en este dispositivo.',
+    tabEmpty:'Escribe uno o más códigos de orden y presiona "Mostrar" para ver su avance en vivo.',
+    orderCode:'Código de la orden', orderCodePh:'Ej. OP-8891', refresh:'↻ Actualizar', notConnected:'Sin conectar',
+    supBanner:'👁️ Modo supervisor activo — vista de solo lectura. Los cambios están deshabilitados.',
+    orderData:'Datos de la orden', product:'Producto', productPh:'Ej. Vitamina C 500mg', batch:'N° Batch', batchPh:'Ej. B-2026-0142', roomPh:'Ej. Room 3',
+    minWeight:'Peso mínimo por cápsula (mg)', minPh:'Ej. 490', minHint:'Límite inferior del rango',
+    maxWeight:'Peso máximo por cápsula (mg)', maxPh:'Ej. 510', maxHint:'Límite superior del rango',
+    targetCaps:'Objetivo total cápsulas', targetPh:'Ej. 500000', targetHint:'Meta de producción de la orden',
+    registerSample:'➕ Registrar muestra', dayClosedBtn:'🔒 Día cerrado',
+    dayClosedNotice:'🔒 El día de hoy está cerrado. No se pueden registrar muestras hasta que el supervisor lo reabra o inicie un nuevo día.',
+    orderSummary:'Resumen de la orden', samples:'Muestras', avgCap:'Prom. cápsula (mg)', outOfRange:'Fuera de rango', accumProd:'Producción acum. (cáps)',
+    rangeUndef:'Rango: definir min/máx en datos de orden', prodProgress:'Avance de producción',
+    recordsByDay:'Registros por día', noSamples:'Aún no hay muestras registradas. Presione "Registrar muestra" para comenzar.',
+    finishOrder:'Finalizar orden', finishDesc:'Al finalizar se genera la hoja con formato preestablecido lista para imprimir o exportar.',
+    printSheet:'🖨️ Imprimir hoja de orden', exportCsv:'📥 Exportar CSV (Excel)', clearOrder:'🗑️ Limpiar orden',
+    newSample:'Nueva muestra', sampleTime:'Hora de la toma', sampleTimeHint:'Se toma la hora del sistema por defecto. Puede modificarla manualmente.',
+    weight10:'Peso de 10 cápsulas (g)', weightPerCap:'Peso por cápsula (mg)', operatorInitials:'Iniciales del operador', operatorPh:'Ej. JPM',
+    cancel:'Cancelar', saveSample:'Guardar muestra',
+    updateProgress:'Actualizar avance del día', capsProducedSoFar:'Cápsulas producidas hasta ahora', progressHint:'Sustituye el valor anterior. Actualízalo cuantas veces quieras durante el día.', saveProgress:'Guardar avance',
+    closeDay:'Cerrar día', totalCapsDay:'Producción total de cápsulas del día', closeDayHint:'Cantidad final del día. Se suma a la producción acumulada de la orden.',
+    fullBarrels:'Barriles llenos', partialWeight:'Parcial: peso (kg)', partialHint:'Déjalo vacío si no hay parcial.', closeDayBtn:'Cerrar día',
+    operator:'👷 Operador', supervisor:'👁️ Supervisor',
+    capRangePrefix:'Rango por cápsula:', capRangeUndef:'Rango por cápsula: (defina min/máx en datos de orden)',
+    inRange:'✓ En rango', outRangeShort:'✗ Fuera', outRangeFull:'✗ Fuera de rango',
+    capsUnit:'cáps', mg:'mg', kg:'kg',
+    connNoOrder:'Conectado · sin orden', connMissing:'Falta configurar la nube', connLoading:'Cargando orden…',
+    connLoaded:'lista', connSaving:'Guardando…', connSaved:'guardado', connSaveErr:'Error al guardar', connLoadErr:'No se pudo cargar',
+    connUpdated:'actualizado', viewPrefix:'Vista:', orderPrefix:'Orden',
+    updating:'Actualizando…', updatedAt:'Actualizado', updateErr:'Error al actualizar',
+    orderNotFound:'Orden no encontrada', noCloudData:'Sin datos en la nube todavía.', noProduct:'(sin producto)',
+    lastDayProgress:'Último avance del día:', prevDayClose:'Cierre día anterior:', todayPartial:'Producción parcial de hoy:',
+    dayClosedTag:'(día cerrado)', prodProgressLabel:'Avance de producción',
+    accumLabel:'Producción acum.:', noTargetSet:'(sin objetivo definido)', batchLabel:'Batch:', roomLabel:'Room:',
+    sampleCount:'muestra(s)', advance:'Avance:', capsLabel:'Cáps:', barrelsLabel:'Barriles:', partialLabel:'Parcial:',
+    closedTag:'🔒 Cerrado', openTag:'Abierto', reopen:'↩︎ Reabrir', printDay:'🖨️ Imprimir día',
+    updateAdvance:'📈 Actualizar avance', closeDayMini:'🔒 Cerrar día',
+    advanceInProgress:'📈 Avance del día (en proceso)', updatedShort:'act.',
+    showOnly3:'▲ Mostrar solo las últimas 3', showAll:'▼ Ver todas las muestras del día',
+    noSamplesDay:'Sin muestras este día.',
+    thTime:'Hora', thW10:'Peso 10 cáps (g)', thWcap:'Peso/cáps (mg)', thStatus:'Estado', thOperator:'Operador',
+    alOnlySupExport:'Solo el supervisor puede exportar.', alOnlySupPrint:'Solo el supervisor puede imprimir.',
+    alOnlySupReopen:'Solo el supervisor puede reabrir un día.',
+    confReopen:'¿Reabrir este día? Quedará abierto hasta que el operador lo cierre de nuevo.',
+    confClear:'Esto borra todos los registros, días y datos de la orden actual. ¿Continuar?',
+    confDelSample:'¿Eliminar esta muestra?',
+    alEnterWeight:'Ingrese el peso de la muestra de 10 cápsulas.', alEnterOper:'Ingrese las iniciales del operador.',
+    alDayClosedSample:'El día de hoy se cerró. No se puede guardar la muestra.',
+    alDayClosedReg:'El día de hoy está cerrado. No se pueden registrar muestras hasta que el supervisor lo reabra o inicie un nuevo día.',
+    alDayClosedAdv:'Este día está cerrado. No se puede actualizar el avance.', alEnterCaps:'Ingrese las cápsulas producidas hasta ahora.',
+    alEnterDayProd:'Ingrese la producción de cápsulas del día.', alBarrelsInvalid:'Barriles inválido.', alPartialInvalid:'Peso parcial inválido.',
+    alPopupBlocked:'El navegador bloqueó la ventana de impresión. Permite las ventanas emergentes para este sitio e inténtalo de nuevo.',
+    statusOrder:'Estatus de la orden:', closedState:'Cerrado', openState:'Abierto',
+    noDays:'Sin días', closedOrder:'CERRADA', inProcess:'EN PROCESO', noState:'SIN DATOS',
+    pDailyTitle:'PARTE DIARIO DE PRODUCCIÓN', pSubtitle:'Control de Producción — GVIP', pPrinted:'Impreso:',
+    pDayDate:'Fecha del día', pTotalCapsDay:'Total cápsulas del día', pTotalBarrelsDay:'Total barriles del día',
+    pPartialWeight:'Peso del parcial', pNoPartial:'— (sin parcial)', pDayState:'Estado del día',
+    pOperResp:'Operador responsable', pSupQC:'Supervisor QC',
+    pMainTitle:'CONTROL DE PRODUCCIÓN', pMainSub:'GVIP · Registro de muestreo QC — 10 cápsulas por toma',
+    pProductLbl:'Producto:', pBatchLbl:'N° Batch:', pRoomLbl:'Room:', pRangeLbl:'Rango por cápsula:',
+    pTargetLbl:'Objetivo total:', pAccumLbl:'Producción acum.:', pStatusLbl:'Estatus de la orden:',
+    pProdByDay:'Producción por día', pDate:'Fecha', pCapsules:'Cápsulas', pBarrels:'Barriles llenos', pPartial:'Parcial (kg)', pState:'Estado',
+    pTotal:'TOTAL', pNoRecords:'Sin registros', pNoDays:'Sin días registrados',
+    pTotalSamples:'Total muestras:', pAvgCap:'Prom. cápsula:', pOutSamples:'Muestras fuera de rango:',
+    pInRange:'En rango', pOut:'FUERA', pClosed:'Cerrado', pOpen:'Abierto',
+    printPreview:'Vista previa de impresión', printBtn:'🖨️ Imprimir', closeBtn:'Cerrar',
+    months:['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'],
+    weekdays:['domingo','lunes','martes','miércoles','jueves','viernes','sábado'],
+    dateFmt:(wd,da,mo,yr)=>`${wd}, ${da} de ${mo} de ${yr}`, locale:'es'
+  }
+};
+const LANG_LS_KEY='qc_idioma';
+let lang='en';
+function t(k){ return (I18N[lang] && I18N[lang][k]!==undefined) ? I18N[lang][k] : (I18N.en[k]!==undefined?I18N.en[k]:k); }
+function aplicarIdioma(){
+  document.documentElement.lang=lang;
+  document.title=t('appTitle')+' — GVIP';
+  document.querySelectorAll('[data-i18n]').forEach(el=>{ el.textContent=t(el.getAttribute('data-i18n')); });
+  document.querySelectorAll('[data-i18n-ph]').forEach(el=>{ el.setAttribute('placeholder', t(el.getAttribute('data-i18n-ph'))); });
+  /* el rol y el estado de conexión se re-renderizan aparte */
+  if(typeof refrescarRol==='function') refrescarRol();
+  render();
+  if(typeof refrescarTablero==='function') refrescarTablero();
+}
+function setLang(l){
+  lang=(l==='es')?'es':'en';
+  try{ localStorage.setItem(LANG_LS_KEY, lang); }catch(e){}
+  aplicarIdioma();
+}
+/* ====================================================================== */
+
+function fmtDate(d){ const L=I18N[lang]; return L.dateFmt(L.weekdays[d.getDay()], d.getDate(), L.months[d.getMonth()], d.getFullYear()); }
+function fmtTime(d){return d.toLocaleTimeString(I18N[lang].locale,{hour12:false});}
 function dayKey(d){return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;}
 
 function tick(){ const n=new Date(); $('liveDate').textContent=fmtDate(n); $('liveTime').textContent=fmtTime(n); $('btnClock').textContent=fmtTime(n); }
@@ -571,7 +754,7 @@ function hoyCerrado(){
 }
 function openModal(){
   if(hoyCerrado()){
-    alert('El día de hoy está cerrado. No se pueden registrar muestras hasta que el supervisor lo reabra o inicie un nuevo día.');
+    alert(t('alDayClosedReg'));
     return;
   }
   const n=new Date();
@@ -583,7 +766,7 @@ function openModal(){
   $('mStatus').style.display='none';
   $('mAlert').classList.remove('show'); $('mAlert').textContent='';
   const {min,max}=getRange();
-  $('mRangeHint').textContent = (min>0&&max>0)?`Rango por cápsula: ${min.toFixed(1)} – ${max.toFixed(1)} mg`:'Rango por cápsula: (defina min/máx en datos de orden)';
+  $('mRangeHint').textContent = (min>0&&max>0)?`${t('capRangePrefix')} ${min.toFixed(1)} – ${max.toFixed(1)} ${t('mg')}`:t('capRangeUndef');
   modal.classList.add('show'); setTimeout(()=>$('mDiez').focus(),50);
 }
 function closeModal(){ modal.classList.remove('show'); }
@@ -596,24 +779,24 @@ $('mDiez').addEventListener('input',()=>{
   const st=$('mStatus');
   if(v>0){
     const prom=v*100;
-    $('mPromedio').textContent=prom.toFixed(1)+' mg';
+    $('mPromedio').textContent=prom.toFixed(1)+' '+t('mg');
     const ir=inRange(prom);
     if(ir===null){ st.style.display='none'; }
-    else if(ir){ st.style.display='inline-block'; st.textContent='✓ En rango';
+    else if(ir){ st.style.display='inline-block'; st.textContent=t('inRange');
       st.style.background='rgba(45,212,167,.18)'; st.style.color='var(--accent)'; }
-    else { st.style.display='inline-block'; st.textContent='✗ Fuera de rango';
+    else { st.style.display='inline-block'; st.textContent=t('outRangeFull');
       st.style.background='rgba(226,85,85,.18)'; st.style.color='var(--danger)'; }
   } else { $('mPromedio').textContent='—'; st.style.display='none'; }
 });
 
 $('mSave').addEventListener('click',()=>{
   if(hoyCerrado()){ closeModal(); render();
-    alert('El día de hoy se cerró. No se puede guardar la muestra.'); return; }
+    alert(t('alDayClosedSample')); return; }
   const diez=parseFloat($('mDiez').value);
   const oper=($('mOper').value||'').trim().toUpperCase();
   const al=$('mAlert');
-  if(!(diez>0)){al.textContent='Ingrese el peso de la muestra de 10 cápsulas.';al.classList.add('show');return;}
-  if(!oper){al.textContent='Ingrese las iniciales del operador.';al.classList.add('show');$('mOper').focus();return;}
+  if(!(diez>0)){al.textContent=t('alEnterWeight');al.classList.add('show');return;}
+  if(!oper){al.textContent=t('alEnterOper');al.classList.add('show');$('mOper').focus();return;}
   /* combinar la fecha del modal con la hora indicada (sistema o manual) */
   let ts=modal.dataset.ts;
   const horaTxt=($('mHora').value||'').trim();
@@ -637,7 +820,7 @@ function getDia(key){
 function openParcialModal(key){
   if(supervisor){ return; }
   const info=state.dias[key];
-  if(info && info.closed){ alert('Este día está cerrado. No se puede actualizar el avance.'); return; }
+  if(info && info.closed){ alert(t('alDayClosedAdv')); return; }
   modalParcial.dataset.key=key;
   const n=new Date();
   $('pStamp').textContent=`${fmtDate(new Date(key+'T12:00:00'))} · ${fmtTime(n)}`;
@@ -651,10 +834,10 @@ $('pSave').addEventListener('click',()=>{
   const key=modalParcial.dataset.key;
   const info=state.dias[key];
   if(info && info.closed){ modalParcial.classList.remove('show'); render();
-    alert('Este día se cerró. No se puede actualizar el avance.'); return; }
+    alert(t('alDayClosedAdv')); return; }
   const prod=parseFloat($('pProd').value);
   const al=$('pAlert');
-  if(!(prod>=0)){al.textContent='Ingrese las cápsulas producidas hasta ahora.';al.classList.add('show');return;}
+  if(!(prod>=0)){al.textContent=t('alEnterCaps');al.classList.add('show');return;}
   const dia=getDia(key);
   dia.avance = prod;              /* sustituye el valor anterior */
   dia.avanceTs = new Date().toISOString();
@@ -683,19 +866,19 @@ $('dSave').addEventListener('click',()=>{
   const key=modalDay.dataset.key;
   const prod=parseFloat($('dProd').value);
   const barrilesRaw=$('dBarriles').value, parcialRaw=$('dParcial').value;
-  if(!(prod>=0)){alert('Ingrese la producción de cápsulas del día.');return;}
+  if(!(prod>=0)){alert(t('alEnterDayProd'));return;}
   const barriles = barrilesRaw!=='' ? parseFloat(barrilesRaw) : null;
   const parcial  = parcialRaw!==''  ? parseFloat(parcialRaw)  : null;
-  if(barrilesRaw!=='' && !(barriles>=0)){alert('Barriles inválido.');return;}
-  if(parcialRaw!==''  && !(parcial>=0)){alert('Peso parcial inválido.');return;}
+  if(barrilesRaw!=='' && !(barriles>=0)){alert(t('alBarrelsInvalid'));return;}
+  if(parcialRaw!==''  && !(parcial>=0)){alert(t('alPartialInvalid'));return;}
   /* preservar el avance registrado durante el día */
   const prev=state.dias[key]||{};
   state.dias[key]={closed:true, prod:prod, barriles:barriles, parcial:parcial, avance:prev.avance!=null?prev.avance:null, avanceTs:prev.avanceTs||null};
   save(); modalDay.classList.remove('show'); render();
 });
 function reopenDay(key){
-  if(!supervisor){ alert('Solo el supervisor puede reabrir un día.'); return; }
-  if(confirm('¿Reabrir este día? Quedará abierto hasta que el operador lo cierre de nuevo.')){
+  if(!supervisor){ alert(t('alOnlySupReopen')); return; }
+  if(confirm(t('confReopen'))){
     if(state.dias[key]){ state.dias[key].closed=false; }
     render();
     escribirNube();
@@ -713,7 +896,7 @@ function render(){
   const btn=$('btnNuevo');
   if(btn){
     btn.disabled=cerradoHoy;
-    $('btnNuevoTxt').textContent = cerradoHoy ? '🔒 Día cerrado' : '➕ Registrar muestra';
+    $('btnNuevoTxt').textContent = cerradoHoy ? t('dayClosedBtn') : t('registerSample');
     $('diaCerradoAviso').style.display = cerradoHoy ? 'block' : 'none';
   }
 
@@ -729,11 +912,11 @@ function render(){
   $('sFuera').style.color = fuera>0 ? 'var(--danger)' : '';
 
   $('rangePill').innerHTML = (min>0&&max>0)
-    ? `Rango por cápsula: <b>${min.toFixed(1)}</b> – <b>${max.toFixed(1)} mg</b>`
-    : 'Rango: definir min/máx en datos de orden';
+    ? `${t('capRangePrefix')} <b>${min.toFixed(1)}</b> – <b>${max.toFixed(1)} ${t('mg')}</b>`
+    : t('rangeUndef');
 
   const prodTotal=prodAcumulada(state.dias, true);
-  $('sProd').textContent=prodTotal.toLocaleString('es');
+  $('sProd').textContent=prodTotal.toLocaleString(I18N[lang].locale);
 
   if(meta>0){
     $('progWrap').style.display='block';
@@ -746,12 +929,12 @@ function render(){
     else if(pctReal<=70) color='var(--warn)';
     else color='var(--accent)';
     barra.style.background=color;
-    $('progTxt').textContent=`${prodTotal.toLocaleString('es')} / ${meta.toLocaleString('es')} cáps · ${pct.toFixed(1)}%`;
+    $('progTxt').textContent=`${prodTotal.toLocaleString(I18N[lang].locale)} / ${meta.toLocaleString(I18N[lang].locale)} ${t('capsUnit')} · ${pct.toFixed(1)}%`;
   }else $('progWrap').style.display='none';
 
   const box=$('records');
   if(!recs.length && Object.keys(state.dias).length===0){
-    box.innerHTML='<div class="empty">Aún no hay muestras registradas. Presione "Registrar muestra" para comenzar.</div>'; return; }
+    box.innerHTML='<div class="empty">'+t('noSamples')+'</div>'; return; }
 
   const groups={};
   recs.forEach(r=>{ const k=dayKey(new Date(r.ts)); (groups[k]=groups[k]||[]).push(r); });
@@ -763,36 +946,37 @@ function render(){
     const dinfo=state.dias[k]||{}; const closed=!!dinfo.closed;
     let btnDia='';
     if(closed){
-      btnDia = supervisor ? `<button class="mini-btn btn-reabrir" onclick="reopenDay('${k}')">↩︎ Reabrir</button>` : '';
-      btnDia += ` <button class="mini-btn btn-reabrir" onclick="imprimirDia('${k}')">🖨️ Imprimir día</button>`;
+      btnDia = supervisor ? `<button class="mini-btn btn-reabrir" onclick="reopenDay('${k}')">${t('reopen')}</button>` : '';
+      btnDia += ` <button class="mini-btn btn-reabrir" onclick="imprimirDia('${k}')">${t('printDay')}</button>`;
     } else {
       btnDia = supervisor ? '' :
-        `<button class="mini-btn" onclick="openParcialModal('${k}')">📈 Actualizar avance</button>
-         <button class="mini-btn" onclick="openDayModal('${k}')">🔒 Cerrar día</button>`;
+        `<button class="mini-btn" onclick="openParcialModal('${k}')">${t('updateAdvance')}</button>
+         <button class="mini-btn" onclick="openDayModal('${k}')">${t('closeDayMini')}</button>`;
     }
     /* avance en vivo: solo se muestra en días abiertos que tengan un avance registrado */
     const mostrarAvance = !closed && dinfo.avance!=null;
+    const loc=I18N[lang].locale;
     html+=`<div class="day-group"><div class="day-head${closed?' closed':''}">
-      <span>${fmtDate(d)} ${closed?'<span class="lock-tag">🔒 Cerrado</span>':'<span class="lock-tag" style="background:rgba(240,180,41,.15);color:var(--warn)">Abierto</span>'}</span>
+      <span>${fmtDate(d)} ${closed?`<span class="lock-tag">${t('closedTag')}</span>`:`<span class="lock-tag" style="background:rgba(240,180,41,.15);color:var(--warn)">${t('openTag')}</span>`}</span>
       <span class="meta">
-        <span>${list.length} muestra(s)</span>
-        ${mostrarAvance?`<span>Avance: <b>${Number(dinfo.avance).toLocaleString('es')}</b> cáps${dinfo.avanceTs?` <span style="color:var(--muted)">(${fmtTime(new Date(dinfo.avanceTs))})</span>`:''}</span>`:''}
-        ${dinfo.prod!=null?`<span>Cáps: <b>${Number(dinfo.prod).toLocaleString('es')}</b></span>`:''}
-        ${dinfo.barriles!=null?`<span>Barriles: <b>${dinfo.barriles}</b></span>`:''}
-        ${dinfo.parcial!=null?`<span>Parcial: <b>${dinfo.parcial} kg</b></span>`:''}
+        <span>${list.length} ${t('sampleCount')}</span>
+        ${mostrarAvance?`<span>${t('advance')} <b>${Number(dinfo.avance).toLocaleString(loc)}</b> ${t('capsUnit')}${dinfo.avanceTs?` <span style="color:var(--muted)">(${fmtTime(new Date(dinfo.avanceTs))})</span>`:''}</span>`:''}
+        ${dinfo.prod!=null?`<span>${t('capsLabel')} <b>${Number(dinfo.prod).toLocaleString(loc)}</b></span>`:''}
+        ${dinfo.barriles!=null?`<span>${t('barrelsLabel')} <b>${dinfo.barriles}</b></span>`:''}
+        ${dinfo.parcial!=null?`<span>${t('partialLabel')} <b>${dinfo.parcial} ${t('kg')}</b></span>`:''}
         ${btnDia}
       </span></div>`;
 
     /* Banda de avance en vivo (día abierto con avance) */
     if(mostrarAvance){
       html+=`<div class="parciales-box"><div class="parcial-row" style="border:none;padding:2px 0">
-          <span class="ph">📈 Avance del día (en proceso)</span>
-          <span class="pc"><b style="font-size:15px">${Number(dinfo.avance).toLocaleString('es')}</b> cáps${dinfo.avanceTs?` <span class="ph-time">· act. ${fmtTime(new Date(dinfo.avanceTs))}</span>`:''}</span>
+          <span class="ph">${t('advanceInProgress')}</span>
+          <span class="pc"><b style="font-size:15px">${Number(dinfo.avance).toLocaleString(loc)}</b> ${t('capsUnit')}${dinfo.avanceTs?` <span class="ph-time">· ${t('updatedShort')} ${fmtTime(new Date(dinfo.avanceTs))}</span>`:''}</span>
         </div></div>`;
     }
 
-    html+='<table><thead><tr><th>Hora</th><th>Peso 10 cáps (g)</th><th>Peso/cáps (mg)</th><th>Estado</th><th>Operador</th><th></th></tr></thead><tbody>';
-    if(!list.length){ html+='<tr><td colspan="6" class="empty">Sin muestras este día.</td></tr>'; }
+    html+=`<table><thead><tr><th>${t('thTime')}</th><th>${t('thW10')}</th><th>${t('thWcap')}</th><th>${t('thStatus')}</th><th>${t('thOperator')}</th><th></th></tr></thead><tbody>`;
+    if(!list.length){ html+=`<tr><td colspan="6" class="empty">${t('noSamplesDay')}</td></tr>`; }
     /* mostrar solo las últimas TOPE_MUESTRAS tomas salvo que el día esté expandido */
     const expandido=!!diasExpandidos[k];
     const ocultas=Math.max(0, list.length-TOPE_MUESTRAS);
@@ -800,8 +984,8 @@ function render(){
     visibles.forEach(r=>{
       const ir=inRange(r.prom);
       let estado='—', promCls='';
-      if(ir===true){ estado='<span class="in-range">✓ En rango</span>'; promCls='in-range'; }
-      else if(ir===false){ estado='<span class="out-range">✗ Fuera</span>'; promCls='out-range'; }
+      if(ir===true){ estado=`<span class="in-range">${t('inRange')}</span>`; promCls='in-range'; }
+      else if(ir===false){ estado=`<span class="out-range">${t('outRangeShort')}</span>`; promCls='out-range'; }
       const idx=state.registros.indexOf(r);
       const delBtn=closed?'' :`<button class="btn danger" style="padding:3px 9px;font-size:11px" onclick="delRec(${idx})">✕</button>`;
       html+=`<tr><td>${fmtTime(new Date(r.ts))}</td><td>${r.diez.toFixed(4)}</td><td class="${promCls}">${r.prom.toFixed(1)}</td><td>${estado}</td><td>${r.oper}</td><td style="text-align:right">${delBtn}</td></tr>`;
@@ -809,18 +993,18 @@ function render(){
     html+='</tbody></table>';
     if(ocultas>0){
       html+=`<div style="text-align:center;padding:8px 0">
-        <button class="mini-btn" onclick="toggleDia('${k}')">${expandido?'▲ Mostrar solo las últimas 3':`▼ Ver todas las muestras del día (${list.length})`}</button>
+        <button class="mini-btn" onclick="toggleDia('${k}')">${expandido?t('showOnly3'):`${t('showAll')} (${list.length})`}</button>
       </div>`;
     }
     html+='</div>';
   });
   box.innerHTML=html;
 }
-function delRec(i){ if(confirm('¿Eliminar esta muestra?')){ state.registros.splice(i,1); save(); render(); } }
+function delRec(i){ if(confirm(t('confDelSample'))){ state.registros.splice(i,1); save(); render(); } }
 function toggleDia(k){ diasExpandidos[k]=!diasExpandidos[k]; render(); }
 
 $('btnLimpiar').addEventListener('click',()=>{
-  if(confirm('Esto borra todos los registros, días y datos de la orden actual. ¿Continuar?')){
+  if(confirm(t('confClear'))){
     state={orden:{producto:'',lote:'',orden:'',min:'',max:'',metaCaps:''},registros:[],dias:{}};
     save(); fillOrden(); render();
   }
@@ -828,22 +1012,22 @@ $('btnLimpiar').addEventListener('click',()=>{
 
 /* ---- CSV ---- */
 $('btnCSV').addEventListener('click',()=>{
-  if(!supervisor){ alert('Solo el supervisor puede exportar.'); return; }
+  if(!supervisor){ alert(t('alOnlySupExport')); return; }
   const o=state.orden, {min,max}=getRange();
-  let rows=[['Producto',o.producto],['N° Batch',o.lote],['Room',o.orden],
-    ['Peso mínimo/cáps (mg)',o.min],['Peso máximo/cáps (mg)',o.max],['Objetivo total cápsulas',o.metaCaps],[],
-    ['Fecha','Hora','Peso 10 cáps (g)','Peso/cáps (mg)','Estado','Operador']];
+  let rows=[[t('pProductLbl').replace(':',''),o.producto],[t('batch'),o.lote],['Room',o.orden],
+    [t('minWeight'),o.min],[t('maxWeight'),o.max],[t('targetCaps'),o.metaCaps],[],
+    [t('pDate'),t('thTime'),t('thW10'),t('thWcap'),t('thStatus'),t('thOperator')]];
   state.registros.slice().sort((a,b)=>new Date(a.ts)-new Date(b.ts)).forEach(r=>{
     const d=new Date(r.ts); const ir=inRange(r.prom);
-    const est = ir===true?'En rango':(ir===false?'FUERA DE RANGO':'');
+    const est = ir===true?t('pInRange'):(ir===false?t('outRangeFull'):'');
     rows.push([dayKey(d),fmtTime(d),r.diez.toFixed(4),r.prom.toFixed(1),est,r.oper]);
   });
-  rows.push([]); rows.push(['PRODUCCIÓN POR DÍA']); rows.push(['Fecha','Cápsulas','Barriles llenos','Parcial (kg)','Estado']);
+  rows.push([]); rows.push([t('pProdByDay').toUpperCase()]); rows.push([t('pDate'),t('pCapsules'),t('pBarrels'),t('pPartial'),t('pState')]);
   Object.keys(state.dias).sort().forEach(k=>{const dd=state.dias[k];
-    rows.push([k, dd.prod!=null?dd.prod:'', dd.barriles!=null?dd.barriles:'', dd.parcial!=null?dd.parcial:'', dd.closed?'Cerrado':'Abierto']);});
+    rows.push([k, dd.prod!=null?dd.prod:'', dd.barriles!=null?dd.barriles:'', dd.parcial!=null?dd.parcial:'', dd.closed?t('pClosed'):t('pOpen')]);});
   const prodTotal=prodAcumulada(state.dias, false); /* CSV: solo producción confirmada */
   const barrTotal=Object.values(state.dias).reduce((s,d)=>s+(d&&d.barriles?d.barriles:0),0);
-  rows.push([]); rows.push(['TOTAL',prodTotal,barrTotal,'','']);
+  rows.push([]); rows.push([t('pTotal'),prodTotal,barrTotal,'','']);
   const csv='\uFEFF'+rows.map(r=>r.map(c=>`"${(c??'').toString().replace(/"/g,'""')}"`).join(';')).join('\n');
   const blob=new Blob([csv],{type:'text/csv;charset=utf-8'});
   const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
@@ -856,12 +1040,12 @@ $('btnCSV').addEventListener('click',()=>{
 function abrirVistaPrevia(htmlInterior, titulo){
   const win=window.open('', '_blank');
   if(!win){
-    alert('El navegador bloqueó la ventana de impresión. Permite las ventanas emergentes para este sitio e inténtalo de nuevo.');
+    alert(t('alPopupBlocked'));
     return;
   }
   win.document.open();
-  win.document.write(`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">
-    <title>${titulo||'Impresión'}</title>
+  win.document.write(`<!DOCTYPE html><html lang="${lang}"><head><meta charset="UTF-8">
+    <title>${titulo||t('printPreview')}</title>
     <style>
       body{margin:0;background:#525659;font-family:Arial,sans-serif}
       .toolbar{position:sticky;top:0;background:#323639;color:#fff;padding:10px 16px;
@@ -878,9 +1062,9 @@ function abrirVistaPrevia(htmlInterior, titulo){
       }
     </style></head><body>
     <div class="toolbar">
-      <span class="ttl">${titulo||'Vista previa de impresión'}</span>
-      <button onclick="window.print()">🖨️ Imprimir</button>
-      <button class="sec" onclick="window.close()">Cerrar</button>
+      <span class="ttl">${titulo||t('printPreview')}</span>
+      <button onclick="window.print()">${t('printBtn')}</button>
+      <button class="sec" onclick="window.close()">${t('closeBtn')}</button>
     </div>
     <div class="hoja">${htmlInterior}</div>
     </body></html>`);
@@ -895,9 +1079,9 @@ function abrirVistaPrevia(htmlInterior, titulo){
 function estatusOrden(st){
   const dd=(st||state).dias||{};
   const claves=Object.keys(dd);
-  if(!claves.length) return 'Sin días';
+  if(!claves.length) return t('noState');
   const todosCerrados=claves.every(k=>dd[k] && dd[k].closed);
-  return todosCerrados ? 'CERRADA' : 'EN PROCESO';
+  return todosCerrados ? t('closedOrder') : t('inProcess');
 }
 
 /* Imprimir el parte de UN día (solo totales, sin lista de muestras) */
@@ -909,39 +1093,40 @@ function imprimirDia(key){
   const cuerpo=`
     <div style="font-family:Arial,sans-serif;color:#000;padding:24px;font-size:12px">
       <div style="display:flex;justify-content:space-between;border-bottom:2px solid #000;padding-bottom:10px;margin-bottom:16px">
-        <div><h2 style="margin:0;font-size:18px">PARTE DIARIO DE PRODUCCIÓN</h2>
-        <div style="font-size:11px;color:#444">Control de Producción — GVIP</div></div>
-        <div style="text-align:right;font-size:11px">Impreso:<br>${fmtDate(new Date())}<br>${fmtTime(new Date())}</div>
+        <div><h2 style="margin:0;font-size:18px">${t('pDailyTitle')}</h2>
+        <div style="font-size:11px;color:#444">${t('pSubtitle')}</div></div>
+        <div style="text-align:right;font-size:11px">${t('pPrinted')}<br>${fmtDate(new Date())}<br>${fmtTime(new Date())}</div>
       </div>
       <table style="width:100%;font-size:12px;margin-bottom:18px">
-        <tr><td style="padding:3px 0;width:50%"><b>Producto:</b> ${o.producto||'________________'}</td>
-            <td style="padding:3px 0"><b>N° Batch:</b> ${o.lote||'____________'}</td></tr>
-        <tr><td style="padding:3px 0"><b>Room:</b> ${o.orden||'____________'}</td>
-            <td style="padding:3px 0"><b>Estatus de la orden:</b> ${estO}</td></tr>
+        <tr><td style="padding:3px 0;width:50%"><b>${t('pProductLbl')}</b> ${o.producto||'________________'}</td>
+            <td style="padding:3px 0"><b>${t('pBatchLbl')}</b> ${o.lote||'____________'}</td></tr>
+        <tr><td style="padding:3px 0"><b>${t('pRoomLbl')}</b> ${o.orden||'____________'}</td>
+            <td style="padding:3px 0"><b>${t('pStatusLbl')}</b> ${estO}</td></tr>
       </table>
       <table style="width:75%;border-collapse:collapse;font-size:13px">
-        <tr><td style="border:1px solid #999;padding:9px;background:#eee;width:55%"><b>Fecha del día</b></td>
+        <tr><td style="border:1px solid #999;padding:9px;background:#eee;width:55%"><b>${t('pDayDate')}</b></td>
             <td style="border:1px solid #999;padding:9px;text-align:right">${fmtDate(d)}</td></tr>
-        <tr><td style="border:1px solid #999;padding:9px;background:#eee"><b>Total cápsulas del día</b></td>
-            <td style="border:1px solid #999;padding:9px;text-align:right">${dd.prod!=null?Number(dd.prod).toLocaleString('es'):'—'}</td></tr>
-        <tr><td style="border:1px solid #999;padding:9px;background:#eee"><b>Total barriles del día</b></td>
+        <tr><td style="border:1px solid #999;padding:9px;background:#eee"><b>${t('pTotalCapsDay')}</b></td>
+            <td style="border:1px solid #999;padding:9px;text-align:right">${dd.prod!=null?Number(dd.prod).toLocaleString(I18N[lang].locale):'—'}</td></tr>
+        <tr><td style="border:1px solid #999;padding:9px;background:#eee"><b>${t('pTotalBarrelsDay')}</b></td>
             <td style="border:1px solid #999;padding:9px;text-align:right">${dd.barriles!=null?dd.barriles:'—'}</td></tr>
-        <tr><td style="border:1px solid #999;padding:9px;background:#eee"><b>Peso del parcial</b></td>
-            <td style="border:1px solid #999;padding:9px;text-align:right">${dd.parcial!=null?dd.parcial+' kg':'— (sin parcial)'}</td></tr>
-        <tr><td style="border:1px solid #999;padding:9px;background:#eee"><b>Estado del día</b></td>
-            <td style="border:1px solid #999;padding:9px;text-align:right">${dd.closed?'Cerrado':'Abierto'}</td></tr>
+        <tr><td style="border:1px solid #999;padding:9px;background:#eee"><b>${t('pPartialWeight')}</b></td>
+            <td style="border:1px solid #999;padding:9px;text-align:right">${dd.parcial!=null?dd.parcial+' '+t('kg'):t('pNoPartial')}</td></tr>
+        <tr><td style="border:1px solid #999;padding:9px;background:#eee"><b>${t('pDayState')}</b></td>
+            <td style="border:1px solid #999;padding:9px;text-align:right">${dd.closed?t('pClosed'):t('pOpen')}</td></tr>
       </table>
       <div style="display:flex;justify-content:space-between;margin-top:56px;font-size:11px">
-        <div style="border-top:1px solid #000;padding-top:5px;width:40%;text-align:center">Operador responsable</div>
-        <div style="border-top:1px solid #000;padding-top:5px;width:40%;text-align:center">Supervisor QC</div>
+        <div style="border-top:1px solid #000;padding-top:5px;width:40%;text-align:center">${t('pOperResp')}</div>
+        <div style="border-top:1px solid #000;padding-top:5px;width:40%;text-align:center">${t('pSupQC')}</div>
       </div>
     </div>`;
-  abrirVistaPrevia(cuerpo, 'Parte diario — '+fmtDate(d));
+  abrirVistaPrevia(cuerpo, t('pDailyTitle')+' — '+fmtDate(d));
 }
 
 $('btnImprimir').addEventListener('click',()=>{
-  if(!supervisor){ alert('Solo el supervisor puede imprimir.'); return; }
+  if(!supervisor){ alert(t('alOnlySupPrint')); return; }
   const o=state.orden, {min,max}=getRange(), meta=parseFloat(o.metaCaps);
+  const loc=I18N[lang].locale;
   const recs=state.registros.slice().sort((a,b)=>new Date(a.ts)-new Date(b.ts));
   const pc=recs.length?recs.reduce((s,r)=>s+r.prom,0)/recs.length:0;
   let fuera=0; recs.forEach(r=>{ if(inRange(r.prom)===false) fuera++; });
@@ -950,62 +1135,62 @@ $('btnImprimir').addEventListener('click',()=>{
 
   let rowsHtml='';
   recs.forEach(r=>{ const d=new Date(r.ts); const ir=inRange(r.prom);
-    const est = ir===true?'En rango':(ir===false?'FUERA':'—');
+    const est = ir===true?t('pInRange'):(ir===false?t('pOut'):'—');
     const rowBg = ir===false?'background:#fde2e2':'';
     rowsHtml+=`<tr style="${rowBg}"><td style="border:1px solid #999;padding:5px">${dayKey(d)}</td><td style="border:1px solid #999;padding:5px">${fmtTime(d)}</td><td style="border:1px solid #999;padding:5px;text-align:right">${r.diez.toFixed(4)}</td><td style="border:1px solid #999;padding:5px;text-align:right">${r.prom.toFixed(1)}</td><td style="border:1px solid #999;padding:5px;text-align:center">${est}</td><td style="border:1px solid #999;padding:5px;text-align:center">${r.oper}</td></tr>`;
   });
   let dayRows='';
   Object.keys(state.dias).sort().forEach(k=>{const dd=state.dias[k];
-    dayRows+=`<tr><td style="border:1px solid #999;padding:5px">${k}</td><td style="border:1px solid #999;padding:5px;text-align:right">${dd.prod!=null?Number(dd.prod).toLocaleString('es'):'—'}</td><td style="border:1px solid #999;padding:5px;text-align:right">${dd.barriles!=null?dd.barriles:'—'}</td><td style="border:1px solid #999;padding:5px;text-align:right">${dd.parcial!=null?dd.parcial+' kg':'—'}</td><td style="border:1px solid #999;padding:5px;text-align:center">${dd.closed?'Cerrado':'Abierto'}</td></tr>`;});
+    dayRows+=`<tr><td style="border:1px solid #999;padding:5px">${k}</td><td style="border:1px solid #999;padding:5px;text-align:right">${dd.prod!=null?Number(dd.prod).toLocaleString(loc):'—'}</td><td style="border:1px solid #999;padding:5px;text-align:right">${dd.barriles!=null?dd.barriles:'—'}</td><td style="border:1px solid #999;padding:5px;text-align:right">${dd.parcial!=null?dd.parcial+' '+t('kg'):'—'}</td><td style="border:1px solid #999;padding:5px;text-align:center">${dd.closed?t('pClosed'):t('pOpen')}</td></tr>`;});
   const barrTotalP=Object.values(state.dias).reduce((s,d)=>s+(d&&d.barriles?d.barriles:0),0);
 
-  const rangoTxt = (min>0&&max>0)?`${min.toFixed(1)} – ${max.toFixed(1)} mg`:'_______';
+  const rangoTxt = (min>0&&max>0)?`${min.toFixed(1)} – ${max.toFixed(1)} ${t('mg')}`:'_______';
 
   const cuerpo=`
     <div style="font-family:Arial,sans-serif;color:#000;padding:24px;font-size:12px">
       <div style="display:flex;justify-content:space-between;border-bottom:2px solid #000;padding-bottom:10px;margin-bottom:16px">
-        <div><h2 style="margin:0;font-size:18px">CONTROL DE PRODUCCIÓN</h2>
-        <div style="font-size:11px;color:#444">GVIP · Registro de muestreo QC — 10 cápsulas por toma</div></div>
-        <div style="text-align:right;font-size:11px">Impreso:<br>${fmtDate(new Date())}<br>${fmtTime(new Date())}</div>
+        <div><h2 style="margin:0;font-size:18px">${t('pMainTitle')}</h2>
+        <div style="font-size:11px;color:#444">${t('pMainSub')}</div></div>
+        <div style="text-align:right;font-size:11px">${t('pPrinted')}<br>${fmtDate(new Date())}<br>${fmtTime(new Date())}</div>
       </div>
       <table style="width:100%;font-size:12px;margin-bottom:16px">
-        <tr><td style="padding:3px 0;width:50%"><b>Producto:</b> ${o.producto||'________________'}</td>
-            <td style="padding:3px 0"><b>N° Batch:</b> ${o.lote||'____________'}</td></tr>
-        <tr><td style="padding:3px 0"><b>Room:</b> ${o.orden||'____________'}</td>
-            <td style="padding:3px 0"><b>Rango por cápsula:</b> ${rangoTxt}</td></tr>
-        <tr><td style="padding:3px 0"><b>Objetivo total:</b> ${meta?meta.toLocaleString('es')+' cáps':'_______'}</td>
-            <td style="padding:3px 0"><b>Producción acum.:</b> ${prodTotal.toLocaleString('es')} cáps (${pct})</td></tr>
-        <tr><td style="padding:3px 0"><b>Estatus de la orden:</b> ${estatusOrden()}</td><td></td></tr>
+        <tr><td style="padding:3px 0;width:50%"><b>${t('pProductLbl')}</b> ${o.producto||'________________'}</td>
+            <td style="padding:3px 0"><b>${t('pBatchLbl')}</b> ${o.lote||'____________'}</td></tr>
+        <tr><td style="padding:3px 0"><b>${t('pRoomLbl')}</b> ${o.orden||'____________'}</td>
+            <td style="padding:3px 0"><b>${t('pRangeLbl')}</b> ${rangoTxt}</td></tr>
+        <tr><td style="padding:3px 0"><b>${t('pTargetLbl')}</b> ${meta?meta.toLocaleString(loc)+' '+t('capsUnit'):'_______'}</td>
+            <td style="padding:3px 0"><b>${t('pAccumLbl')}</b> ${prodTotal.toLocaleString(loc)} ${t('capsUnit')} (${pct})</td></tr>
+        <tr><td style="padding:3px 0"><b>${t('pStatusLbl')}</b> ${estatusOrden()}</td><td></td></tr>
       </table>
       <table style="width:100%;border-collapse:collapse;font-size:11px">
         <thead><tr style="background:#eee">
-          ${['Fecha','Hora','Peso 10 cáps (g)','Peso/cáps (mg)','Estado','Operador'].map(h=>`<th style="border:1px solid #999;padding:6px">${h}</th>`).join('')}
+          ${[t('pDate'),t('thTime'),t('thW10'),t('thWcap'),t('thStatus'),t('thOperator')].map(h=>`<th style="border:1px solid #999;padding:6px">${h}</th>`).join('')}
         </tr></thead>
-        <tbody>${rowsHtml||'<tr><td colspan="6" style="border:1px solid #999;padding:10px;text-align:center">Sin registros</td></tr>'}</tbody>
+        <tbody>${rowsHtml||`<tr><td colspan="6" style="border:1px solid #999;padding:10px;text-align:center">${t('pNoRecords')}</td></tr>`}</tbody>
       </table>
-      <h3 style="font-size:13px;margin:18px 0 8px">Producción por día</h3>
+      <h3 style="font-size:13px;margin:18px 0 8px">${t('pProdByDay')}</h3>
       <table style="width:85%;border-collapse:collapse;font-size:11px">
         <thead><tr style="background:#eee">
-          <th style="border:1px solid #999;padding:6px;text-align:left">Fecha</th>
-          <th style="border:1px solid #999;padding:6px">Cápsulas</th>
-          <th style="border:1px solid #999;padding:6px">Barriles llenos</th>
-          <th style="border:1px solid #999;padding:6px">Parcial (kg)</th>
-          <th style="border:1px solid #999;padding:6px">Estado</th>
+          <th style="border:1px solid #999;padding:6px;text-align:left">${t('pDate')}</th>
+          <th style="border:1px solid #999;padding:6px">${t('pCapsules')}</th>
+          <th style="border:1px solid #999;padding:6px">${t('pBarrels')}</th>
+          <th style="border:1px solid #999;padding:6px">${t('pPartial')}</th>
+          <th style="border:1px solid #999;padding:6px">${t('pState')}</th>
         </tr></thead>
-        <tbody>${dayRows||'<tr><td colspan="5" style="border:1px solid #999;padding:8px;text-align:center">Sin días registrados</td></tr>'}
-        <tr style="background:#f5f5f5;font-weight:bold"><td style="border:1px solid #999;padding:6px">TOTAL</td><td style="border:1px solid #999;padding:6px;text-align:right">${prodTotal.toLocaleString('es')}</td><td style="border:1px solid #999;padding:6px;text-align:right">${barrTotalP}</td><td style="border:1px solid #999;padding:6px"></td><td style="border:1px solid #999;padding:6px"></td></tr></tbody>
+        <tbody>${dayRows||`<tr><td colspan="5" style="border:1px solid #999;padding:8px;text-align:center">${t('pNoDays')}</td></tr>`}
+        <tr style="background:#f5f5f5;font-weight:bold"><td style="border:1px solid #999;padding:6px">${t('pTotal')}</td><td style="border:1px solid #999;padding:6px;text-align:right">${prodTotal.toLocaleString(loc)}</td><td style="border:1px solid #999;padding:6px;text-align:right">${barrTotalP}</td><td style="border:1px solid #999;padding:6px"></td><td style="border:1px solid #999;padding:6px"></td></tr></tbody>
       </table>
       <table style="width:100%;font-size:12px;margin-top:16px;border-top:1px solid #000">
-        <tr><td style="padding:6px 0"><b>Total muestras:</b> ${recs.length}</td>
-            <td style="padding:6px 0"><b>Prom. cápsula:</b> ${pc?pc.toFixed(1)+' mg':'—'}</td>
-            <td style="padding:6px 0"><b>Muestras fuera de rango:</b> ${fuera}</td></tr>
+        <tr><td style="padding:6px 0"><b>${t('pTotalSamples')}</b> ${recs.length}</td>
+            <td style="padding:6px 0"><b>${t('pAvgCap')}</b> ${pc?pc.toFixed(1)+' '+t('mg'):'—'}</td>
+            <td style="padding:6px 0"><b>${t('pOutSamples')}</b> ${fuera}</td></tr>
       </table>
       <div style="display:flex;justify-content:space-between;margin-top:48px;font-size:11px">
-        <div style="border-top:1px solid #000;padding-top:5px;width:40%;text-align:center">Operador responsable</div>
-        <div style="border-top:1px solid #000;padding-top:5px;width:40%;text-align:center">Supervisor QC</div>
+        <div style="border-top:1px solid #000;padding-top:5px;width:40%;text-align:center">${t('pOperResp')}</div>
+        <div style="border-top:1px solid #000;padding-top:5px;width:40%;text-align:center">${t('pSupQC')}</div>
       </div>
     </div>`;
-  abrirVistaPrevia(cuerpo, 'Control de Producción — '+(o.orden||'orden'));
+  abrirVistaPrevia(cuerpo, t('pMainTitle')+' — '+(o.orden||'orden'));
 });
 
 /* ---- código de orden y modo supervisor ---- */
@@ -1041,20 +1226,21 @@ async function refrescarTablero(){
   const grid=$('tabGrid'), empty=$('tabEmpty');
   if(!tabCodigos.length){ grid.innerHTML=''; empty.style.display='block'; setTabConn('','—'); return; }
   empty.style.display='none';
-  setTabConn('sync','Actualizando…');
+  setTabConn('sync',t('updating'));
   let datos={};
-  try{ datos=await leerVarias(tabCodigos); setTabConn('ok','Actualizado · '+fmtTime(new Date())); }
-  catch(e){ setTabConn('bad','Error al actualizar'); return; }
+  try{ datos=await leerVarias(tabCodigos); setTabConn('ok',t('updatedAt')+' · '+fmtTime(new Date())); }
+  catch(e){ setTabConn('bad',t('updateErr')); return; }
 
   let html='';
+  const loc=I18N[lang].locale;
   tabCodigos.forEach(cod=>{
     const d=datos[cod];
     if(!d){
       html+=`<div class="ord-card miss">
         <div class="oc-top"><div><div class="oc-code">${cod}</div>
-          <div class="oc-prod">Orden no encontrada</div></div>
-          <button class="oc-rm" onclick="quitarTab('${cod}')" title="Quitar">✕</button></div>
-        <div class="oc-meta">Sin datos en la nube todavía.</div></div>`;
+          <div class="oc-prod">${t('orderNotFound')}</div></div>
+          <button class="oc-rm" onclick="quitarTab('${cod}')" title="${t('cancel')}">✕</button></div>
+        <div class="oc-meta">${t('noCloudData')}</div></div>`;
       return;
     }
     const o=d.orden||{};
@@ -1062,7 +1248,7 @@ async function refrescarTablero(){
     const meta=parseFloat(o.metaCaps);
     const prodTotal=prodAcumulada(dias, true);
     const est=estatusOrden(d);
-    const estCls = est==='CERRADA'?'cerr':(est==='EN PROCESO'?'proc':'sin');
+    const estCls = est===t('closedOrder')?'cerr':(est===t('inProcess')?'proc':'sin');
 
     /* último avance del día: del día abierto más reciente con avance */
     let avanceTxt='—';
@@ -1070,8 +1256,8 @@ async function refrescarTablero(){
     if(clavesAbiertas.length){
       const k=clavesAbiertas[clavesAbiertas.length-1];
       const a=dias[k].avance;
-      const t=dias[k].avanceTs?` · ${fmtTime(new Date(dias[k].avanceTs))}`:'';
-      avanceTxt=`<b>${Number(a).toLocaleString('es')}</b> cáps${t}`;
+      const hh=dias[k].avanceTs?` · ${fmtTime(new Date(dias[k].avanceTs))}`:'';
+      avanceTxt=`<b>${Number(a).toLocaleString(loc)}</b> ${t('capsUnit')}${hh}`;
     }
 
     /* producción del cierre del día anterior: último día CERRADO con total */
@@ -1079,7 +1265,7 @@ async function refrescarTablero(){
     const clavesCerradas=Object.keys(dias).filter(k=>dias[k] && dias[k].closed && dias[k].prod!=null).sort();
     if(clavesCerradas.length){
       const kc=clavesCerradas[clavesCerradas.length-1];
-      cierreAntTxt=`<b>${Number(dias[kc].prod).toLocaleString('es')}</b> cáps`;
+      cierreAntTxt=`<b>${Number(dias[kc].prod).toLocaleString(loc)}</b> ${t('capsUnit')}`;
       cierreAntFecha=` <span style="color:var(--muted)">(${kc})</span>`;
     }
 
@@ -1088,10 +1274,10 @@ async function refrescarTablero(){
     const hoyKey=dayKey(new Date());
     const dHoy=dias[hoyKey];
     if(dHoy && !dHoy.closed && dHoy.avance!=null){
-      const t=dHoy.avanceTs?` · ${fmtTime(new Date(dHoy.avanceTs))}`:'';
-      parcialHoyTxt=`<b>${Number(dHoy.avance).toLocaleString('es')}</b> cáps${t}`;
+      const hh=dHoy.avanceTs?` · ${fmtTime(new Date(dHoy.avanceTs))}`:'';
+      parcialHoyTxt=`<b>${Number(dHoy.avance).toLocaleString(loc)}</b> ${t('capsUnit')}${hh}`;
     } else if(dHoy && dHoy.closed && dHoy.prod!=null){
-      parcialHoyTxt=`<b>${Number(dHoy.prod).toLocaleString('es')}</b> cáps <span style="color:var(--accent)">(día cerrado)</span>`;
+      parcialHoyTxt=`<b>${Number(dHoy.prod).toLocaleString(loc)}</b> ${t('capsUnit')} <span style="color:var(--accent)">${t('dayClosedTag')}</span>`;
     }
 
     let prog='';
@@ -1099,35 +1285,35 @@ async function refrescarTablero(){
       const pctReal=prodTotal/meta*100, pct=Math.min(100,pctReal);
       let color = pctReal<=30?'var(--danger)':(pctReal<=70?'var(--warn)':'var(--accent)');
       prog=`<div>
-        <div class="oc-prog-top"><span>Avance de producción</span>
+        <div class="oc-prog-top"><span>${t('prodProgressLabel')}</span>
           <b>${pct.toFixed(1)}%</b></div>
         <div class="bar"><span style="width:${pct}%;background:${color}"></span></div>
         <div class="oc-prog-top" style="margin-top:5px;margin-bottom:0">
-          <span style="color:var(--muted)">${prodTotal.toLocaleString('es')} / ${meta.toLocaleString('es')} cáps</span></div>
+          <span style="color:var(--muted)">${prodTotal.toLocaleString(loc)} / ${meta.toLocaleString(loc)} ${t('capsUnit')}</span></div>
       </div>`;
     } else {
-      prog=`<div class="oc-meta">Producción acum.: <b>${prodTotal.toLocaleString('es')}</b> cáps (sin objetivo definido)</div>`;
+      prog=`<div class="oc-meta">${t('accumLabel')} <b>${prodTotal.toLocaleString(loc)}</b> ${t('capsUnit')} ${t('noTargetSet')}</div>`;
     }
 
     html+=`<div class="ord-card">
       <div class="oc-top">
         <div>
           <div class="oc-code">${cod}</div>
-          <div class="oc-prod">${o.producto||'(sin producto)'}</div>
+          <div class="oc-prod">${o.producto||t('noProduct')}</div>
         </div>
         <div style="display:flex;align-items:center;gap:8px">
           <span class="est-pill ${estCls}">${est}</span>
-          <button class="oc-rm" onclick="quitarTab('${cod}')" title="Quitar">✕</button>
+          <button class="oc-rm" onclick="quitarTab('${cod}')" title="${t('cancel')}">✕</button>
         </div>
       </div>
       <div class="oc-meta">
-        ${o.lote?`<span>Batch: <b>${o.lote}</b></span>`:''}
-        ${o.orden?`<span>Room: <b>${o.orden}</b></span>`:''}
+        ${o.lote?`<span>${t('batchLabel')} <b>${o.lote}</b></span>`:''}
+        ${o.orden?`<span>${t('roomLabel')} <b>${o.orden}</b></span>`:''}
       </div>
       ${prog}
-      <div class="oc-avance">Último avance del día: ${avanceTxt}</div>
-      <div class="oc-avance">Cierre día anterior: ${cierreAntTxt}${cierreAntFecha}</div>
-      <div class="oc-avance">Producción parcial de hoy: ${parcialHoyTxt}</div>
+      <div class="oc-avance">${t('lastDayProgress')} ${avanceTxt}</div>
+      <div class="oc-avance">${t('prevDayClose')} ${cierreAntTxt}${cierreAntFecha}</div>
+      <div class="oc-avance">${t('todayPartial')} ${parcialHoyTxt}</div>
     </div>`;
   });
   grid.innerHTML=html;
@@ -1159,6 +1345,10 @@ function iniciarTablero(){
 }
 /* =============================================================== */
 
+function refrescarRol(){
+  $('rolTag').textContent = supervisor ? t('supervisor') : t('operator');
+}
+
 function applyURL(){
   const p=new URLSearchParams(location.search);
   const cod=p.get('orden');
@@ -1167,7 +1357,6 @@ function applyURL(){
     supervisor=true;
     document.body.classList.add('supervisor');
     $('supBanner').classList.add('show');
-    $('rolTag').textContent='👁️ Supervisor';
     $('rolTag').classList.add('sup');
     /* bloquear edición de los campos de la orden (siguen visibles) */
     ['fProducto','fLote','fOrden','fMin','fMax','fMetaCaps'].forEach(id=>{
@@ -1175,8 +1364,8 @@ function applyURL(){
     });
   } else {
     supervisor=false;
-    $('rolTag').textContent='👷 Operador';
   }
+  refrescarRol();
   if(cod){ $('fCodigo').value=cod.toUpperCase(); }
   /* modo tablero: solo para supervisor y con ?tablero=1 */
   const quiereTablero = supervisor && (p.get('tablero')==='1' || p.get('tablero')==='si');
@@ -1184,6 +1373,12 @@ function applyURL(){
 }
 
 $('btnRefrescar').addEventListener('click',()=>{ if(codigo) abrirOrden(codigo); });
+
+/* idioma: por defecto inglés; recuerda la elección en el dispositivo */
+try{ const g=localStorage.getItem(LANG_LS_KEY); if(g==='es'||g==='en') lang=g; }catch(e){}
+$('langSel').value=lang;
+$('langSel').addEventListener('change',e=>setLang(e.target.value));
+aplicarIdioma();
 
 initSupabase();
 const initInfo=applyURL();
