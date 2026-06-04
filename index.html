@@ -599,6 +599,8 @@ const I18N = {
     signSubFor:'Initials:', signEmpty:'Please draw a signature before saving.',
     firmaOnFile:'✓ Signature on file for these initials.', firmaNeeded:'A signature will be requested for these initials.',
     firmaRedo:'Redo signature', firmaAdd:'Add signature',
+    signLegendTitle:'Signatures — initials and digital signature of each sampler',
+    signNone:'(no signature)',
     printControlChart:'🖨️ Print control chart (Sam\u2019s Club)',
     pChartTitle:'CONTROL CHART — INDIVIDUAL CAPSULE WEIGHT', pChartProductFixed:'Sam\u2019s Club — Extra Strength Turmeric Capsules (W5226)',
     pChartW10:'Weight of 10 capsules \u2013 9.01 to 9.93 grams', pChartIndiv:'Individual Capsule Weight \u2013 Not Less than 886 mg',
@@ -686,6 +688,8 @@ const I18N = {
     signSubFor:'Iniciales:', signEmpty:'Dibuje una firma antes de guardar.',
     firmaOnFile:'✓ Firma registrada para estas iniciales.', firmaNeeded:'Se pedirá una firma para estas iniciales.',
     firmaRedo:'Rehacer firma', firmaAdd:'Agregar firma',
+    signLegendTitle:'Firmas — iniciales y firma digital de cada persona que tomó muestra',
+    signNone:'(sin firma)',
     printControlChart:'🖨️ Imprimir gráfica de control (Sam\u2019s Club)',
     pChartTitle:'GRÁFICA DE CONTROL — PESO INDIVIDUAL DE CÁPSULA', pChartProductFixed:'Sam\u2019s Club — Extra Strength Turmeric Capsules (W5226)',
     pChartW10:'Weight of 10 capsules \u2013 9.01 to 9.93 grams', pChartIndiv:'Individual Capsule Weight \u2013 Not Less than 886 mg',
@@ -1298,7 +1302,6 @@ function construirTablaControl(muestras, loc){
   const cellW=26;        /* ancho de cada columna de toma (px) */
   const rowH=16;         /* alto de cada fila de la malla (px) */
   const labelW=52;       /* ancho de la columna de etiquetas de peso (px) */
-  const ckdH=34;         /* alto de la fila Ckd By (firmas) */
 
   let h=`<table style="border-collapse:collapse;font-size:9px;table-layout:fixed">`;
   /* filas de la malla: etiqueta de peso + celdas VACÍAS (las '+' las pinta el SVG encima,
@@ -1325,18 +1328,12 @@ function construirTablaControl(muestras, loc){
   h+=filaInferior(t('pChartWeightRow'), m=>Math.round(m.prom));
   h+=filaInferior(t('pChartTimeRow'),   m=>{ const d=new Date(m.ts); return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`; });
   h+=filaInferior(t('pChartDateRow'),   m=>{ const d=new Date(m.ts); return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}`; });
-  /* Ckd By: firma manuscrita si existe (grande y legible), si no las iniciales en texto en negrita */
-  let rc=`<tr><td style="${bd}padding:0 5px;font-weight:bold;text-align:left;white-space:nowrap;height:${ckdH}px;line-height:${ckdH}px">${t('pChartCkd')}</td>`;
+  /* Ckd By: solo las iniciales en texto (las firmas van en la leyenda bajo las tablas) */
+  let rc=`<tr><td style="${bd}padding:0 5px;font-weight:bold;text-align:left;white-space:nowrap;height:${rowH}px;line-height:${rowH}px">${t('pChartCkd')}</td>`;
   for(let c=0;c<ncols;c++){
     const m=muestras[c];
-    let cont='';
-    if(m){
-      const firmaImg = state.firmas && state.firmas[m.oper];
-      cont = firmaImg
-        ? `<img src="${firmaImg}" alt="${m.oper}" style="width:${cellW}px;height:${ckdH-4}px;object-fit:contain;display:block;margin:0 auto">`
-        : `<span style="font-size:11px;font-weight:bold">${m.oper}</span>`;
-    }
-    rc+=`<td style="${bd}width:${cellW}px;height:${ckdH}px;text-align:center;vertical-align:middle;padding:1px">${cont}</td>`;
+    const cont = m ? `<span style="font-size:10px;font-weight:bold">${m.oper}</span>` : '';
+    rc+=`<td style="${bd}width:${cellW}px;height:${rowH}px;text-align:center;vertical-align:middle;padding:0">${cont}</td>`;
   }
   rc+=`<td style="border:none"></td></tr>`;
   h+=rc;
@@ -1401,6 +1398,28 @@ $('btnGrafica').addEventListener('click',()=>{
   const avgMg = pcMg ? pcMg.toFixed(1) : '____________';
   const avgKg = pcMg ? (pcMg/1000000).toFixed(7) : '____________';
 
+  /* leyenda de firmas: una entrada por inicial que tomó muestras en esta orden */
+  let leyenda='';
+  const inicialesUsadas=[];
+  recs.forEach(r=>{ if(r.oper && inicialesUsadas.indexOf(r.oper)<0) inicialesUsadas.push(r.oper); });
+  if(inicialesUsadas.length){
+    let items='';
+    inicialesUsadas.forEach(op=>{
+      const firmaImg = state.firmas && state.firmas[op];
+      const firmaCell = firmaImg
+        ? `<img src="${firmaImg}" alt="${op}" style="height:36px;max-width:160px;object-fit:contain;display:block">`
+        : `<span style="color:#888;font-size:10px">${t('signNone')}</span>`;
+      items+=`<div style="display:flex;align-items:center;gap:10px;border:1px solid #999;border-radius:4px;padding:6px 12px;min-width:170px">
+                <span style="font-weight:bold;font-size:14px;min-width:34px">${op}</span>
+                <span style="border-left:1px solid #ccc;padding-left:10px">${firmaCell}</span>
+              </div>`;
+    });
+    leyenda=`<div style="margin-top:18px">
+      <div style="font-weight:bold;font-size:12px;margin-bottom:8px">${t('signLegendTitle')}</div>
+      <div style="display:flex;flex-wrap:wrap;gap:12px">${items}</div>
+    </div>`;
+  }
+
   const cuerpo=`
     <div style="font-family:'Times New Roman',serif;color:#000;padding:22px;font-size:12px">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px">
@@ -1412,6 +1431,7 @@ $('btnGrafica').addEventListener('click',()=>{
         </div>
       </div>
       ${tablas}
+      ${leyenda}
       <div style="margin-top:18px;font-size:12px">
         <div style="margin-bottom:10px">${t('pChartAvgMg')}
           <span style="border-bottom:1px solid #000;padding:0 40px">${avgMg}</span> mg</div>
