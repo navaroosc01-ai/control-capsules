@@ -170,21 +170,32 @@
     padding:7px 14px;border-radius:8px;background:var(--panel2);color:var(--muted);white-space:nowrap}
   .rol-tag.sup{background:rgba(240,180,41,.15);color:var(--warn)}
   body.supervisor .big-btn,
-  body.supervisor #btnLimpiar,
   body.supervisor .day-head .mini-btn:not(.btn-reabrir),
   body.supervisor .parcial-row .px,
-  body.supervisor .btn.danger{display:none !important}
+  body.supervisor tbody .btn.danger{display:none !important}
   /* El supervisor VE los datos de la orden pero no puede editarlos */
   body.supervisor input:not(#fCodigo):not(#tabCodigos){pointer-events:none;opacity:.85;background:var(--panel)}
   body.supervisor #fCodigo{pointer-events:auto;opacity:1}
   body.supervisor #tabCodigos{pointer-events:auto;opacity:1;background:var(--panel2)}
-  /* Imprimir y CSV: solo visibles para el supervisor */
-  #btnImprimir, #btnCSV, #btnGrafica{display:none}
-  body.supervisor #btnImprimir, body.supervisor #btnCSV, body.supervisor #btnGrafica{display:inline-block !important}
+  /* Imprimir, CSV y Limpiar: solo visibles para el supervisor */
+  #btnImprimir, #btnCSV, #btnGrafica, #btnLimpiar{display:none}
+  body.supervisor #btnImprimir, body.supervisor #btnCSV, body.supervisor #btnGrafica, body.supervisor #btnLimpiar{display:inline-block !important}
   /* Vista supervisor simplificada: ocultar rango/objetivo, tarjetas de stats y pill de rango */
   body.supervisor #filaRango,
   body.supervisor .stats,
   body.supervisor #rangePillWrap{display:none !important}
+
+  /* ===== Modo recolección (operador): solo el botón grande ===== */
+  /* El botón para activarlo solo existe para el operador y solo cuando NO está activo */
+  #btnRecoleccion{display:none}
+  body:not(.supervisor):not(.recoleccion) #btnRecoleccion{display:inline-block}
+  body.recoleccion .connbar,
+  body.recoleccion .sup-banner,
+  body.recoleccion .wrap > .card,
+  body.recoleccion #btnRecoleccion{display:none !important}
+  body.recoleccion #btnSalirRecoleccion{display:inline-block !important}
+  /* dar aire al botón grande cuando es lo único en pantalla */
+  body.recoleccion .big-btn{margin-top:24px}
 
   /* ===== Tablero multi-orden del supervisor ===== */
   #tablero{display:none}
@@ -310,6 +321,10 @@
   </button>
   <div id="diaCerradoAviso" style="display:none;font-size:12px;color:var(--warn);text-align:center;margin-top:8px" data-i18n="dayClosedNotice">
     🔒 Today is closed. Samples cannot be registered until the supervisor reopens it or starts a new day.
+  </div>
+  <div style="text-align:center;margin-top:10px">
+    <button class="mini-btn" id="btnRecoleccion" data-i18n="collectionModeOn">📲 Collection mode</button>
+    <button class="mini-btn" id="btnSalirRecoleccion" style="display:none" data-i18n="collectionModeOff">✕ Show full view</button>
   </div>
   <div style="height:16px"></div>
 
@@ -471,6 +486,7 @@ let state={ orden:{producto:'',lote:'',orden:'',min:'',max:'',metaCaps:''}, regi
 let codigo='', supervisor=false, lastPush=0, pollTimer=null;
 let diasExpandidos={}; /* { dayKey: true } días con todas las muestras desplegadas */
 const TOPE_MUESTRAS=3; /* muestras visibles por día antes de "Ver todas" */
+const RECOLECCION_LS_KEY='qc_recoleccion'; /* recuerda el modo recolección en el dispositivo */
 
 const CONFIGURED = !SUPABASE_URL.includes("PEGA_AQUI") && !SUPABASE_KEY.includes("PEGA_AQUI");
 const REST = SUPABASE_URL.replace(/\/$/,'') + '/rest/v1/ordenes';
@@ -631,6 +647,9 @@ const I18N = {
     noSamplesDay:'No samples this day.',
     thTime:'Time', thW10:'10-cap weight (g)', thWcap:'Weight/cap (mg)', thStatus:'Status', thOperator:'Operator',
     alOnlySupExport:'Only the supervisor can export.', alOnlySupPrint:'Only the supervisor can print.',
+    alOnlySupClear:'Only the supervisor can clear the order.',
+    collectionModeOn:'📲 Collection mode', collectionModeOff:'✕ Show full view',
+    alNeedFirstSample:'Register the first sample before enabling collection mode.',
     alOnlySupReopen:'Only the supervisor can reopen a day.',
     confReopen:'Reopen this day? It will stay open until the operator closes it again.',
     confClear:'This deletes all records, days and data of the current order. Continue?',
@@ -719,6 +738,9 @@ const I18N = {
     noSamplesDay:'Sin muestras este día.',
     thTime:'Hora', thW10:'Peso 10 cáps (g)', thWcap:'Peso/cáps (mg)', thStatus:'Estado', thOperator:'Operador',
     alOnlySupExport:'Solo el supervisor puede exportar.', alOnlySupPrint:'Solo el supervisor puede imprimir.',
+    alOnlySupClear:'Solo el supervisor puede limpiar la orden.',
+    collectionModeOn:'📲 Modo recolección', collectionModeOff:'✕ Ver pantalla completa',
+    alNeedFirstSample:'Registre la primera muestra antes de activar el modo recolección.',
     alOnlySupReopen:'Solo el supervisor puede reabrir un día.',
     confReopen:'¿Reabrir este día? Quedará abierto hasta que el operador lo cierre de nuevo.',
     confClear:'Esto borra todos los registros, días y datos de la orden actual. ¿Continuar?',
@@ -1057,6 +1079,18 @@ function render(){
   const meta=parseFloat(state.orden.metaCaps);
   const recs=state.registros.slice().sort((a,b)=>new Date(a.ts)-new Date(b.ts));
 
+  /* restaurar el modo recolección si quedó activo en este dispositivo (solo operador, con muestras) */
+  if(!supervisor && recs.length){
+    let flag=''; try{ flag=localStorage.getItem(RECOLECCION_LS_KEY)||''; }catch(e){}
+    if(flag==='1' && !document.body.classList.contains('recoleccion')){
+      document.body.classList.add('recoleccion');
+    }
+  }
+  /* si ya no hay muestras o es supervisor, nunca permanecer en modo recolección */
+  if((supervisor || !recs.length) && document.body.classList.contains('recoleccion')){
+    document.body.classList.remove('recoleccion');
+  }
+
   /* Bloqueo del botón de registro si el día de hoy está cerrado */
   const cerradoHoy=hoyCerrado();
   const btn=$('btnNuevo');
@@ -1170,11 +1204,29 @@ function delRec(i){ if(confirm(t('confDelSample'))){ state.registros.splice(i,1)
 function toggleDia(k){ diasExpandidos[k]=!diasExpandidos[k]; render(); }
 
 $('btnLimpiar').addEventListener('click',()=>{
+  if(!supervisor){ alert(t('alOnlySupClear')); return; }
   if(confirm(t('confClear'))){
     state={orden:{producto:'',lote:'',orden:'',min:'',max:'',metaCaps:''},registros:[],dias:{},firmas:{}};
-    save(); fillOrden(); render();
+    escribirNube(); fillOrden(); render();
   }
 });
+
+/* ===== Modo recolección (operador) ===== */
+function entrarRecoleccion(){
+  document.body.classList.add('recoleccion');
+  try{ localStorage.setItem(RECOLECCION_LS_KEY,'1'); }catch(e){}
+}
+function salirRecoleccion(){
+  document.body.classList.remove('recoleccion');
+  try{ localStorage.removeItem(RECOLECCION_LS_KEY); }catch(e){}
+}
+$('btnRecoleccion').addEventListener('click',()=>{
+  if(supervisor) return;
+  if(!state.registros.length){ alert(t('alNeedFirstSample')); return; }
+  entrarRecoleccion();
+});
+$('btnSalirRecoleccion').addEventListener('click',salirRecoleccion);
+/* ======================================== */
 
 /* ---- CSV ---- */
 $('btnCSV').addEventListener('click',()=>{
