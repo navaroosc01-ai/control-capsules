@@ -179,8 +179,8 @@
   body.supervisor #fCodigo{pointer-events:auto;opacity:1}
   body.supervisor #tabCodigos{pointer-events:auto;opacity:1;background:var(--panel2)}
   /* Imprimir y CSV: solo visibles para el supervisor */
-  #btnImprimir, #btnCSV{display:none}
-  body.supervisor #btnImprimir, body.supervisor #btnCSV{display:inline-block !important}
+  #btnImprimir, #btnCSV, #btnGrafica{display:none}
+  body.supervisor #btnImprimir, body.supervisor #btnCSV, body.supervisor #btnGrafica{display:inline-block !important}
   /* Vista supervisor simplificada: ocultar rango/objetivo, tarjetas de stats y pill de rango */
   body.supervisor #filaRango,
   body.supervisor .stats,
@@ -345,6 +345,7 @@
       When finished, a preformatted sheet is generated, ready to print or export.</p>
     <div class="btn-row">
       <button class="btn primary" id="btnImprimir" data-i18n="printSheet">🖨️ Print order sheet</button>
+      <button class="btn primary" id="btnGrafica" data-i18n="printControlChart">🖨️ Print control chart (Sam's Club)</button>
       <button class="btn" id="btnCSV" data-i18n="exportCsv">📥 Export CSV (Excel)</button>
       <button class="btn danger" id="btnLimpiar" data-i18n="clearOrder">🗑️ Clear order</button>
     </div>
@@ -377,7 +378,11 @@
     </div>
     <div class="row">
       <label data-i18n="operatorInitials">Operator initials</label>
-      <input id="mOper" maxlength="5" placeholder="Ex. JPM" data-i18n-ph="operatorPh" style="text-transform:uppercase">
+      <input id="mOper" maxlength="5" placeholder="Ex. JP" data-i18n-ph="operatorPh" style="text-transform:uppercase">
+      <div class="hint" id="mFirmaHint" style="display:flex;align-items:center;justify-content:space-between;gap:8px">
+        <span id="mFirmaTxt"></span>
+        <button type="button" class="mini-btn" id="mFirmaBtn" style="display:none"></button>
+      </div>
     </div>
     <div class="actions">
       <button class="btn" id="mCancel" data-i18n="cancel">Cancel</button>
@@ -432,6 +437,27 @@
   </div>
 </div>
 
+<!-- Modal de captura de firma -->
+<div class="modal-bg" id="modalFirma">
+  <div class="modal" style="max-width:460px">
+    <h3 data-i18n="signTitle">Capture signature</h3>
+    <div class="sub" id="firmaSub">—</div>
+    <div class="alert" id="firmaAlert"></div>
+    <div class="row">
+      <label data-i18n="signDraw">Draw your signature</label>
+      <div style="background:#fff;border:1px solid var(--line);border-radius:8px;overflow:hidden">
+        <canvas id="firmaCanvas" width="420" height="170"
+          style="display:block;width:100%;height:170px;touch-action:none;cursor:crosshair"></canvas>
+      </div>
+      <div class="hint" data-i18n="signHint">Sign with your finger or mouse. It will be saved for these initials and printed next to each of your samples.</div>
+    </div>
+    <div class="actions">
+      <button class="btn" id="firmaClear" data-i18n="signClear">Clear</button>
+      <button class="btn primary" id="firmaSave" data-i18n="signSave">Save signature</button>
+    </div>
+  </div>
+</div>
+
 <div id="printArea"></div>
 
 <script>
@@ -441,7 +467,7 @@ const SUPABASE_URL = "https://ureozunpfqmhetiaxdoj.supabase.co";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVyZW96dW5wZnFtaGV0aWF4ZG9qIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAyNDgxMTcsImV4cCI6MjA5NTgyNDExN30.oTAAiObEF0NKhqX5lMQJUPdTMOjB3PmYfYemFBHjoNI";
 /* =================================================================== */
 
-let state={ orden:{producto:'',lote:'',orden:'',min:'',max:'',metaCaps:''}, registros:[], dias:{} };
+let state={ orden:{producto:'',lote:'',orden:'',min:'',max:'',metaCaps:''}, registros:[], dias:{}, firmas:{} };
 let codigo='', supervisor=false, lastPush=0, pollTimer=null;
 let diasExpandidos={}; /* { dayKey: true } días con todas las muestras desplegadas */
 const TOPE_MUESTRAS=3; /* muestras visibles por día antes de "Ver todas" */
@@ -458,7 +484,7 @@ function initSupabase(){
 }
 
 function normalizar(d){ d=d||{}; d.orden=d.orden||{producto:'',lote:'',orden:'',min:'',max:'',metaCaps:''};
-  d.registros=d.registros||[]; d.dias=d.dias||{};
+  d.registros=d.registros||[]; d.dias=d.dias||{}; d.firmas=d.firmas||{};
   return d; }
 
 /* Leer la orden por código (GET REST) */
@@ -493,10 +519,10 @@ async function abrirOrden(cod){
     const d = await leerOrden();
     if(d){ state=normalizar(d); }
     else if(!supervisor){
-      state={ orden:{producto:'',lote:'',orden:'',min:'',max:'',metaCaps:''}, registros:[], dias:{} };
+      state={ orden:{producto:'',lote:'',orden:'',min:'',max:'',metaCaps:''}, registros:[], dias:{}, firmas:{} };
       await pushNow();
     } else {
-      state={ orden:{producto:'',lote:'',orden:'',min:'',max:'',metaCaps:''}, registros:[], dias:{} };
+      state={ orden:{producto:'',lote:'',orden:'',min:'',max:'',metaCaps:''}, registros:[], dias:{}, firmas:{} };
     }
     fillOrden(); render();
     setConn('ok', supervisor?(t('viewPrefix')+' '+codigo):(t('orderPrefix')+' '+codigo+' '+t('connLoaded')));
@@ -508,6 +534,8 @@ async function abrirOrden(cod){
 /* Sondeo: si pasó suficiente tiempo desde mi último guardado, refresco desde la nube */
 async function sondear(){
   if(!codigo || Date.now()-lastPush < 3000) return;
+  /* no refrescar desde la nube mientras se está capturando una firma o muestra pendiente */
+  if(modalFirma.classList.contains('show') || muestraPendiente) return;
   try{
     const d = await leerOrden();
     if(d){ state=normalizar(d); fillOrden(); render();
@@ -562,8 +590,21 @@ const I18N = {
     finishOrder:'Finish order', finishDesc:'When finished, a preformatted sheet is generated, ready to print or export.',
     printSheet:'🖨️ Print order sheet', exportCsv:'📥 Export CSV (Excel)', clearOrder:'🗑️ Clear order',
     newSample:'New sample', sampleTime:'Sample time', sampleTimeHint:'The system time is used by default. You can change it manually.',
-    weight10:'Weight of 10 capsules (g)', weightPerCap:'Weight per capsule (mg)', operatorInitials:'Operator initials', operatorPh:'Ex. JPM',
+    weight10:'Weight of 10 capsules (g)', weightPerCap:'Weight per capsule (mg)', operatorInitials:'Operator initials', operatorPh:'Ex. JP',
     cancel:'Cancel', saveSample:'Save sample',
+    /* firma digital */
+    signTitle:'Capture signature', signDraw:'Draw your signature',
+    signHint:'Sign with your finger or mouse. It will be saved for these initials and printed next to each of your samples.',
+    signClear:'Clear', signSave:'Save signature',
+    signSubFor:'Initials:', signEmpty:'Please draw a signature before saving.',
+    firmaOnFile:'✓ Signature on file for these initials.', firmaNeeded:'A signature will be requested for these initials.',
+    firmaRedo:'Redo signature', firmaAdd:'Add signature',
+    printControlChart:'🖨️ Print control chart (Sam\u2019s Club)',
+    pChartTitle:'CONTROL CHART — INDIVIDUAL CAPSULE WEIGHT', pChartProductFixed:'Sam\u2019s Club — Extra Strength Turmeric Capsules (W5226)',
+    pChartW10:'Weight of 10 capsules \u2013 9.01 to 9.93 grams', pChartIndiv:'Individual Capsule Weight \u2013 Not Less than 886 mg',
+    pChartWeightRow:'Weight', pChartTimeRow:'Time', pChartDateRow:'Date', pChartCkd:'Ckd By',
+    pChartDoc:'Document No.:', pChartAvgMg:'Average Weight of Capsules in mg (Average from above tables) =',
+    pChartAvgKg:'Average Weight of Capsules in kg =', pChartNoSamples:'No samples to chart.',
     updateProgress:'Update day progress', capsProducedSoFar:'Capsules produced so far', progressHint:'Replaces the previous value. Update it as many times as you want during the day.', saveProgress:'Save progress',
     closeDay:'Close day', totalCapsDay:'Total capsules for the day', closeDayHint:"Final amount for the day. Added to the order's accumulated production.",
     fullBarrels:'Full barrels', partialWeight:'Partial: weight (kg)', partialHint:'Leave empty if there is no partial.', closeDayBtn:'Close day',
@@ -636,8 +677,21 @@ const I18N = {
     finishOrder:'Finalizar orden', finishDesc:'Al finalizar se genera la hoja con formato preestablecido lista para imprimir o exportar.',
     printSheet:'🖨️ Imprimir hoja de orden', exportCsv:'📥 Exportar CSV (Excel)', clearOrder:'🗑️ Limpiar orden',
     newSample:'Nueva muestra', sampleTime:'Hora de la toma', sampleTimeHint:'Se toma la hora del sistema por defecto. Puede modificarla manualmente.',
-    weight10:'Peso de 10 cápsulas (g)', weightPerCap:'Peso por cápsula (mg)', operatorInitials:'Iniciales del operador', operatorPh:'Ej. JPM',
+    weight10:'Peso de 10 cápsulas (g)', weightPerCap:'Peso por cápsula (mg)', operatorInitials:'Iniciales del operador', operatorPh:'Ej. JP',
     cancel:'Cancelar', saveSample:'Guardar muestra',
+    /* firma digital */
+    signTitle:'Capturar firma', signDraw:'Dibuje su firma',
+    signHint:'Firme con el dedo o el mouse. Se guardará para estas iniciales y se imprimirá junto a cada una de sus muestras.',
+    signClear:'Borrar', signSave:'Guardar firma',
+    signSubFor:'Iniciales:', signEmpty:'Dibuje una firma antes de guardar.',
+    firmaOnFile:'✓ Firma registrada para estas iniciales.', firmaNeeded:'Se pedirá una firma para estas iniciales.',
+    firmaRedo:'Rehacer firma', firmaAdd:'Agregar firma',
+    printControlChart:'🖨️ Imprimir gráfica de control (Sam\u2019s Club)',
+    pChartTitle:'GRÁFICA DE CONTROL — PESO INDIVIDUAL DE CÁPSULA', pChartProductFixed:'Sam\u2019s Club — Extra Strength Turmeric Capsules (W5226)',
+    pChartW10:'Weight of 10 capsules \u2013 9.01 to 9.93 grams', pChartIndiv:'Individual Capsule Weight \u2013 Not Less than 886 mg',
+    pChartWeightRow:'Peso', pChartTimeRow:'Hora', pChartDateRow:'Fecha', pChartCkd:'Rev. por',
+    pChartDoc:'Document No.:', pChartAvgMg:'Peso promedio de cápsulas en mg (promedio de las tablas) =',
+    pChartAvgKg:'Peso promedio de cápsulas en kg =', pChartNoSamples:'No hay muestras para graficar.',
     updateProgress:'Actualizar avance del día', capsProducedSoFar:'Cápsulas producidas hasta ahora', progressHint:'Sustituye el valor anterior. Actualízalo cuantas veces quieras durante el día.', saveProgress:'Guardar avance',
     closeDay:'Cerrar día', totalCapsDay:'Producción total de cápsulas del día', closeDayHint:'Cantidad final del día. Se suma a la producción acumulada de la orden.',
     fullBarrels:'Barriles llenos', partialWeight:'Parcial: peso (kg)', partialHint:'Déjalo vacío si no hay parcial.', closeDayBtn:'Cerrar día',
@@ -765,6 +819,8 @@ function openModal(){
   $('mDiez').value=''; $('mPromedio').textContent='—';
   $('mStatus').style.display='none';
   $('mAlert').classList.remove('show'); $('mAlert').textContent='';
+  $('mOper').value='';
+  actualizarFirmaHint();
   const {min,max}=getRange();
   $('mRangeHint').textContent = (min>0&&max>0)?`${t('capRangePrefix')} ${min.toFixed(1)} – ${max.toFixed(1)} ${t('mg')}`:t('capRangeUndef');
   modal.classList.add('show'); setTimeout(()=>$('mDiez').focus(),50);
@@ -807,9 +863,110 @@ $('mSave').addEventListener('click',()=>{
     base.setHours(hh,mm,ss,0);
     ts=base.toISOString();
   }
+  /* si estas iniciales aún no tienen firma registrada, pedirla una sola vez
+     y dejar la muestra pendiente hasta que se capture */
+  if(!state.firmas || !state.firmas[oper]){
+    muestraPendiente={ ts, diez, prom:diez*100, oper };
+    abrirFirmaModal(oper, /*porMuestra=*/true);
+    return;
+  }
   state.registros.push({ ts, diez, prom:diez*100, oper });
   save(); closeModal(); render();
 });
+
+/* ===================== FIRMA DIGITAL ===================== */
+let muestraPendiente=null;       /* muestra a guardar tras capturar la firma */
+let firmaDesdeMuestra=false;     /* true si el modal de firma se abrió durante una toma */
+const modalFirma=$('modalFirma');
+const firmaCanvas=$('firmaCanvas');
+let fctx=null, dibujando=false, hayTrazo=false, lastPt=null;
+
+/* indicador junto al campo de iniciales en el modal de muestra */
+function actualizarFirmaHint(){
+  const oper=($('mOper').value||'').trim().toUpperCase();
+  const txt=$('mFirmaTxt'), btn=$('mFirmaBtn');
+  if(!oper){ txt.textContent=''; btn.style.display='none'; return; }
+  if(state.firmas && state.firmas[oper]){
+    txt.textContent=t('firmaOnFile'); txt.style.color='var(--accent)';
+    btn.textContent=t('firmaRedo'); btn.style.display='inline-block';
+  } else {
+    txt.textContent=t('firmaNeeded'); txt.style.color='var(--muted)';
+    btn.textContent=t('firmaAdd'); btn.style.display='inline-block';
+  }
+}
+$('mOper').addEventListener('input',actualizarFirmaHint);
+$('mFirmaBtn').addEventListener('click',()=>{
+  const oper=($('mOper').value||'').trim().toUpperCase();
+  if(!oper){ $('mOper').focus(); return; }
+  abrirFirmaModal(oper, /*porMuestra=*/false);
+});
+
+/* ajustar el canvas a su tamaño real en pantalla (nitidez en móvil) */
+function ajustarCanvas(){
+  const rect=firmaCanvas.getBoundingClientRect();
+  const ratio=window.devicePixelRatio||1;
+  firmaCanvas.width=Math.round(rect.width*ratio);
+  firmaCanvas.height=Math.round(rect.height*ratio);
+  fctx=firmaCanvas.getContext('2d');
+  fctx.scale(ratio,ratio);
+  fctx.lineWidth=2.2; fctx.lineCap='round'; fctx.lineJoin='round';
+  fctx.strokeStyle='#111';
+  fctx.clearRect(0,0,firmaCanvas.width,firmaCanvas.height);
+  hayTrazo=false;
+}
+function ptDesdeEvento(e){
+  const rect=firmaCanvas.getBoundingClientRect();
+  const src=(e.touches&&e.touches[0])?e.touches[0]:e;
+  return { x:src.clientX-rect.left, y:src.clientY-rect.top };
+}
+function fStart(e){ e.preventDefault(); dibujando=true; lastPt=ptDesdeEvento(e); }
+function fMove(e){
+  if(!dibujando) return; e.preventDefault();
+  const p=ptDesdeEvento(e);
+  fctx.beginPath(); fctx.moveTo(lastPt.x,lastPt.y); fctx.lineTo(p.x,p.y); fctx.stroke();
+  lastPt=p; hayTrazo=true;
+}
+function fEnd(e){ if(e) e.preventDefault(); dibujando=false; }
+firmaCanvas.addEventListener('mousedown',fStart);
+firmaCanvas.addEventListener('mousemove',fMove);
+window.addEventListener('mouseup',fEnd);
+firmaCanvas.addEventListener('touchstart',fStart,{passive:false});
+firmaCanvas.addEventListener('touchmove',fMove,{passive:false});
+firmaCanvas.addEventListener('touchend',fEnd,{passive:false});
+
+function abrirFirmaModal(oper, porMuestra){
+  firmaDesdeMuestra=!!porMuestra;
+  modalFirma.dataset.oper=oper;
+  $('firmaSub').textContent=`${t('signSubFor')} ${oper}`;
+  $('firmaAlert').classList.remove('show'); $('firmaAlert').textContent='';
+  modalFirma.classList.add('show');
+  /* esperar a que el modal sea visible para medir bien el canvas */
+  setTimeout(ajustarCanvas,60);
+}
+function cerrarFirmaModal(){ modalFirma.classList.remove('show'); }
+
+$('firmaClear').addEventListener('click',()=>{ if(fctx){ fctx.clearRect(0,0,firmaCanvas.width,firmaCanvas.height); hayTrazo=false; } });
+$('firmaSave').addEventListener('click',()=>{
+  const oper=modalFirma.dataset.oper;
+  const al=$('firmaAlert');
+  if(!hayTrazo){ al.textContent=t('signEmpty'); al.classList.add('show'); return; }
+  /* recortar el PNG a un tamaño compacto (mantiene transparencia) */
+  const dataUrl=firmaCanvas.toDataURL('image/png');
+  if(!state.firmas) state.firmas={};
+  state.firmas[oper]=dataUrl;
+  cerrarFirmaModal();
+  actualizarFirmaHint();
+  /* si la firma se pidió durante una toma, completar el guardado de la muestra */
+  if(firmaDesdeMuestra && muestraPendiente){
+    state.registros.push(muestraPendiente);
+    muestraPendiente=null; firmaDesdeMuestra=false;
+    save(); closeModal(); render();
+  } else {
+    save();
+  }
+});
+modalFirma.addEventListener('click',e=>{ if(e.target===modalFirma){ /* no cerrar al fondo si vino de muestra, para no perder el dato */ if(!firmaDesdeMuestra) cerrarFirmaModal(); } });
+/* ========================================================= */
 
 /* ---- modal avance del día ---- */
 const modalParcial=$('modalParcial');
@@ -1005,7 +1162,7 @@ function toggleDia(k){ diasExpandidos[k]=!diasExpandidos[k]; render(); }
 
 $('btnLimpiar').addEventListener('click',()=>{
   if(confirm(t('confClear'))){
-    state={orden:{producto:'',lote:'',orden:'',min:'',max:'',metaCaps:''},registros:[],dias:{}};
+    state={orden:{producto:'',lote:'',orden:'',min:'',max:'',metaCaps:''},registros:[],dias:{},firmas:{}};
     save(); fillOrden(); render();
   }
 });
@@ -1122,6 +1279,119 @@ function imprimirDia(key){
     </div>`;
   abrirVistaPrevia(cuerpo, t('pDailyTitle')+' — '+fmtDate(d));
 }
+
+/* ===================== GRÁFICA DE CONTROL (Sam's Club) ===================== */
+/* Escala vertical fija del formato W5226, de mayor a menor (como se imprime, arriba = mayor). */
+const CHART_NIVELES=[993,979,959,939,919,916,911,906,901];
+/* fila etiquetada más cercana a un peso por cápsula (sin decimales) */
+function nivelMasCercano(prom){
+  const v=Math.round(prom);
+  let best=CHART_NIVELES[0], bd=Math.abs(v-best);
+  for(const n of CHART_NIVELES){ const d=Math.abs(v-n); if(d<bd){ bd=d; best=n; } }
+  return best;
+}
+const CHART_COLS_POR_TABLA=29; /* columnas de toma por tabla, como el formato impreso */
+
+function construirTablaControl(muestras, loc){
+  const nfilas=CHART_NIVELES.length;
+  const ncols=CHART_COLS_POR_TABLA;
+  const bd='border:1px solid #555;';
+  const cellW=22;
+  let h=`<table style="border-collapse:collapse;font-size:9px;table-layout:fixed">`;
+  /* filas de la malla: etiqueta de peso + celdas con '+' (punto resaltado si hay muestra en ese nivel) */
+  CHART_NIVELES.forEach((nivel,ri)=>{
+    h+=`<tr>`;
+    h+=`<td style="${bd}padding:2px 5px;font-weight:bold;text-align:left;white-space:nowrap;width:48px">${nivel} mg</td>`;
+    for(let c=0;c<ncols;c++){
+      const m=muestras[c];
+      const marcado = m && nivelMasCercano(m.prom)===nivel;
+      const cont = marcado
+        ? `<span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:#000"></span>`
+        : `<span style="color:#888">+</span>`;
+      h+=`<td style="${bd}width:${cellW}px;height:15px;text-align:center;vertical-align:middle">${cont}</td>`;
+    }
+    /* etiqueta "Std" a la derecha en la fila 919 como en el formato */
+    h+= (nivel===919) ? `<td style="padding:2px 4px;font-size:9px;border:none">Std</td>` : `<td style="border:none"></td>`;
+    h+=`</tr>`;
+  });
+  /* filas inferiores: Weight, Time, Date, Ckd By (con firma) */
+  const filaInferior=(label, fn, alto)=>{
+    let r=`<tr><td style="${bd}padding:2px 5px;font-weight:bold;text-align:left;white-space:nowrap">${label}</td>`;
+    for(let c=0;c<ncols;c++){
+      const m=muestras[c];
+      r+=`<td style="${bd}width:${cellW}px;height:${alto||15}px;text-align:center;vertical-align:middle;font-size:8px">${m?fn(m):''}</td>`;
+    }
+    r+=`<td style="border:none"></td></tr>`;
+    return r;
+  };
+  h+=filaInferior(t('pChartWeightRow'), m=>Math.round(m.prom));
+  h+=filaInferior(t('pChartTimeRow'),   m=>{ const d=new Date(m.ts); return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`; });
+  h+=filaInferior(t('pChartDateRow'),   m=>{ const d=new Date(m.ts); return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}`; });
+  /* Ckd By: firma manuscrita si existe, si no las iniciales en texto */
+  let rc=`<tr><td style="${bd}padding:2px 5px;font-weight:bold;text-align:left;white-space:nowrap">${t('pChartCkd')}</td>`;
+  for(let c=0;c<ncols;c++){
+    const m=muestras[c];
+    let cont='';
+    if(m){
+      const firmaImg = state.firmas && state.firmas[m.oper];
+      cont = firmaImg ? `<img src="${firmaImg}" alt="${m.oper}" style="max-width:${cellW-2}px;max-height:24px;display:block;margin:0 auto">` : m.oper;
+    }
+    rc+=`<td style="${bd}width:${cellW}px;height:28px;text-align:center;vertical-align:middle;font-size:8px">${cont}</td>`;
+  }
+  rc+=`<td style="border:none"></td></tr>`;
+  h+=rc;
+  h+=`</table>`;
+  return h;
+}
+
+$('btnGrafica').addEventListener('click',()=>{
+  if(!supervisor){ alert(t('alOnlySupPrint')); return; }
+  const o=state.orden;
+  const loc=I18N[lang].locale;
+  const recs=state.registros.slice().sort((a,b)=>new Date(a.ts)-new Date(b.ts));
+  const pcMg = recs.length ? recs.reduce((s,r)=>s+r.prom,0)/recs.length : 0;
+
+  /* partir las muestras en bloques de CHART_COLS_POR_TABLA columnas */
+  let tablas='';
+  if(!recs.length){
+    tablas=`<p style="font-size:12px">${t('pChartNoSamples')}</p>`;
+  } else {
+    for(let i=0;i<recs.length;i+=CHART_COLS_POR_TABLA){
+      const bloque=recs.slice(i,i+CHART_COLS_POR_TABLA);
+      tablas+=`<div style="text-align:center;font-weight:bold;font-size:12px;margin:14px 0 2px">${t('pChartW10')}</div>`;
+      tablas+=`<div style="text-align:center;font-weight:bold;font-size:12px;margin-bottom:6px">${t('pChartIndiv')}</div>`;
+      tablas+=`<div style="overflow-x:auto">${construirTablaControl(bloque, loc)}</div>`;
+    }
+  }
+
+  const avgMg = pcMg ? pcMg.toFixed(1) : '____________';
+  const avgKg = pcMg ? (pcMg/1000000).toFixed(7) : '____________';
+
+  const cuerpo=`
+    <div style="font-family:'Times New Roman',serif;color:#000;padding:22px;font-size:12px">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px">
+        <div style="max-width:60%">
+          <b>PRODUCT:</b> ${o.producto||t('pChartProductFixed')}
+        </div>
+        <div style="text-align:right">
+          <div><b>BATCH NO.:</b> <span style="border-bottom:1px solid #000;padding:0 18px">${o.lote||''}</span></div>
+        </div>
+      </div>
+      ${tablas}
+      <div style="margin-top:18px;font-size:12px">
+        <div style="margin-bottom:10px">${t('pChartAvgMg')}
+          <span style="border-bottom:1px solid #000;padding:0 40px">${avgMg}</span> mg</div>
+        <div>${t('pChartAvgKg')}
+          <span style="border-bottom:1px solid #000;padding:0 40px">${avgKg}</span> kg
+          <span style="font-size:10px;color:#444">&nbsp;( = mg / 1,000,000 )</span></div>
+      </div>
+      <div style="text-align:right;margin-top:22px;font-size:11px">
+        <b>${t('pChartDoc')}</b> M-C/EXTURMERIC/14.0
+      </div>
+    </div>`;
+  abrirVistaPrevia(cuerpo, t('pChartTitle'));
+});
+/* ============================================================ */
 
 $('btnImprimir').addEventListener('click',()=>{
   if(!supervisor){ alert(t('alOnlySupPrint')); return; }
