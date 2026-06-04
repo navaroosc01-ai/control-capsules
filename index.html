@@ -751,6 +751,11 @@ const I18N = {
 const LANG_LS_KEY='qc_idioma';
 let lang='en';
 function t(k){ return (I18N[lang] && I18N[lang][k]!==undefined) ? I18N[lang][k] : (I18N.en[k]!==undefined?I18N.en[k]:k); }
+/* Para informes impresos: siempre en inglés, sin importar el idioma de la app */
+function tEN(k){ return (I18N.en[k]!==undefined) ? I18N.en[k] : k; }
+/* Fecha/hora en formato inglés para los informes impresos */
+function fmtDateEN(d){ const L=I18N.en; return L.dateFmt(L.weekdays[d.getDay()], d.getDate(), L.months[d.getMonth()], d.getFullYear()); }
+function fmtTimeEN(d){ return d.toLocaleTimeString('en',{hour12:false}); }
 function aplicarIdioma(){
   document.documentElement.lang=lang;
   document.title=t('appTitle')+' — GVIP';
@@ -1237,12 +1242,13 @@ function abrirVistaPrevia(htmlInterior, titulo){
 
 /* Estatus de la orden: Cerrada si TODOS los días están cerrados; si no, En proceso.
    Acepta un estado opcional (para el tablero); por defecto usa el estado global. */
-function estatusOrden(st){
+function estatusOrden(st, forzarEN){
+  const tf = forzarEN ? tEN : t;
   const dd=(st||state).dias||{};
   const claves=Object.keys(dd);
-  if(!claves.length) return t('noState');
+  if(!claves.length) return tf('noState');
   const todosCerrados=claves.every(k=>dd[k] && dd[k].closed);
-  return todosCerrados ? t('closedOrder') : t('inProcess');
+  return todosCerrados ? tf('closedOrder') : tf('inProcess');
 }
 
 /* Imprimir el parte de UN día (solo totales, sin lista de muestras) */
@@ -1250,38 +1256,38 @@ function imprimirDia(key){
   const o=state.orden;
   const dd=state.dias[key]||{};
   const d=new Date(key+'T12:00:00');
-  const estO=estatusOrden();
+  const estO=estatusOrden(null,true);
   const cuerpo=`
     <div style="font-family:Arial,sans-serif;color:#000;padding:24px;font-size:12px">
       <div style="display:flex;justify-content:space-between;border-bottom:2px solid #000;padding-bottom:10px;margin-bottom:16px">
-        <div><h2 style="margin:0;font-size:18px">${t('pDailyTitle')}</h2>
-        <div style="font-size:11px;color:#444">${t('pSubtitle')}</div></div>
-        <div style="text-align:right;font-size:11px">${t('pPrinted')}<br>${fmtDate(new Date())}<br>${fmtTime(new Date())}</div>
+        <div><h2 style="margin:0;font-size:18px">${tEN('pDailyTitle')}</h2>
+        <div style="font-size:11px;color:#444">${tEN('pSubtitle')}</div></div>
+        <div style="text-align:right;font-size:11px">${tEN('pPrinted')}<br>${fmtDateEN(new Date())}<br>${fmtTimeEN(new Date())}</div>
       </div>
       <table style="width:100%;font-size:12px;margin-bottom:18px">
-        <tr><td style="padding:3px 0;width:50%"><b>${t('pProductLbl')}</b> ${o.producto||'________________'}</td>
-            <td style="padding:3px 0"><b>${t('pBatchLbl')}</b> ${o.lote||'____________'}</td></tr>
-        <tr><td style="padding:3px 0"><b>${t('pRoomLbl')}</b> ${o.orden||'____________'}</td>
-            <td style="padding:3px 0"><b>${t('pStatusLbl')}</b> ${estO}</td></tr>
+        <tr><td style="padding:3px 0;width:50%"><b>${tEN('pProductLbl')}</b> ${o.producto||'________________'}</td>
+            <td style="padding:3px 0"><b>${tEN('pBatchLbl')}</b> ${o.lote||'____________'}</td></tr>
+        <tr><td style="padding:3px 0"><b>${tEN('pRoomLbl')}</b> ${o.orden||'____________'}</td>
+            <td style="padding:3px 0"><b>${tEN('pStatusLbl')}</b> ${estO}</td></tr>
       </table>
       <table style="width:75%;border-collapse:collapse;font-size:13px">
-        <tr><td style="border:1px solid #999;padding:9px;background:#eee;width:55%"><b>${t('pDayDate')}</b></td>
-            <td style="border:1px solid #999;padding:9px;text-align:right">${fmtDate(d)}</td></tr>
-        <tr><td style="border:1px solid #999;padding:9px;background:#eee"><b>${t('pTotalCapsDay')}</b></td>
-            <td style="border:1px solid #999;padding:9px;text-align:right">${dd.prod!=null?Number(dd.prod).toLocaleString(I18N[lang].locale):'—'}</td></tr>
-        <tr><td style="border:1px solid #999;padding:9px;background:#eee"><b>${t('pTotalBarrelsDay')}</b></td>
+        <tr><td style="border:1px solid #999;padding:9px;background:#eee;width:55%"><b>${tEN('pDayDate')}</b></td>
+            <td style="border:1px solid #999;padding:9px;text-align:right">${fmtDateEN(d)}</td></tr>
+        <tr><td style="border:1px solid #999;padding:9px;background:#eee"><b>${tEN('pTotalCapsDay')}</b></td>
+            <td style="border:1px solid #999;padding:9px;text-align:right">${dd.prod!=null?Number(dd.prod).toLocaleString('en'):'—'}</td></tr>
+        <tr><td style="border:1px solid #999;padding:9px;background:#eee"><b>${tEN('pTotalBarrelsDay')}</b></td>
             <td style="border:1px solid #999;padding:9px;text-align:right">${dd.barriles!=null?dd.barriles:'—'}</td></tr>
-        <tr><td style="border:1px solid #999;padding:9px;background:#eee"><b>${t('pPartialWeight')}</b></td>
-            <td style="border:1px solid #999;padding:9px;text-align:right">${dd.parcial!=null?dd.parcial+' '+t('kg'):t('pNoPartial')}</td></tr>
-        <tr><td style="border:1px solid #999;padding:9px;background:#eee"><b>${t('pDayState')}</b></td>
-            <td style="border:1px solid #999;padding:9px;text-align:right">${dd.closed?t('pClosed'):t('pOpen')}</td></tr>
+        <tr><td style="border:1px solid #999;padding:9px;background:#eee"><b>${tEN('pPartialWeight')}</b></td>
+            <td style="border:1px solid #999;padding:9px;text-align:right">${dd.parcial!=null?dd.parcial+' '+tEN('kg'):tEN('pNoPartial')}</td></tr>
+        <tr><td style="border:1px solid #999;padding:9px;background:#eee"><b>${tEN('pDayState')}</b></td>
+            <td style="border:1px solid #999;padding:9px;text-align:right">${dd.closed?tEN('pClosed'):tEN('pOpen')}</td></tr>
       </table>
       <div style="display:flex;justify-content:space-between;margin-top:56px;font-size:11px">
-        <div style="border-top:1px solid #000;padding-top:5px;width:40%;text-align:center">${t('pOperResp')}</div>
-        <div style="border-top:1px solid #000;padding-top:5px;width:40%;text-align:center">${t('pSupQC')}</div>
+        <div style="border-top:1px solid #000;padding-top:5px;width:40%;text-align:center">${tEN('pOperResp')}</div>
+        <div style="border-top:1px solid #000;padding-top:5px;width:40%;text-align:center">${tEN('pSupQC')}</div>
       </div>
     </div>`;
-  abrirVistaPrevia(cuerpo, t('pDailyTitle')+' — '+fmtDate(d));
+  abrirVistaPrevia(cuerpo, tEN('pDailyTitle')+' — '+fmtDateEN(d));
 }
 
 /* ===================== GRÁFICA DE CONTROL (Sam's Club) ===================== */
@@ -1325,11 +1331,11 @@ function construirTablaControl(muestras, loc){
     r+=`<td style="border:none"></td></tr>`;
     return r;
   };
-  h+=filaInferior(t('pChartWeightRow'), m=>Math.round(m.prom));
-  h+=filaInferior(t('pChartTimeRow'),   m=>{ const d=new Date(m.ts); return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`; });
-  h+=filaInferior(t('pChartDateRow'),   m=>{ const d=new Date(m.ts); return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}`; });
+  h+=filaInferior(tEN('pChartWeightRow'), m=>Math.round(m.prom));
+  h+=filaInferior(tEN('pChartTimeRow'),   m=>{ const d=new Date(m.ts); return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`; });
+  h+=filaInferior(tEN('pChartDateRow'),   m=>{ const d=new Date(m.ts); return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}`; });
   /* Ckd By: solo las iniciales en texto (las firmas van en la leyenda bajo las tablas) */
-  let rc=`<tr><td style="${bd}padding:0 5px;font-weight:bold;text-align:left;white-space:nowrap;height:${rowH}px;line-height:${rowH}px">${t('pChartCkd')}</td>`;
+  let rc=`<tr><td style="${bd}padding:0 5px;font-weight:bold;text-align:left;white-space:nowrap;height:${rowH}px;line-height:${rowH}px">${tEN('pChartCkd')}</td>`;
   for(let c=0;c<ncols;c++){
     const m=muestras[c];
     const cont = m ? `<span style="font-size:10px;font-weight:bold">${m.oper}</span>` : '';
@@ -1378,19 +1384,19 @@ function construirTablaControl(muestras, loc){
 $('btnGrafica').addEventListener('click',()=>{
   if(!supervisor){ alert(t('alOnlySupPrint')); return; }
   const o=state.orden;
-  const loc=I18N[lang].locale;
+  const loc='en';
   const recs=state.registros.slice().sort((a,b)=>new Date(a.ts)-new Date(b.ts));
   const pcMg = recs.length ? recs.reduce((s,r)=>s+r.prom,0)/recs.length : 0;
 
   /* partir las muestras en bloques de CHART_COLS_POR_TABLA columnas */
   let tablas='';
   if(!recs.length){
-    tablas=`<p style="font-size:12px">${t('pChartNoSamples')}</p>`;
+    tablas=`<p style="font-size:12px">${tEN('pChartNoSamples')}</p>`;
   } else {
     for(let i=0;i<recs.length;i+=CHART_COLS_POR_TABLA){
       const bloque=recs.slice(i,i+CHART_COLS_POR_TABLA);
-      tablas+=`<div style="text-align:center;font-weight:bold;font-size:12px;margin:14px 0 2px">${t('pChartW10')}</div>`;
-      tablas+=`<div style="text-align:center;font-weight:bold;font-size:12px;margin-bottom:6px">${t('pChartIndiv')}</div>`;
+      tablas+=`<div style="text-align:center;font-weight:bold;font-size:12px;margin:14px 0 2px">${tEN('pChartW10')}</div>`;
+      tablas+=`<div style="text-align:center;font-weight:bold;font-size:12px;margin-bottom:6px">${tEN('pChartIndiv')}</div>`;
       tablas+=`<div style="overflow-x:auto">${construirTablaControl(bloque, loc)}</div>`;
     }
   }
@@ -1408,14 +1414,14 @@ $('btnGrafica').addEventListener('click',()=>{
       const firmaImg = state.firmas && state.firmas[op];
       const firmaCell = firmaImg
         ? `<img src="${firmaImg}" alt="${op}" style="height:36px;max-width:160px;object-fit:contain;display:block">`
-        : `<span style="color:#888;font-size:10px">${t('signNone')}</span>`;
+        : `<span style="color:#888;font-size:10px">${tEN('signNone')}</span>`;
       items+=`<div style="display:flex;align-items:center;gap:10px;border:1px solid #999;border-radius:4px;padding:6px 12px;min-width:170px">
                 <span style="font-weight:bold;font-size:14px;min-width:34px">${op}</span>
                 <span style="border-left:1px solid #ccc;padding-left:10px">${firmaCell}</span>
               </div>`;
     });
     leyenda=`<div style="margin-top:18px">
-      <div style="font-weight:bold;font-size:12px;margin-bottom:8px">${t('signLegendTitle')}</div>
+      <div style="font-weight:bold;font-size:12px;margin-bottom:8px">${tEN('signLegendTitle')}</div>
       <div style="display:flex;flex-wrap:wrap;gap:12px">${items}</div>
     </div>`;
   }
@@ -1424,7 +1430,7 @@ $('btnGrafica').addEventListener('click',()=>{
     <div style="font-family:'Times New Roman',serif;color:#000;padding:22px;font-size:12px">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px">
         <div style="max-width:60%">
-          <b>PRODUCT:</b> ${o.producto||t('pChartProductFixed')}
+          <b>PRODUCT:</b> ${o.producto||tEN('pChartProductFixed')}
         </div>
         <div style="text-align:right">
           <div><b>BATCH NO.:</b> <span style="border-bottom:1px solid #000;padding:0 18px">${o.lote||''}</span></div>
@@ -1433,24 +1439,24 @@ $('btnGrafica').addEventListener('click',()=>{
       ${tablas}
       ${leyenda}
       <div style="margin-top:18px;font-size:12px">
-        <div style="margin-bottom:10px">${t('pChartAvgMg')}
+        <div style="margin-bottom:10px">${tEN('pChartAvgMg')}
           <span style="border-bottom:1px solid #000;padding:0 40px">${avgMg}</span> mg</div>
-        <div>${t('pChartAvgKg')}
+        <div>${tEN('pChartAvgKg')}
           <span style="border-bottom:1px solid #000;padding:0 40px">${avgKg}</span> kg
           <span style="font-size:10px;color:#444">&nbsp;( = mg / 1,000,000 )</span></div>
       </div>
       <div style="text-align:right;margin-top:22px;font-size:11px">
-        <b>${t('pChartDoc')}</b> M-C/EXTURMERIC/14.0
+        <b>${tEN('pChartDoc')}</b> M-C/EXTURMERIC/14.0
       </div>
     </div>`;
-  abrirVistaPrevia(cuerpo, t('pChartTitle'));
+  abrirVistaPrevia(cuerpo, tEN('pChartTitle'));
 });
 /* ============================================================ */
 
 $('btnImprimir').addEventListener('click',()=>{
   if(!supervisor){ alert(t('alOnlySupPrint')); return; }
   const o=state.orden, {min,max}=getRange(), meta=parseFloat(o.metaCaps);
-  const loc=I18N[lang].locale;
+  const loc='en';
   const recs=state.registros.slice().sort((a,b)=>new Date(a.ts)-new Date(b.ts));
   const pc=recs.length?recs.reduce((s,r)=>s+r.prom,0)/recs.length:0;
   let fuera=0; recs.forEach(r=>{ if(inRange(r.prom)===false) fuera++; });
@@ -1459,62 +1465,62 @@ $('btnImprimir').addEventListener('click',()=>{
 
   let rowsHtml='';
   recs.forEach(r=>{ const d=new Date(r.ts); const ir=inRange(r.prom);
-    const est = ir===true?t('pInRange'):(ir===false?t('pOut'):'—');
+    const est = ir===true?tEN('pInRange'):(ir===false?tEN('pOut'):'—');
     const rowBg = ir===false?'background:#fde2e2':'';
-    rowsHtml+=`<tr style="${rowBg}"><td style="border:1px solid #999;padding:5px">${dayKey(d)}</td><td style="border:1px solid #999;padding:5px">${fmtTime(d)}</td><td style="border:1px solid #999;padding:5px;text-align:right">${r.diez.toFixed(4)}</td><td style="border:1px solid #999;padding:5px;text-align:right">${r.prom.toFixed(1)}</td><td style="border:1px solid #999;padding:5px;text-align:center">${est}</td><td style="border:1px solid #999;padding:5px;text-align:center">${r.oper}</td></tr>`;
+    rowsHtml+=`<tr style="${rowBg}"><td style="border:1px solid #999;padding:5px">${dayKey(d)}</td><td style="border:1px solid #999;padding:5px">${fmtTimeEN(d)}</td><td style="border:1px solid #999;padding:5px;text-align:right">${r.diez.toFixed(4)}</td><td style="border:1px solid #999;padding:5px;text-align:right">${r.prom.toFixed(1)}</td><td style="border:1px solid #999;padding:5px;text-align:center">${est}</td><td style="border:1px solid #999;padding:5px;text-align:center">${r.oper}</td></tr>`;
   });
   let dayRows='';
   Object.keys(state.dias).sort().forEach(k=>{const dd=state.dias[k];
-    dayRows+=`<tr><td style="border:1px solid #999;padding:5px">${k}</td><td style="border:1px solid #999;padding:5px;text-align:right">${dd.prod!=null?Number(dd.prod).toLocaleString(loc):'—'}</td><td style="border:1px solid #999;padding:5px;text-align:right">${dd.barriles!=null?dd.barriles:'—'}</td><td style="border:1px solid #999;padding:5px;text-align:right">${dd.parcial!=null?dd.parcial+' '+t('kg'):'—'}</td><td style="border:1px solid #999;padding:5px;text-align:center">${dd.closed?t('pClosed'):t('pOpen')}</td></tr>`;});
+    dayRows+=`<tr><td style="border:1px solid #999;padding:5px">${k}</td><td style="border:1px solid #999;padding:5px;text-align:right">${dd.prod!=null?Number(dd.prod).toLocaleString(loc):'—'}</td><td style="border:1px solid #999;padding:5px;text-align:right">${dd.barriles!=null?dd.barriles:'—'}</td><td style="border:1px solid #999;padding:5px;text-align:right">${dd.parcial!=null?dd.parcial+' '+tEN('kg'):'—'}</td><td style="border:1px solid #999;padding:5px;text-align:center">${dd.closed?tEN('pClosed'):tEN('pOpen')}</td></tr>`;});
   const barrTotalP=Object.values(state.dias).reduce((s,d)=>s+(d&&d.barriles?d.barriles:0),0);
 
-  const rangoTxt = (min>0&&max>0)?`${min.toFixed(1)} – ${max.toFixed(1)} ${t('mg')}`:'_______';
+  const rangoTxt = (min>0&&max>0)?`${min.toFixed(1)} – ${max.toFixed(1)} ${tEN('mg')}`:'_______';
 
   const cuerpo=`
     <div style="font-family:Arial,sans-serif;color:#000;padding:24px;font-size:12px">
       <div style="display:flex;justify-content:space-between;border-bottom:2px solid #000;padding-bottom:10px;margin-bottom:16px">
-        <div><h2 style="margin:0;font-size:18px">${t('pMainTitle')}</h2>
-        <div style="font-size:11px;color:#444">${t('pMainSub')}</div></div>
-        <div style="text-align:right;font-size:11px">${t('pPrinted')}<br>${fmtDate(new Date())}<br>${fmtTime(new Date())}</div>
+        <div><h2 style="margin:0;font-size:18px">${tEN('pMainTitle')}</h2>
+        <div style="font-size:11px;color:#444">${tEN('pMainSub')}</div></div>
+        <div style="text-align:right;font-size:11px">${tEN('pPrinted')}<br>${fmtDateEN(new Date())}<br>${fmtTimeEN(new Date())}</div>
       </div>
       <table style="width:100%;font-size:12px;margin-bottom:16px">
-        <tr><td style="padding:3px 0;width:50%"><b>${t('pProductLbl')}</b> ${o.producto||'________________'}</td>
-            <td style="padding:3px 0"><b>${t('pBatchLbl')}</b> ${o.lote||'____________'}</td></tr>
-        <tr><td style="padding:3px 0"><b>${t('pRoomLbl')}</b> ${o.orden||'____________'}</td>
-            <td style="padding:3px 0"><b>${t('pRangeLbl')}</b> ${rangoTxt}</td></tr>
-        <tr><td style="padding:3px 0"><b>${t('pTargetLbl')}</b> ${meta?meta.toLocaleString(loc)+' '+t('capsUnit'):'_______'}</td>
-            <td style="padding:3px 0"><b>${t('pAccumLbl')}</b> ${prodTotal.toLocaleString(loc)} ${t('capsUnit')} (${pct})</td></tr>
-        <tr><td style="padding:3px 0"><b>${t('pStatusLbl')}</b> ${estatusOrden()}</td><td></td></tr>
+        <tr><td style="padding:3px 0;width:50%"><b>${tEN('pProductLbl')}</b> ${o.producto||'________________'}</td>
+            <td style="padding:3px 0"><b>${tEN('pBatchLbl')}</b> ${o.lote||'____________'}</td></tr>
+        <tr><td style="padding:3px 0"><b>${tEN('pRoomLbl')}</b> ${o.orden||'____________'}</td>
+            <td style="padding:3px 0"><b>${tEN('pRangeLbl')}</b> ${rangoTxt}</td></tr>
+        <tr><td style="padding:3px 0"><b>${tEN('pTargetLbl')}</b> ${meta?meta.toLocaleString(loc)+' '+tEN('capsUnit'):'_______'}</td>
+            <td style="padding:3px 0"><b>${tEN('pAccumLbl')}</b> ${prodTotal.toLocaleString(loc)} ${tEN('capsUnit')} (${pct})</td></tr>
+        <tr><td style="padding:3px 0"><b>${tEN('pStatusLbl')}</b> ${estatusOrden(null,true)}</td><td></td></tr>
       </table>
       <table style="width:100%;border-collapse:collapse;font-size:11px">
         <thead><tr style="background:#eee">
-          ${[t('pDate'),t('thTime'),t('thW10'),t('thWcap'),t('thStatus'),t('thOperator')].map(h=>`<th style="border:1px solid #999;padding:6px">${h}</th>`).join('')}
+          ${[tEN('pDate'),tEN('thTime'),tEN('thW10'),tEN('thWcap'),tEN('thStatus'),tEN('thOperator')].map(h=>`<th style="border:1px solid #999;padding:6px">${h}</th>`).join('')}
         </tr></thead>
-        <tbody>${rowsHtml||`<tr><td colspan="6" style="border:1px solid #999;padding:10px;text-align:center">${t('pNoRecords')}</td></tr>`}</tbody>
+        <tbody>${rowsHtml||`<tr><td colspan="6" style="border:1px solid #999;padding:10px;text-align:center">${tEN('pNoRecords')}</td></tr>`}</tbody>
       </table>
-      <h3 style="font-size:13px;margin:18px 0 8px">${t('pProdByDay')}</h3>
+      <h3 style="font-size:13px;margin:18px 0 8px">${tEN('pProdByDay')}</h3>
       <table style="width:85%;border-collapse:collapse;font-size:11px">
         <thead><tr style="background:#eee">
-          <th style="border:1px solid #999;padding:6px;text-align:left">${t('pDate')}</th>
-          <th style="border:1px solid #999;padding:6px">${t('pCapsules')}</th>
-          <th style="border:1px solid #999;padding:6px">${t('pBarrels')}</th>
-          <th style="border:1px solid #999;padding:6px">${t('pPartial')}</th>
-          <th style="border:1px solid #999;padding:6px">${t('pState')}</th>
+          <th style="border:1px solid #999;padding:6px;text-align:left">${tEN('pDate')}</th>
+          <th style="border:1px solid #999;padding:6px">${tEN('pCapsules')}</th>
+          <th style="border:1px solid #999;padding:6px">${tEN('pBarrels')}</th>
+          <th style="border:1px solid #999;padding:6px">${tEN('pPartial')}</th>
+          <th style="border:1px solid #999;padding:6px">${tEN('pState')}</th>
         </tr></thead>
-        <tbody>${dayRows||`<tr><td colspan="5" style="border:1px solid #999;padding:8px;text-align:center">${t('pNoDays')}</td></tr>`}
-        <tr style="background:#f5f5f5;font-weight:bold"><td style="border:1px solid #999;padding:6px">${t('pTotal')}</td><td style="border:1px solid #999;padding:6px;text-align:right">${prodTotal.toLocaleString(loc)}</td><td style="border:1px solid #999;padding:6px;text-align:right">${barrTotalP}</td><td style="border:1px solid #999;padding:6px"></td><td style="border:1px solid #999;padding:6px"></td></tr></tbody>
+        <tbody>${dayRows||`<tr><td colspan="5" style="border:1px solid #999;padding:8px;text-align:center">${tEN('pNoDays')}</td></tr>`}
+        <tr style="background:#f5f5f5;font-weight:bold"><td style="border:1px solid #999;padding:6px">${tEN('pTotal')}</td><td style="border:1px solid #999;padding:6px;text-align:right">${prodTotal.toLocaleString(loc)}</td><td style="border:1px solid #999;padding:6px;text-align:right">${barrTotalP}</td><td style="border:1px solid #999;padding:6px"></td><td style="border:1px solid #999;padding:6px"></td></tr></tbody>
       </table>
       <table style="width:100%;font-size:12px;margin-top:16px;border-top:1px solid #000">
-        <tr><td style="padding:6px 0"><b>${t('pTotalSamples')}</b> ${recs.length}</td>
-            <td style="padding:6px 0"><b>${t('pAvgCap')}</b> ${pc?pc.toFixed(1)+' '+t('mg'):'—'}</td>
-            <td style="padding:6px 0"><b>${t('pOutSamples')}</b> ${fuera}</td></tr>
+        <tr><td style="padding:6px 0"><b>${tEN('pTotalSamples')}</b> ${recs.length}</td>
+            <td style="padding:6px 0"><b>${tEN('pAvgCap')}</b> ${pc?pc.toFixed(1)+' '+tEN('mg'):'—'}</td>
+            <td style="padding:6px 0"><b>${tEN('pOutSamples')}</b> ${fuera}</td></tr>
       </table>
       <div style="display:flex;justify-content:space-between;margin-top:48px;font-size:11px">
-        <div style="border-top:1px solid #000;padding-top:5px;width:40%;text-align:center">${t('pOperResp')}</div>
-        <div style="border-top:1px solid #000;padding-top:5px;width:40%;text-align:center">${t('pSupQC')}</div>
+        <div style="border-top:1px solid #000;padding-top:5px;width:40%;text-align:center">${tEN('pOperResp')}</div>
+        <div style="border-top:1px solid #000;padding-top:5px;width:40%;text-align:center">${tEN('pSupQC')}</div>
       </div>
     </div>`;
-  abrirVistaPrevia(cuerpo, t('pMainTitle')+' — '+(o.orden||'orden'));
+  abrirVistaPrevia(cuerpo, tEN('pMainTitle')+' — '+(o.orden||'orden'));
 });
 
 /* ---- código de orden y modo supervisor ---- */
