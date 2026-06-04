@@ -1294,28 +1294,30 @@ const CHART_COLS_POR_TABLA=29; /* columnas de toma por tabla, como el formato im
 
 function construirTablaControl(muestras, loc){
   const ncols=CHART_COLS_POR_TABLA;
-  const bd='border:1px solid #555;';
-  const cellW=22;        /* ancho de cada columna de toma (px) */
-  const rowH=15;         /* alto de cada fila de la malla (px) */
-  const labelW=49;       /* ancho de la columna de etiquetas de peso (px) */
+  const bd='border:1px solid #555;box-sizing:border-box;';
+  const cellW=26;        /* ancho de cada columna de toma (px) */
+  const rowH=16;         /* alto de cada fila de la malla (px) */
+  const labelW=52;       /* ancho de la columna de etiquetas de peso (px) */
+  const ckdH=34;         /* alto de la fila Ckd By (firmas) */
 
   let h=`<table style="border-collapse:collapse;font-size:9px;table-layout:fixed">`;
-  /* filas de la malla: etiqueta de peso + celdas con '+' de referencia */
+  /* filas de la malla: etiqueta de peso + celdas VACÍAS (las '+' las pinta el SVG encima,
+     así malla y puntos comparten el mismo sistema de coordenadas y quedan perfectamente alineados) */
   CHART_NIVELES.forEach((nivel)=>{
     h+=`<tr>`;
-    h+=`<td style="${bd}padding:2px 5px;font-weight:bold;text-align:left;white-space:nowrap;width:${labelW}px;height:${rowH}px">${nivel} mg</td>`;
+    h+=`<td style="${bd}padding:0 5px;font-weight:bold;text-align:left;white-space:nowrap;width:${labelW}px;height:${rowH}px;line-height:${rowH}px">${nivel} mg</td>`;
     for(let c=0;c<ncols;c++){
-      h+=`<td style="${bd}width:${cellW}px;height:${rowH}px;text-align:center;vertical-align:middle"><span style="color:#aaa">+</span></td>`;
+      h+=`<td style="${bd}width:${cellW}px;height:${rowH}px;padding:0"></td>`;
     }
-    h+= (nivel===919) ? `<td style="padding:2px 4px;font-size:9px;border:none">Std</td>` : `<td style="border:none"></td>`;
+    h+= (nivel===919) ? `<td style="padding:0 4px;font-size:9px;border:none">Std</td>` : `<td style="border:none"></td>`;
     h+=`</tr>`;
   });
   /* filas inferiores: Weight, Time, Date, Ckd By (con firma) */
   const filaInferior=(label, fn, alto)=>{
-    let r=`<tr><td style="${bd}padding:2px 5px;font-weight:bold;text-align:left;white-space:nowrap">${label}</td>`;
+    let r=`<tr><td style="${bd}padding:0 5px;font-weight:bold;text-align:left;white-space:nowrap;height:${alto||rowH}px;line-height:${alto||rowH}px">${label}</td>`;
     for(let c=0;c<ncols;c++){
       const m=muestras[c];
-      r+=`<td style="${bd}width:${cellW}px;height:${alto||rowH}px;text-align:center;vertical-align:middle;font-size:8px">${m?fn(m):''}</td>`;
+      r+=`<td style="${bd}width:${cellW}px;height:${alto||rowH}px;text-align:center;vertical-align:middle;font-size:8px;padding:0">${m?fn(m):''}</td>`;
     }
     r+=`<td style="border:none"></td></tr>`;
     return r;
@@ -1323,16 +1325,18 @@ function construirTablaControl(muestras, loc){
   h+=filaInferior(t('pChartWeightRow'), m=>Math.round(m.prom));
   h+=filaInferior(t('pChartTimeRow'),   m=>{ const d=new Date(m.ts); return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`; });
   h+=filaInferior(t('pChartDateRow'),   m=>{ const d=new Date(m.ts); return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}`; });
-  /* Ckd By: firma manuscrita si existe, si no las iniciales en texto */
-  let rc=`<tr><td style="${bd}padding:2px 5px;font-weight:bold;text-align:left;white-space:nowrap">${t('pChartCkd')}</td>`;
+  /* Ckd By: firma manuscrita si existe (grande y legible), si no las iniciales en texto en negrita */
+  let rc=`<tr><td style="${bd}padding:0 5px;font-weight:bold;text-align:left;white-space:nowrap;height:${ckdH}px;line-height:${ckdH}px">${t('pChartCkd')}</td>`;
   for(let c=0;c<ncols;c++){
     const m=muestras[c];
     let cont='';
     if(m){
       const firmaImg = state.firmas && state.firmas[m.oper];
-      cont = firmaImg ? `<img src="${firmaImg}" alt="${m.oper}" style="max-width:${cellW-2}px;max-height:24px;display:block;margin:0 auto">` : m.oper;
+      cont = firmaImg
+        ? `<img src="${firmaImg}" alt="${m.oper}" style="width:${cellW}px;height:${ckdH-4}px;object-fit:contain;display:block;margin:0 auto">`
+        : `<span style="font-size:11px;font-weight:bold">${m.oper}</span>`;
     }
-    rc+=`<td style="${bd}width:${cellW}px;height:28px;text-align:center;vertical-align:middle;font-size:8px">${cont}</td>`;
+    rc+=`<td style="${bd}width:${cellW}px;height:${ckdH}px;text-align:center;vertical-align:middle;padding:1px">${cont}</td>`;
   }
   rc+=`<td style="border:none"></td></tr>`;
   h+=rc;
@@ -1341,8 +1345,8 @@ function construirTablaControl(muestras, loc){
   /* ---- capa SVG: puntos de cada muestra unidos por una línea (curva de control) ---- */
   const gridW = labelW + ncols*cellW;          /* ancho de la zona de malla */
   const gridH = CHART_NIVELES.length*rowH;      /* alto de la zona de malla */
-  const colX = c => labelW + c*cellW + cellW/2; /* centro X de la columna c */
-  const rowY = nivel => {                        /* centro Y de la fila del nivel */
+  const colX = c => labelW + c*cellW + cellW/2; /* centro X de la columna c (coincide con la +) */
+  const rowY = nivel => {                        /* centro Y de la fila del nivel (coincide con la +) */
     const idx=CHART_NIVELES.indexOf(nivel);
     return idx*rowH + rowH/2;
   };
@@ -1352,13 +1356,22 @@ function construirTablaControl(muestras, loc){
     pts.push({ x:colX(c), y:rowY(nivelMasCercano(m.prom)) });
   });
   let svg='';
-  if(pts.length){
+  /* malla de '+' de referencia, dibujada en el SVG en cada intersección fila×columna */
+  let mallaPlus='';
+  for(let ri=0; ri<CHART_NIVELES.length; ri++){
+    const y=ri*rowH + rowH/2;
+    for(let c=0; c<ncols; c++){
+      const x=labelW + c*cellW + cellW/2;
+      mallaPlus+=`<text x="${x.toFixed(1)}" y="${y.toFixed(1)}" fill="#bbb" font-size="9" text-anchor="middle" dominant-baseline="central">+</text>`;
+    }
+  }
+  {
     const linea = pts.length>1
       ? `<polyline points="${pts.map(p=>`${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ')}" fill="none" stroke="#c0392b" stroke-width="1.4"/>`
       : '';
     const circulos = pts.map(p=>`<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="3" fill="#000"/>`).join('');
     svg=`<svg width="${gridW}" height="${gridH}" viewBox="0 0 ${gridW} ${gridH}"
-          style="position:absolute;left:0;top:0;pointer-events:none">${linea}${circulos}</svg>`;
+          style="position:absolute;left:0;top:0;pointer-events:none">${mallaPlus}${linea}${circulos}</svg>`;
   }
 
   /* envolver tabla + SVG superpuesto; el SVG solo cubre la zona de la malla (arriba) */
