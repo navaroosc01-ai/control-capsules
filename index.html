@@ -1293,24 +1293,20 @@ function nivelMasCercano(prom){
 const CHART_COLS_POR_TABLA=29; /* columnas de toma por tabla, como el formato impreso */
 
 function construirTablaControl(muestras, loc){
-  const nfilas=CHART_NIVELES.length;
   const ncols=CHART_COLS_POR_TABLA;
   const bd='border:1px solid #555;';
-  const cellW=22;
+  const cellW=22;        /* ancho de cada columna de toma (px) */
+  const rowH=15;         /* alto de cada fila de la malla (px) */
+  const labelW=49;       /* ancho de la columna de etiquetas de peso (px) */
+
   let h=`<table style="border-collapse:collapse;font-size:9px;table-layout:fixed">`;
-  /* filas de la malla: etiqueta de peso + celdas con '+' (punto resaltado si hay muestra en ese nivel) */
-  CHART_NIVELES.forEach((nivel,ri)=>{
+  /* filas de la malla: etiqueta de peso + celdas con '+' de referencia */
+  CHART_NIVELES.forEach((nivel)=>{
     h+=`<tr>`;
-    h+=`<td style="${bd}padding:2px 5px;font-weight:bold;text-align:left;white-space:nowrap;width:48px">${nivel} mg</td>`;
+    h+=`<td style="${bd}padding:2px 5px;font-weight:bold;text-align:left;white-space:nowrap;width:${labelW}px;height:${rowH}px">${nivel} mg</td>`;
     for(let c=0;c<ncols;c++){
-      const m=muestras[c];
-      const marcado = m && nivelMasCercano(m.prom)===nivel;
-      const cont = marcado
-        ? `<span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:#000"></span>`
-        : `<span style="color:#888">+</span>`;
-      h+=`<td style="${bd}width:${cellW}px;height:15px;text-align:center;vertical-align:middle">${cont}</td>`;
+      h+=`<td style="${bd}width:${cellW}px;height:${rowH}px;text-align:center;vertical-align:middle"><span style="color:#aaa">+</span></td>`;
     }
-    /* etiqueta "Std" a la derecha en la fila 919 como en el formato */
     h+= (nivel===919) ? `<td style="padding:2px 4px;font-size:9px;border:none">Std</td>` : `<td style="border:none"></td>`;
     h+=`</tr>`;
   });
@@ -1319,7 +1315,7 @@ function construirTablaControl(muestras, loc){
     let r=`<tr><td style="${bd}padding:2px 5px;font-weight:bold;text-align:left;white-space:nowrap">${label}</td>`;
     for(let c=0;c<ncols;c++){
       const m=muestras[c];
-      r+=`<td style="${bd}width:${cellW}px;height:${alto||15}px;text-align:center;vertical-align:middle;font-size:8px">${m?fn(m):''}</td>`;
+      r+=`<td style="${bd}width:${cellW}px;height:${alto||rowH}px;text-align:center;vertical-align:middle;font-size:8px">${m?fn(m):''}</td>`;
     }
     r+=`<td style="border:none"></td></tr>`;
     return r;
@@ -1341,7 +1337,32 @@ function construirTablaControl(muestras, loc){
   rc+=`<td style="border:none"></td></tr>`;
   h+=rc;
   h+=`</table>`;
-  return h;
+
+  /* ---- capa SVG: puntos de cada muestra unidos por una línea (curva de control) ---- */
+  const gridW = labelW + ncols*cellW;          /* ancho de la zona de malla */
+  const gridH = CHART_NIVELES.length*rowH;      /* alto de la zona de malla */
+  const colX = c => labelW + c*cellW + cellW/2; /* centro X de la columna c */
+  const rowY = nivel => {                        /* centro Y de la fila del nivel */
+    const idx=CHART_NIVELES.indexOf(nivel);
+    return idx*rowH + rowH/2;
+  };
+  let pts=[];
+  muestras.forEach((m,c)=>{
+    if(!m) return;
+    pts.push({ x:colX(c), y:rowY(nivelMasCercano(m.prom)) });
+  });
+  let svg='';
+  if(pts.length){
+    const linea = pts.length>1
+      ? `<polyline points="${pts.map(p=>`${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ')}" fill="none" stroke="#c0392b" stroke-width="1.4"/>`
+      : '';
+    const circulos = pts.map(p=>`<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="3" fill="#000"/>`).join('');
+    svg=`<svg width="${gridW}" height="${gridH}" viewBox="0 0 ${gridW} ${gridH}"
+          style="position:absolute;left:0;top:0;pointer-events:none">${linea}${circulos}</svg>`;
+  }
+
+  /* envolver tabla + SVG superpuesto; el SVG solo cubre la zona de la malla (arriba) */
+  return `<div style="position:relative;display:inline-block">${h}${svg}</div>`;
 }
 
 $('btnGrafica').addEventListener('click',()=>{
