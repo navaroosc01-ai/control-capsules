@@ -243,7 +243,7 @@
   body.mecanico .big-btn,
   body.mecanico #tablero,
   body.mecanico #diaCerradoAviso{display:none !important}
-  .mec-cols{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+  .mec-cols{display:grid;grid-template-columns:repeat(2,1fr);gap:14px}
   @media(max-width:820px){.mec-cols{grid-template-columns:1fr}}
   .mec-col{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:12px;min-height:120px}
   .mec-col-head{display:flex;align-items:center;justify-content:space-between;gap:8px;
@@ -1927,20 +1927,20 @@ async function refrescarMec(){
   try{ mecDatos=await leerVarias(mecCodigos); setMecConn('ok',t('updatedAt')+' · '+fmtTime(new Date())); }
   catch(e){ setMecConn('bad',t('updateErr')); return; }
 
-  /* reunir todas las incidencias de todas las órdenes, anotando su código */
+  /* reunir las incidencias ACTIVAS (no resueltas) de todas las órdenes, anotando su código.
+     Una vez finalizadas, desaparecen del tablero del mecánico. */
   const items=[];
   mecCodigos.forEach(cod=>{
     const d=mecDatos[cod];
     if(!d || !Array.isArray(d.incidencias)) return;
-    d.incidencias.forEach(inc=>{ if(inc) items.push({cod, inc}); });
+    d.incidencias.forEach(inc=>{ if(inc && estadoInc(inc)!=='res') items.push({cod, inc}); });
   });
 
-  const buckets={pend:[],proc:[],res:[]};
+  const buckets={pend:[],proc:[]};
   items.forEach(it=>{ buckets[estadoInc(it.inc)].push(it); });
-  /* ordenar: pend/proc por más antiguo primero (lo más urgente arriba); res por más reciente */
+  /* ordenar por más antiguo primero (lo más urgente arriba) */
   buckets.pend.sort((a,b)=>new Date(a.inc.ts)-new Date(b.inc.ts));
   buckets.proc.sort((a,b)=>new Date(a.inc.ts)-new Date(b.inc.ts));
-  buckets.res.sort((a,b)=>new Date(b.inc.resTs||b.inc.ts)-new Date(a.inc.resTs||a.inc.ts));
 
   const totalIssues=items.length;
   if(!totalIssues){ cols.innerHTML=`<div class="tab-empty" style="grid-column:1/-1">${t('mechNoIssues')}</div>`; return; }
@@ -1957,8 +1957,7 @@ async function refrescarMec(){
   };
   cols.innerHTML =
     col('pend','pend',t('colPending')) +
-    col('proc','proc',t('colProcessing')) +
-    col('res','res',t('colResolved'));
+    col('proc','proc',t('colProcessing'));
 }
 
 function mecCard(cod, inc){
