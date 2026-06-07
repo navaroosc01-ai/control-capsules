@@ -1369,7 +1369,9 @@ function avanzarIncidencia(id, destino){
   } else if(destino==='pend'){
     inc.estado='pend'; inc.resuelto=false; inc.resTs=null;
   }
-  save(); render();
+  lastPush=Date.now();
+  render();
+  escribirNube();
 }
 /* El supervisor cambia el estado desde el <select> de la tarjeta */
 function cambiarEstadoInc(sel){
@@ -1404,7 +1406,9 @@ $('incEditSave').addEventListener('click',()=>{
   const hp=horaTxt.split(':');
   const hh=parseInt(hp[0],10)||0, mm=parseInt(hp[1],10)||0, ss=parseInt(hp[2],10)||0;
   inc.ts=new Date(yy,(mo||1)-1,dd||1,hh,mm,ss,0).toISOString();
-  save(); closeIncEdit(); render();
+  lastPush=Date.now();
+  closeIncEdit(); render();
+  escribirNube();
 });
 function renderIncidencias(){
   const box=$('incidentList');
