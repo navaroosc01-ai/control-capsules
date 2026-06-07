@@ -112,6 +112,10 @@
   .mini-btn{background:transparent;border:1px solid var(--line);color:var(--muted);
     border-radius:6px;padding:4px 10px;font-size:11px;font-weight:600;cursor:pointer;transition:.15s}
   .mini-btn:hover{border-color:var(--accent);color:var(--ink)}
+  .mini-sel{background:var(--panel2);border:1px solid var(--line);color:var(--ink);
+    border-radius:6px;padding:4px 8px;font-size:11px;font-weight:600;cursor:pointer;
+    font-family:inherit;outline:none;width:auto}
+  .mini-sel:focus{border-color:var(--accent)}
 
   .parciales-box{background:rgba(240,180,41,.06);border:1px solid rgba(240,180,41,.25);
     border-radius:8px;padding:8px 12px;margin:0 0 2px}
@@ -175,7 +179,9 @@
   body.supervisor .parcial-row .px,
   body.supervisor tbody .btn.danger{display:none !important}
   /* El supervisor VE los datos de la orden pero no puede editarlos */
-  body.supervisor input:not(#fCodigo):not(#tabCodigos){pointer-events:none;opacity:.85;background:var(--panel)}
+  body.supervisor input:not(#fCodigo):not(#tabCodigos):not(#incEditFecha):not(#incEditHora){pointer-events:none;opacity:.85;background:var(--panel)}
+  body.supervisor #incEditFecha,
+  body.supervisor #incEditHora{pointer-events:auto;opacity:1;background:var(--panel2)}
   body.supervisor #fCodigo{pointer-events:auto;opacity:1}
   body.supervisor #tabCodigos{pointer-events:auto;opacity:1;background:var(--panel2)}
   /* Imprimir, CSV y Limpiar: solo visibles para el supervisor */
@@ -505,6 +511,29 @@
   </div>
 </div>
 
+<!-- Modal editar fecha/hora de ingreso del problema -->
+<div class="modal-bg" id="modalIncEdit">
+  <div class="modal" style="max-width:400px">
+    <h3 data-i18n="incidentEditDateTitle">Edit issue date/time</h3>
+    <div class="sub" data-i18n="incidentEditDateSub">Adjust the reported date and time.</div>
+    <div class="alert" id="incEditAlert"></div>
+    <div class="grid g2">
+      <div class="row">
+        <label data-i18n="incidentDate">Date</label>
+        <input id="incEditFecha" type="date">
+      </div>
+      <div class="row">
+        <label data-i18n="incidentTime">Time</label>
+        <input id="incEditHora" type="time" step="1">
+      </div>
+    </div>
+    <div class="actions">
+      <button class="btn" id="incEditCancel" data-i18n="cancel">Cancel</button>
+      <button class="btn primary" id="incEditSave" data-i18n="save">Save</button>
+    </div>
+  </div>
+</div>
+
 <!-- Modal avance del día -->
 <div class="modal-bg" id="modalParcial">
   <div class="modal" style="max-width:400px">
@@ -720,6 +749,9 @@ const I18N = {
     incidentPending:'PENDING', incidentProcessing:'IN PROGRESS',
     incidentStartWork:'Start work', incidentWhoPrompt:'Initials of who will attend this issue:',
     incidentAttendedBy:'Attended by',
+    incidentChangeStatus:'Change status', incidentEditDate:'Edit date/time', edit:'Edit', save:'Save',
+    incidentEditDateTitle:'Edit issue date/time', incidentEditDateSub:'Adjust the reported date and time.',
+    alIncidentDate:'Please choose a valid date.',
     mechTitle:'Mechanical Manager — issues board', mechTag:'🔧 Mechanical Manager',
     mechBanner:'🔧 Mechanical Manager mode — manage machine issues across orders.',
     mechCounts:'Pending / In progress / Resolved',
@@ -834,6 +866,9 @@ const I18N = {
     incidentPending:'PENDIENTE', incidentProcessing:'PROCESANDO',
     incidentStartWork:'Iniciar atención', incidentWhoPrompt:'Iniciales de quién atenderá el problema:',
     incidentAttendedBy:'Atiende',
+    incidentChangeStatus:'Cambiar estado', incidentEditDate:'Editar fecha/hora', edit:'Editar', save:'Guardar',
+    incidentEditDateTitle:'Editar fecha/hora del problema', incidentEditDateSub:'Ajuste la fecha y hora reportadas.',
+    alIncidentDate:'Elija una fecha válida.',
     mechTitle:'Manager Mecánico — tablero de problemas', mechTag:'🔧 Manager Mecánico',
     mechBanner:'🔧 Modo Manager Mecánico — gestione los problemas de máquina de varias órdenes.',
     mechCounts:'Pendientes / Procesando / Resueltos',
@@ -1310,23 +1345,67 @@ function incEstadoPillBg(e){
   return 'background:rgba(240,180,41,.15);color:var(--warn)';
 }
 
-/* Cambiar estado de una incidencia de la ORDEN ACTUAL (vista operador/supervisor) */
+/* Cambiar estado de una incidencia de la ORDEN ACTUAL (solo supervisor) */
 function avanzarIncidencia(id, destino){
   if(!supervisor){ alert(t('incidentSupOnly')); return; }
   const inc=(state.incidencias||[]).find(x=>x.id===id);
   if(!inc) return;
+  const actual=estadoInc(inc);
+  if(destino===actual) return;
   if(destino==='proc'){
-    const quien=(prompt(t('incidentWhoPrompt'))||'').trim().toUpperCase();
-    if(!quien) return;
-    inc.estado='proc'; inc.atiende=quien; inc.procTs=new Date().toISOString(); inc.resuelto=false;
+    /* si ya tiene quien atiende, conservarlo; si no, pedirlo */
+    let quien=inc.atiende;
+    if(!quien){
+      quien=(prompt(t('incidentWhoPrompt'))||'').trim().toUpperCase();
+      if(!quien) return;
+    }
+    inc.estado='proc'; inc.atiende=quien;
+    if(!inc.procTs) inc.procTs=new Date().toISOString();
+    inc.resuelto=false; inc.resTs=null;
   } else if(destino==='res'){
-    inc.estado='res'; inc.resuelto=true; inc.resTs=new Date().toISOString();
-    inc.resPor = supervisor ? t('supervisor') : '';
+    inc.estado='res'; inc.resuelto=true;
+    if(!inc.resTs) inc.resTs=new Date().toISOString();
+    inc.resPor = t('supervisor');
   } else if(destino==='pend'){
     inc.estado='pend'; inc.resuelto=false; inc.resTs=null;
   }
   save(); render();
 }
+/* El supervisor cambia el estado desde el <select> de la tarjeta */
+function cambiarEstadoInc(sel){
+  avanzarIncidencia(sel.dataset.id, sel.value);
+}
+
+/* Editar fecha y hora de ingreso de una incidencia (solo supervisor) */
+const modalIncEdit=$('modalIncEdit');
+function editarFechaInc(id){
+  if(!supervisor){ alert(t('incidentSupOnly')); return; }
+  const inc=(state.incidencias||[]).find(x=>x.id===id);
+  if(!inc) return;
+  const d=new Date(inc.ts);
+  modalIncEdit.dataset.id=id;
+  $('incEditFecha').value=dayKey(d);
+  $('incEditHora').value=`${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}:${String(d.getSeconds()).padStart(2,'0')}`;
+  $('incEditAlert').classList.remove('show'); $('incEditAlert').textContent='';
+  modalIncEdit.classList.add('show');
+}
+function closeIncEdit(){ modalIncEdit.classList.remove('show'); }
+$('incEditCancel').addEventListener('click',closeIncEdit);
+modalIncEdit.addEventListener('click',e=>{ if(e.target===modalIncEdit) closeIncEdit(); });
+$('incEditSave').addEventListener('click',()=>{
+  const id=modalIncEdit.dataset.id;
+  const inc=(state.incidencias||[]).find(x=>x.id===id);
+  if(!inc){ closeIncEdit(); return; }
+  const fechaTxt=($('incEditFecha').value||'').trim();
+  const horaTxt=($('incEditHora').value||'').trim();
+  const al=$('incEditAlert');
+  if(!fechaTxt){ al.textContent=t('alIncidentDate'); al.classList.add('show'); return; }
+  const [yy,mo,dd]=fechaTxt.split('-').map(x=>parseInt(x,10));
+  const hp=horaTxt.split(':');
+  const hh=parseInt(hp[0],10)||0, mm=parseInt(hp[1],10)||0, ss=parseInt(hp[2],10)||0;
+  inc.ts=new Date(yy,(mo||1)-1,dd||1,hh,mm,ss,0).toISOString();
+  save(); closeIncEdit(); render();
+});
 function renderIncidencias(){
   const box=$('incidentList');
   if(!box) return;
@@ -1340,11 +1419,15 @@ function renderIncidencias(){
     const esHoy = dayKey(incDate)===dayKey(new Date());
     const selloRep = esHoy ? fmtTime(incDate) : `${fmtDate(incDate)} · ${fmtTime(incDate)}`;
     const col=incEstadoColor(e);
-    /* botones de transición (solo supervisor en esta vista) */
+    /* controles del supervisor: selector de estado + editar fecha/hora */
     let btns='';
     if(supervisor){
-      if(e==='pend') btns=`<button class="mini-btn inc-resolve" onclick="avanzarIncidencia('${inc.id}','proc')">${t('incidentStartWork')}</button>`;
-      else if(e==='proc') btns=`<button class="mini-btn inc-resolve" onclick="avanzarIncidencia('${inc.id}','res')">${t('incidentResolve')}</button>`;
+      btns=`<select class="mini-sel" data-id="${inc.id}" onchange="cambiarEstadoInc(this)" title="${t('incidentChangeStatus')}">
+        <option value="pend"${e==='pend'?' selected':''}>${t('incidentPending')}</option>
+        <option value="proc"${e==='proc'?' selected':''}>${t('incidentProcessing')}</option>
+        <option value="res"${e==='res'?' selected':''}>${t('incidentResolved')}</option>
+      </select>
+      <button class="mini-btn inc-resolve" onclick="editarFechaInc('${inc.id}')" title="${t('incidentEditDate')}">🕓 ${t('edit')}</button>`;
     }
     html+=`<div class="day-group" style="margin-bottom:12px">
       <div class="day-head${e==='res'?' closed':''}" style="border-left:3px solid ${col}">
