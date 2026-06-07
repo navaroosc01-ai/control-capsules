@@ -2063,7 +2063,7 @@ function mecCard(cod, cuarto, inc){
   else if(e==='proc') acciones=`<button class="mini-btn" onclick="mecAvanzar('${cod}','${inc.id}','res')">${t('incidentResolve')}</button>`;
   const cuartoTxt = cuarto ? String(cuarto).replace(/</g,'&lt;') : '—';
   return `<div class="mec-card ${e}">
-    <div class="mc-room">🚪 ${cuartoTxt}</div>
+    <div class="mc-room">Room ${cuartoTxt}</div>
     <div class="mc-ord">${t('mechOrderTag')}: ${cod}</div>
     <div class="mc-type">${nombreFalla(inc.tipo)}</div>
     <div class="mc-desc">${String(inc.desc||'').replace(/</g,'&lt;')}</div>
