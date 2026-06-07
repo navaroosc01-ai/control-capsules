@@ -428,6 +428,17 @@
         <option value="other" data-i18n="ftOther">Other</option>
       </select>
     </div>
+    <div class="grid g2">
+      <div class="row">
+        <label data-i18n="incidentDate">Date</label>
+        <input id="incFecha" type="date">
+      </div>
+      <div class="row">
+        <label data-i18n="incidentTime">Time</label>
+        <input id="incHora" type="time" step="1">
+      </div>
+    </div>
+    <div class="hint" style="margin:-6px 0 14px" data-i18n="incidentDateHint">The system date and time are used by default. You can change them manually.</div>
     <div class="row">
       <label data-i18n="incidentDesc">Problem description</label>
       <input id="incDesc" maxlength="180" placeholder="Ex. Capsule dosing jam on station 2" data-i18n-ph="incidentDescPh">
@@ -620,6 +631,7 @@ const I18N = {
     incidentsTitle:'Machine issues / maintenance', incidentReport:'⚠️ Report issue',
     noIncidents:'No issues reported.', incidentNew:'Report machine issue',
     incidentType:'Fault type', incidentDesc:'Problem description',
+    incidentDate:'Date', incidentTime:'Time', incidentDateHint:'The system date and time are used by default. You can change them manually.',
     incidentDescPh:'Ex. Capsule dosing jam on station 2',
     incidentReporter:'Reported by (initials)',
     incidentSave:'Report issue', incidentOpen:'OPEN', incidentResolved:'RESOLVED',
@@ -724,6 +736,7 @@ const I18N = {
     incidentsTitle:'Problemas de máquina / mantenimiento', incidentReport:'⚠️ Reportar problema',
     noIncidents:'Sin problemas reportados.', incidentNew:'Reportar problema de máquina',
     incidentType:'Tipo de falla', incidentDesc:'Descripción del problema',
+    incidentDate:'Fecha', incidentTime:'Hora', incidentDateHint:'Se usa la fecha y hora del sistema por defecto. Puede cambiarlas manualmente.',
     incidentDescPh:'Ej. Atasco en dosificación de cápsulas estación 2',
     incidentReporter:'Reporta (iniciales)',
     incidentSave:'Reportar problema', incidentOpen:'ABIERTO', incidentResolved:'RESUELTO',
@@ -1156,6 +1169,8 @@ function openIncModal(){
   const n=new Date();
   $('incStamp').textContent=`${fmtDate(n)} · ${fmtTime(n)}`;
   $('incTipo').value='mech'; $('incDesc').value=''; $('incOper').value='';
+  $('incFecha').value=dayKey(n);
+  $('incHora').value=`${String(n.getHours()).padStart(2,'0')}:${String(n.getMinutes()).padStart(2,'0')}:${String(n.getSeconds()).padStart(2,'0')}`;
   $('incAlert').classList.remove('show'); $('incAlert').textContent='';
   modalInc.classList.add('show'); setTimeout(()=>$('incDesc').focus(),50);
 }
@@ -1169,11 +1184,23 @@ $('incSave').addEventListener('click',()=>{
   const al=$('incAlert');
   if(!desc){ al.textContent=t('alIncidentDesc'); al.classList.add('show'); $('incDesc').focus(); return; }
   if(!oper){ al.textContent=t('alIncidentReporter'); al.classList.add('show'); $('incOper').focus(); return; }
+  /* combinar fecha + hora indicadas (sistema o manual) en el timestamp */
+  let ts;
+  const fechaTxt=($('incFecha').value||'').trim();
+  const horaTxt=($('incHora').value||'').trim();
+  if(fechaTxt){
+    const [yy,mo,dd]=fechaTxt.split('-').map(x=>parseInt(x,10));
+    const hp=horaTxt.split(':');
+    const hh=parseInt(hp[0],10)||0, mm=parseInt(hp[1],10)||0, ss=parseInt(hp[2],10)||0;
+    ts=new Date(yy,(mo||1)-1,dd||1,hh,mm,ss,0).toISOString();
+  } else {
+    ts=new Date().toISOString();
+  }
   if(!state.incidencias) state.incidencias=[];
   state.incidencias.push({
     id:Date.now()+'-'+Math.random().toString(36).slice(2,7),
     tipo:$('incTipo').value, desc, oper,
-    ts:new Date().toISOString(),
+    ts,
     resuelto:false, resTs:null, resPor:null
   });
   save(); closeIncModal(); render();
@@ -1195,6 +1222,9 @@ function renderIncidencias(){
   list.forEach(inc=>{
     const abierto=!inc.resuelto;
     const dur = inc.resTs ? fmtDuracion(new Date(inc.resTs)-new Date(inc.ts)) : null;
+    const incDate=new Date(inc.ts);
+    const esHoy = dayKey(incDate)===dayKey(new Date());
+    const selloRep = esHoy ? fmtTime(incDate) : `${fmtDate(incDate)} · ${fmtTime(incDate)}`;
     const pillCls = abierto?'sin':'cerr';
     const pillBg = abierto?'background:rgba(240,180,41,.15);color:var(--warn)':'background:rgba(45,212,167,.15);color:var(--accent)';
     const btnRes = (abierto && supervisor)
@@ -1210,7 +1240,7 @@ function renderIncidencias(){
       <div class="parciales-box" style="background:${abierto?'rgba(240,180,41,.06)':'rgba(45,212,167,.05)'};border-color:${abierto?'rgba(240,180,41,.25)':'rgba(45,212,167,.25)'}">
         <div style="font-size:13px;color:var(--ink);margin-bottom:6px">${inc.desc.replace(/</g,'&lt;')}</div>
         <div class="parcial-row" style="border:none;padding:2px 0;color:var(--muted);font-size:11px">
-          <span>${t('incidentReportedAt')}: <b style="color:var(--ink)">${fmtTime(new Date(inc.ts))}</b> ${t('incidentBy')} <b style="color:var(--ink)">${inc.oper}</b></span>
+          <span>${t('incidentReportedAt')}: <b style="color:var(--ink)">${selloRep}</b> ${t('incidentBy')} <b style="color:var(--ink)">${inc.oper}</b></span>
         </div>
         ${inc.resuelto?`<div class="parcial-row" style="border:none;padding:2px 0;color:var(--muted);font-size:11px">
           <span>${t('incidentResolvedAt')}: <b style="color:var(--ink)">${fmtTime(new Date(inc.resTs))}</b></span>
