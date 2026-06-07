@@ -170,7 +170,8 @@
     padding:7px 14px;border-radius:8px;background:var(--panel2);color:var(--muted);white-space:nowrap}
   .rol-tag.sup{background:rgba(240,180,41,.15);color:var(--warn)}
   body.supervisor .big-btn,
-  body.supervisor .day-head .mini-btn:not(.btn-reabrir),
+  body.supervisor #btnIncidente,
+  body.supervisor .day-head .mini-btn:not(.btn-reabrir):not(.inc-resolve),
   body.supervisor .parcial-row .px,
   body.supervisor tbody .btn.danger{display:none !important}
   /* El supervisor VE los datos de la orden pero no puede editarlos */
@@ -353,6 +354,15 @@
     <div id="records"><div class="empty" data-i18n="noSamples">No samples registered yet. Press "Register sample" to begin.</div></div>
   </div>
 
+  <!-- Problemas de máquina / mantenimiento -->
+  <div class="card">
+    <h2 style="justify-content:space-between">
+      <span style="display:flex;align-items:center;gap:8px"><span class="ic">🛠️</span> <span data-i18n="incidentsTitle">Machine issues / maintenance</span></span>
+      <button class="btn warn" id="btnIncidente" data-i18n="incidentReport">⚠️ Report issue</button>
+    </h2>
+    <div id="incidentList"><div class="empty" data-i18n="noIncidents">No issues reported.</div></div>
+  </div>
+
   <!-- Acciones finales -->
   <div class="card">
     <h2><span class="ic">🏁</span> <span data-i18n="finishOrder">Finish order</span></h2>
@@ -398,6 +408,37 @@
     <div class="actions">
       <button class="btn" id="mCancel" data-i18n="cancel">Cancel</button>
       <button class="btn primary" id="mSave" data-i18n="saveSample">Save sample</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal reportar problema de máquina -->
+<div class="modal-bg" id="modalInc">
+  <div class="modal" style="max-width:440px">
+    <h3 data-i18n="incidentNew">Report machine issue</h3>
+    <div class="sub" id="incStamp">—</div>
+    <div class="alert" id="incAlert"></div>
+    <div class="row">
+      <label data-i18n="incidentType">Fault type</label>
+      <select id="incTipo">
+        <option value="mech" data-i18n="ftMechanical">Mechanical</option>
+        <option value="elec" data-i18n="ftElectrical">Electrical</option>
+        <option value="soft" data-i18n="ftSoftware">Control / software</option>
+        <option value="mat" data-i18n="ftMaterial">Material / supply</option>
+        <option value="other" data-i18n="ftOther">Other</option>
+      </select>
+    </div>
+    <div class="row">
+      <label data-i18n="incidentDesc">Problem description</label>
+      <input id="incDesc" maxlength="180" placeholder="Ex. Capsule dosing jam on station 2" data-i18n-ph="incidentDescPh">
+    </div>
+    <div class="row">
+      <label data-i18n="incidentReporter">Reported by (initials)</label>
+      <input id="incOper" maxlength="5" placeholder="Ex. JP" data-i18n-ph="operatorPh" style="text-transform:uppercase">
+    </div>
+    <div class="actions">
+      <button class="btn" id="incCancel" data-i18n="cancel">Cancel</button>
+      <button class="btn warn" id="incSave" data-i18n="incidentSave">Report issue</button>
     </div>
   </div>
 </div>
@@ -457,7 +498,7 @@ const SUPABASE_URL = "https://ureozunpfqmhetiaxdoj.supabase.co";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVyZW96dW5wZnFtaGV0aWF4ZG9qIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAyNDgxMTcsImV4cCI6MjA5NTgyNDExN30.oTAAiObEF0NKhqX5lMQJUPdTMOjB3PmYfYemFBHjoNI";
 /* =================================================================== */
 
-let state={ orden:{producto:'',lote:'',orden:'',min:'',max:'',metaCaps:''}, registros:[], dias:{}, firmas:{} };
+let state={ orden:{producto:'',lote:'',orden:'',min:'',max:'',metaCaps:''}, registros:[], dias:{}, firmas:{}, incidencias:[] };
 let codigo='', supervisor=false, lastPush=0, pollTimer=null;
 let diasExpandidos={}; /* { dayKey: true } días con todas las muestras desplegadas */
 const TOPE_MUESTRAS=3; /* muestras visibles por día antes de "Ver todas" */
@@ -475,7 +516,7 @@ function initSupabase(){
 }
 
 function normalizar(d){ d=d||{}; d.orden=d.orden||{producto:'',lote:'',orden:'',min:'',max:'',metaCaps:''};
-  d.registros=d.registros||[]; d.dias=d.dias||{}; d.firmas=d.firmas||{};
+  d.registros=d.registros||[]; d.dias=d.dias||{}; d.firmas=d.firmas||{}; d.incidencias=d.incidencias||[];
   return d; }
 
 /* Leer la orden por código (GET REST) */
@@ -510,10 +551,10 @@ async function abrirOrden(cod){
     const d = await leerOrden();
     if(d){ state=normalizar(d); }
     else if(!supervisor){
-      state={ orden:{producto:'',lote:'',orden:'',min:'',max:'',metaCaps:''}, registros:[], dias:{}, firmas:{} };
+      state={ orden:{producto:'',lote:'',orden:'',min:'',max:'',metaCaps:''}, registros:[], dias:{}, firmas:{}, incidencias:[] };
       await pushNow();
     } else {
-      state={ orden:{producto:'',lote:'',orden:'',min:'',max:'',metaCaps:''}, registros:[], dias:{}, firmas:{} };
+      state={ orden:{producto:'',lote:'',orden:'',min:'',max:'',metaCaps:''}, registros:[], dias:{}, firmas:{}, incidencias:[] };
     }
     fillOrden(); render();
     setConn('ok', supervisor?(t('viewPrefix')+' '+codigo):(t('orderPrefix')+' '+codigo+' '+t('connLoaded')));
@@ -576,6 +617,18 @@ const I18N = {
     orderSummary:'Order summary', samples:'Samples', avgCap:'Avg. capsule (mg)', outOfRange:'Out of range', accumProd:'Accum. production (caps)',
     rangeUndef:'Range: set min/max in order data', prodProgress:'Production progress',
     recordsByDay:'Records by day', noSamples:'No samples registered yet. Press "Register sample" to begin.',
+    incidentsTitle:'Machine issues / maintenance', incidentReport:'⚠️ Report issue',
+    noIncidents:'No issues reported.', incidentNew:'Report machine issue',
+    incidentType:'Fault type', incidentDesc:'Problem description',
+    incidentDescPh:'Ex. Capsule dosing jam on station 2',
+    incidentReporter:'Reported by (initials)',
+    incidentSave:'Report issue', incidentOpen:'OPEN', incidentResolved:'RESOLVED',
+    incidentResolve:'Mark resolved', incidentReportedAt:'Reported', incidentResolvedAt:'Resolved',
+    incidentDuration:'Downtime', incidentBy:'by', incidentSupOnly:'Only the supervisor can mark issues as resolved.',
+    alIncidentDesc:'Enter a description of the problem.', alIncidentReporter:'Enter the initials of who reports.',
+    ftMechanical:'Mechanical', ftElectrical:'Electrical', ftSoftware:'Control / software',
+    ftMaterial:'Material / supply', ftOther:'Other',
+    incidentsOpenTab:'open issue(s)', incidentsPrintTitle:'Machine issues / downtime log',
     finishOrder:'Finish order', finishDesc:'When finished, a preformatted sheet is generated, ready to print or export.',
     printSheet:'🖨️ Print order sheet', exportCsv:'📥 Export CSV (Excel)', clearOrder:'🗑️ Clear order',
     newSample:'New sample', sampleTime:'Sample time', sampleTimeHint:'The system time is used by default. You can change it manually.',
@@ -668,6 +721,18 @@ const I18N = {
     orderSummary:'Resumen de la orden', samples:'Muestras', avgCap:'Prom. cápsula (mg)', outOfRange:'Fuera de rango', accumProd:'Producción acum. (cáps)',
     rangeUndef:'Rango: definir min/máx en datos de orden', prodProgress:'Avance de producción',
     recordsByDay:'Registros por día', noSamples:'Aún no hay muestras registradas. Presione "Registrar muestra" para comenzar.',
+    incidentsTitle:'Problemas de máquina / mantenimiento', incidentReport:'⚠️ Reportar problema',
+    noIncidents:'Sin problemas reportados.', incidentNew:'Reportar problema de máquina',
+    incidentType:'Tipo de falla', incidentDesc:'Descripción del problema',
+    incidentDescPh:'Ej. Atasco en dosificación de cápsulas estación 2',
+    incidentReporter:'Reporta (iniciales)',
+    incidentSave:'Reportar problema', incidentOpen:'ABIERTO', incidentResolved:'RESUELTO',
+    incidentResolve:'Marcar resuelto', incidentReportedAt:'Reportado', incidentResolvedAt:'Resuelto',
+    incidentDuration:'Paro', incidentBy:'por', incidentSupOnly:'Solo el supervisor puede marcar los problemas como resueltos.',
+    alIncidentDesc:'Escriba una descripción del problema.', alIncidentReporter:'Escriba las iniciales de quien reporta.',
+    ftMechanical:'Mecánica', ftElectrical:'Eléctrica', ftSoftware:'Control / software',
+    ftMaterial:'Material / insumo', ftOther:'Otra',
+    incidentsOpenTab:'problema(s) abierto(s)', incidentsPrintTitle:'Bitácora de problemas / paros de máquina',
     finishOrder:'Finalizar orden', finishDesc:'Al finalizar se genera la hoja con formato preestablecido lista para imprimir o exportar.',
     printSheet:'🖨️ Imprimir hoja de orden', exportCsv:'📥 Exportar CSV (Excel)', clearOrder:'🗑️ Limpiar orden',
     newSample:'Nueva muestra', sampleTime:'Hora de la toma', sampleTimeHint:'Se toma la hora del sistema por defecto. Puede modificarla manualmente.',
@@ -947,6 +1012,7 @@ function reopenDay(key){
 
 /* ---- render ---- */
 function render(){
+  renderIncidencias();
   const {min,max}=getRange();
   const meta=parseFloat(state.orden.metaCaps);
   const recs=state.registros.slice().sort((a,b)=>new Date(a.ts)-new Date(b.ts));
@@ -1075,10 +1141,92 @@ function render(){
 function delRec(i){ if(confirm(t('confDelSample'))){ state.registros.splice(i,1); save(); render(); } }
 function toggleDia(k){ diasExpandidos[k]=!diasExpandidos[k]; render(); }
 
+/* ===================== INCIDENCIAS DE MÁQUINA ===================== */
+const FALLAS={mech:'ftMechanical',elec:'ftElectrical',soft:'ftSoftware',mat:'ftMaterial',other:'ftOther'};
+const modalInc=$('modalInc');
+function nombreFalla(tipo){ return t(FALLAS[tipo]||'ftOther'); }
+function fmtDuracion(ms){
+  if(ms==null||ms<0) return '—';
+  const totMin=Math.round(ms/60000);
+  const h=Math.floor(totMin/60), m=totMin%60;
+  return h>0 ? `${h} h ${m} min` : `${m} min`;
+}
+function openIncModal(){
+  if(hoyCerrado()){ alert(t('alDayClosedSample')); return; }
+  const n=new Date();
+  $('incStamp').textContent=`${fmtDate(n)} · ${fmtTime(n)}`;
+  $('incTipo').value='mech'; $('incDesc').value=''; $('incOper').value='';
+  $('incAlert').classList.remove('show'); $('incAlert').textContent='';
+  modalInc.classList.add('show'); setTimeout(()=>$('incDesc').focus(),50);
+}
+function closeIncModal(){ modalInc.classList.remove('show'); }
+if($('btnIncidente')) $('btnIncidente').addEventListener('click',openIncModal);
+$('incCancel').addEventListener('click',closeIncModal);
+modalInc.addEventListener('click',e=>{ if(e.target===modalInc) closeIncModal(); });
+$('incSave').addEventListener('click',()=>{
+  const desc=($('incDesc').value||'').trim();
+  const oper=($('incOper').value||'').trim().toUpperCase();
+  const al=$('incAlert');
+  if(!desc){ al.textContent=t('alIncidentDesc'); al.classList.add('show'); $('incDesc').focus(); return; }
+  if(!oper){ al.textContent=t('alIncidentReporter'); al.classList.add('show'); $('incOper').focus(); return; }
+  if(!state.incidencias) state.incidencias=[];
+  state.incidencias.push({
+    id:Date.now()+'-'+Math.random().toString(36).slice(2,7),
+    tipo:$('incTipo').value, desc, oper,
+    ts:new Date().toISOString(),
+    resuelto:false, resTs:null, resPor:null
+  });
+  save(); closeIncModal(); render();
+});
+function resolverIncidencia(id){
+  if(!supervisor){ alert(t('incidentSupOnly')); return; }
+  const inc=(state.incidencias||[]).find(x=>x.id===id);
+  if(!inc || inc.resuelto) return;
+  inc.resuelto=true; inc.resTs=new Date().toISOString();
+  inc.resPor = supervisor ? t('supervisor') : '';
+  save(); render();
+}
+function renderIncidencias(){
+  const box=$('incidentList');
+  if(!box) return;
+  const list=(state.incidencias||[]).slice().sort((a,b)=>new Date(b.ts)-new Date(a.ts));
+  if(!list.length){ box.innerHTML='<div class="empty">'+t('noIncidents')+'</div>'; return; }
+  let html='';
+  list.forEach(inc=>{
+    const abierto=!inc.resuelto;
+    const dur = inc.resTs ? fmtDuracion(new Date(inc.resTs)-new Date(inc.ts)) : null;
+    const pillCls = abierto?'sin':'cerr';
+    const pillBg = abierto?'background:rgba(240,180,41,.15);color:var(--warn)':'background:rgba(45,212,167,.15);color:var(--accent)';
+    const btnRes = (abierto && supervisor)
+      ? `<button class="mini-btn inc-resolve" onclick="resolverIncidencia('${inc.id}')">${t('incidentResolve')}</button>` : '';
+    html+=`<div class="day-group" style="margin-bottom:12px">
+      <div class="day-head${abierto?'':' closed'}" style="border-left:3px solid ${abierto?'var(--warn)':'var(--accent)'}">
+        <span style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+          <span class="lock-tag" style="${pillBg}">${abierto?t('incidentOpen'):t('incidentResolved')}</span>
+          <b>${nombreFalla(inc.tipo)}</b>
+        </span>
+        <span class="meta">${btnRes}</span>
+      </div>
+      <div class="parciales-box" style="background:${abierto?'rgba(240,180,41,.06)':'rgba(45,212,167,.05)'};border-color:${abierto?'rgba(240,180,41,.25)':'rgba(45,212,167,.25)'}">
+        <div style="font-size:13px;color:var(--ink);margin-bottom:6px">${inc.desc.replace(/</g,'&lt;')}</div>
+        <div class="parcial-row" style="border:none;padding:2px 0;color:var(--muted);font-size:11px">
+          <span>${t('incidentReportedAt')}: <b style="color:var(--ink)">${fmtTime(new Date(inc.ts))}</b> ${t('incidentBy')} <b style="color:var(--ink)">${inc.oper}</b></span>
+        </div>
+        ${inc.resuelto?`<div class="parcial-row" style="border:none;padding:2px 0;color:var(--muted);font-size:11px">
+          <span>${t('incidentResolvedAt')}: <b style="color:var(--ink)">${fmtTime(new Date(inc.resTs))}</b></span>
+          <span class="ph-time">${t('incidentDuration')}: <b style="color:var(--accent)">${dur}</b></span>
+        </div>`:''}
+      </div>
+    </div>`;
+  });
+  box.innerHTML=html;
+}
+/* ================================================================= */
+
 $('btnLimpiar').addEventListener('click',()=>{
   if(!supervisor){ alert(t('alOnlySupClear')); return; }
   if(confirm(t('confClear'))){
-    state={orden:{producto:'',lote:'',orden:'',min:'',max:'',metaCaps:''},registros:[],dias:{},firmas:{}};
+    state={orden:{producto:'',lote:'',orden:'',min:'',max:'',metaCaps:''},registros:[],dias:{},firmas:{},incidencias:[]};
     escribirNube(); fillOrden(); render();
   }
 });
@@ -1544,6 +1692,21 @@ async function refrescarTablero(){
       prog=`<div class="oc-meta">${t('accumLabel')} <b>${prodTotal.toLocaleString(loc)}</b> ${t('capsUnit')} ${t('noTargetSet')}</div>`;
     }
 
+    /* incidencias de máquina abiertas */
+    const incs=(d.incidencias||[]);
+    const abiertas=incs.filter(x=>x && !x.resuelto);
+    let incBanner='';
+    if(abiertas.length){
+      const lineas=abiertas.slice(0,3).map(x=>
+        `<div style="font-size:11px;color:var(--ink);margin-top:3px">• <b>${nombreFalla(x.tipo)}</b> — ${String(x.desc||'').replace(/</g,'&lt;')} <span style="color:var(--muted)">(${fmtTime(new Date(x.ts))} · ${x.oper||''})</span></div>`
+      ).join('');
+      const extra = abiertas.length>3 ? `<div style="font-size:11px;color:var(--muted);margin-top:3px">+${abiertas.length-3}…</div>` : '';
+      incBanner=`<div style="background:rgba(240,180,41,.1);border:1px solid rgba(240,180,41,.4);border-radius:8px;padding:8px 10px;margin-top:2px">
+        <div style="font-size:11px;font-weight:700;color:var(--warn);text-transform:uppercase;letter-spacing:.5px">🛠️ ${abiertas.length} ${t('incidentsOpenTab')}</div>
+        ${lineas}${extra}
+      </div>`;
+    }
+
     html+=`<div class="ord-card">
       <div class="oc-top">
         <div>
@@ -1560,6 +1723,7 @@ async function refrescarTablero(){
         ${o.orden?`<span>${t('roomLabel')} <b>${o.orden}</b></span>`:''}
       </div>
       ${prog}
+      ${incBanner}
       <div class="oc-avance">${t('lastDayProgress')} ${avanceTxt}</div>
       <div class="oc-avance">${t('prevDayClose')} ${cierreAntTxt}${cierreAntFecha}</div>
       <div class="oc-avance">${t('todayPartial')} ${parcialHoyTxt}</div>
