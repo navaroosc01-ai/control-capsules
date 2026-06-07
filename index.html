@@ -394,10 +394,6 @@
     <div class="row">
       <label data-i18n="operatorInitials">Operator initials</label>
       <input id="mOper" maxlength="5" placeholder="Ex. JP" data-i18n-ph="operatorPh" style="text-transform:uppercase">
-      <div class="hint" id="mFirmaHint" style="display:flex;align-items:center;justify-content:space-between;gap:8px">
-        <span id="mFirmaTxt"></span>
-        <button type="button" class="mini-btn" id="mFirmaBtn" style="display:none"></button>
-      </div>
     </div>
     <div class="actions">
       <button class="btn" id="mCancel" data-i18n="cancel">Cancel</button>
@@ -448,27 +444,6 @@
     <div class="actions">
       <button class="btn" id="dCancel" data-i18n="cancel">Cancel</button>
       <button class="btn primary" id="dSave" data-i18n="closeDayBtn">Close day</button>
-    </div>
-  </div>
-</div>
-
-<!-- Modal de captura de firma -->
-<div class="modal-bg" id="modalFirma">
-  <div class="modal" style="max-width:460px">
-    <h3 data-i18n="signTitle">Capture signature</h3>
-    <div class="sub" id="firmaSub">—</div>
-    <div class="alert" id="firmaAlert"></div>
-    <div class="row">
-      <label data-i18n="signDraw">Draw your signature</label>
-      <div style="background:#fff;border:1px solid var(--line);border-radius:8px;overflow:hidden">
-        <canvas id="firmaCanvas" width="420" height="170"
-          style="display:block;width:100%;height:170px;touch-action:none;cursor:crosshair"></canvas>
-      </div>
-      <div class="hint" data-i18n="signHint">Sign with your finger or mouse. It will be saved for these initials and printed next to each of your samples.</div>
-    </div>
-    <div class="actions">
-      <button class="btn" id="firmaClear" data-i18n="signClear">Clear</button>
-      <button class="btn primary" id="firmaSave" data-i18n="signSave">Save signature</button>
     </div>
   </div>
 </div>
@@ -550,8 +525,6 @@ async function abrirOrden(cod){
 /* Sondeo: si pasó suficiente tiempo desde mi último guardado, refresco desde la nube */
 async function sondear(){
   if(!codigo || Date.now()-lastPush < 3000) return;
-  /* no refrescar desde la nube mientras se está capturando una firma o muestra pendiente */
-  if(modalFirma.classList.contains('show') || muestraPendiente) return;
   try{
     const d = await leerOrden();
     if(d){ state=normalizar(d); fillOrden(); render();
@@ -615,7 +588,7 @@ const I18N = {
     signSubFor:'Initials:', signEmpty:'Please draw a signature before saving.',
     firmaOnFile:'✓ Signature on file for these initials.', firmaNeeded:'A signature will be requested for these initials.',
     firmaRedo:'Redo signature', firmaAdd:'Add signature',
-    signLegendTitle:'Signatures — initials and digital signature of each sampler',
+    signLegendTitle:'Initials of each sampler',
     signNone:'(no signature)',
     printControlChart:'🖨️ Print control chart (Sam\u2019s Club)',
     pChartTitle:'CONTROL CHART — INDIVIDUAL CAPSULE WEIGHT', pChartProductFixed:'Sam\u2019s Club — Extra Strength Turmeric Capsules (W5226)',
@@ -707,7 +680,7 @@ const I18N = {
     signSubFor:'Iniciales:', signEmpty:'Dibuje una firma antes de guardar.',
     firmaOnFile:'✓ Firma registrada para estas iniciales.', firmaNeeded:'Se pedirá una firma para estas iniciales.',
     firmaRedo:'Rehacer firma', firmaAdd:'Agregar firma',
-    signLegendTitle:'Firmas — iniciales y firma digital de cada persona que tomó muestra',
+    signLegendTitle:'Iniciales de cada persona que tomó muestra',
     signNone:'(sin firma)',
     printControlChart:'🖨️ Imprimir gráfica de control (Sam\u2019s Club)',
     pChartTitle:'GRÁFICA DE CONTROL — PESO INDIVIDUAL DE CÁPSULA', pChartProductFixed:'Sam\u2019s Club — Extra Strength Turmeric Capsules (W5226)',
@@ -851,7 +824,6 @@ function openModal(){
   $('mStatus').style.display='none';
   $('mAlert').classList.remove('show'); $('mAlert').textContent='';
   $('mOper').value='';
-  actualizarFirmaHint();
   const {min,max}=getRange();
   $('mRangeHint').textContent = (min>0&&max>0)?`${t('capRangePrefix')} ${min.toFixed(1)} – ${max.toFixed(1)} ${t('mg')}`:t('capRangeUndef');
   modal.classList.add('show'); setTimeout(()=>$('mDiez').focus(),50);
@@ -894,110 +866,10 @@ $('mSave').addEventListener('click',()=>{
     base.setHours(hh,mm,ss,0);
     ts=base.toISOString();
   }
-  /* si estas iniciales aún no tienen firma registrada, pedirla una sola vez
-     y dejar la muestra pendiente hasta que se capture */
-  if(!state.firmas || !state.firmas[oper]){
-    muestraPendiente={ ts, diez, prom:diez*100, oper };
-    abrirFirmaModal(oper, /*porMuestra=*/true);
-    return;
-  }
   state.registros.push({ ts, diez, prom:diez*100, oper });
   save(); closeModal(); render();
 });
 
-/* ===================== FIRMA DIGITAL ===================== */
-let muestraPendiente=null;       /* muestra a guardar tras capturar la firma */
-let firmaDesdeMuestra=false;     /* true si el modal de firma se abrió durante una toma */
-const modalFirma=$('modalFirma');
-const firmaCanvas=$('firmaCanvas');
-let fctx=null, dibujando=false, hayTrazo=false, lastPt=null;
-
-/* indicador junto al campo de iniciales en el modal de muestra */
-function actualizarFirmaHint(){
-  const oper=($('mOper').value||'').trim().toUpperCase();
-  const txt=$('mFirmaTxt'), btn=$('mFirmaBtn');
-  if(!oper){ txt.textContent=''; btn.style.display='none'; return; }
-  if(state.firmas && state.firmas[oper]){
-    txt.textContent=t('firmaOnFile'); txt.style.color='var(--accent)';
-    btn.textContent=t('firmaRedo'); btn.style.display='inline-block';
-  } else {
-    txt.textContent=t('firmaNeeded'); txt.style.color='var(--muted)';
-    btn.textContent=t('firmaAdd'); btn.style.display='inline-block';
-  }
-}
-$('mOper').addEventListener('input',actualizarFirmaHint);
-$('mFirmaBtn').addEventListener('click',()=>{
-  const oper=($('mOper').value||'').trim().toUpperCase();
-  if(!oper){ $('mOper').focus(); return; }
-  abrirFirmaModal(oper, /*porMuestra=*/false);
-});
-
-/* ajustar el canvas a su tamaño real en pantalla (nitidez en móvil) */
-function ajustarCanvas(){
-  const rect=firmaCanvas.getBoundingClientRect();
-  const ratio=window.devicePixelRatio||1;
-  firmaCanvas.width=Math.round(rect.width*ratio);
-  firmaCanvas.height=Math.round(rect.height*ratio);
-  fctx=firmaCanvas.getContext('2d');
-  fctx.scale(ratio,ratio);
-  fctx.lineWidth=2.2; fctx.lineCap='round'; fctx.lineJoin='round';
-  fctx.strokeStyle='#111';
-  fctx.clearRect(0,0,firmaCanvas.width,firmaCanvas.height);
-  hayTrazo=false;
-}
-function ptDesdeEvento(e){
-  const rect=firmaCanvas.getBoundingClientRect();
-  const src=(e.touches&&e.touches[0])?e.touches[0]:e;
-  return { x:src.clientX-rect.left, y:src.clientY-rect.top };
-}
-function fStart(e){ e.preventDefault(); dibujando=true; lastPt=ptDesdeEvento(e); }
-function fMove(e){
-  if(!dibujando) return; e.preventDefault();
-  const p=ptDesdeEvento(e);
-  fctx.beginPath(); fctx.moveTo(lastPt.x,lastPt.y); fctx.lineTo(p.x,p.y); fctx.stroke();
-  lastPt=p; hayTrazo=true;
-}
-function fEnd(e){ if(e) e.preventDefault(); dibujando=false; }
-firmaCanvas.addEventListener('mousedown',fStart);
-firmaCanvas.addEventListener('mousemove',fMove);
-window.addEventListener('mouseup',fEnd);
-firmaCanvas.addEventListener('touchstart',fStart,{passive:false});
-firmaCanvas.addEventListener('touchmove',fMove,{passive:false});
-firmaCanvas.addEventListener('touchend',fEnd,{passive:false});
-
-function abrirFirmaModal(oper, porMuestra){
-  firmaDesdeMuestra=!!porMuestra;
-  modalFirma.dataset.oper=oper;
-  $('firmaSub').textContent=`${t('signSubFor')} ${oper}`;
-  $('firmaAlert').classList.remove('show'); $('firmaAlert').textContent='';
-  modalFirma.classList.add('show');
-  /* esperar a que el modal sea visible para medir bien el canvas */
-  setTimeout(ajustarCanvas,60);
-}
-function cerrarFirmaModal(){ modalFirma.classList.remove('show'); }
-
-$('firmaClear').addEventListener('click',()=>{ if(fctx){ fctx.clearRect(0,0,firmaCanvas.width,firmaCanvas.height); hayTrazo=false; } });
-$('firmaSave').addEventListener('click',()=>{
-  const oper=modalFirma.dataset.oper;
-  const al=$('firmaAlert');
-  if(!hayTrazo){ al.textContent=t('signEmpty'); al.classList.add('show'); return; }
-  /* recortar el PNG a un tamaño compacto (mantiene transparencia) */
-  const dataUrl=firmaCanvas.toDataURL('image/png');
-  if(!state.firmas) state.firmas={};
-  state.firmas[oper]=dataUrl;
-  cerrarFirmaModal();
-  actualizarFirmaHint();
-  /* si la firma se pidió durante una toma, completar el guardado de la muestra */
-  if(firmaDesdeMuestra && muestraPendiente){
-    state.registros.push(muestraPendiente);
-    muestraPendiente=null; firmaDesdeMuestra=false;
-    save(); closeModal(); render();
-  } else {
-    save();
-  }
-});
-modalFirma.addEventListener('click',e=>{ if(e.target===modalFirma){ /* no cerrar al fondo si vino de muestra, para no perder el dato */ if(!firmaDesdeMuestra) cerrarFirmaModal(); } });
-/* ========================================================= */
 
 /* ---- modal avance del día ---- */
 const modalParcial=$('modalParcial');
@@ -1456,20 +1328,15 @@ $('btnGrafica').addEventListener('click',()=>{
   const avgMg = pcMg ? pcMg.toFixed(1) : '____________';
   const avgKg = pcMg ? (pcMg/1000000).toFixed(7) : '____________';
 
-  /* leyenda de firmas: una entrada por inicial que tomó muestras en esta orden */
+  /* leyenda: una entrada por inicial que tomó muestras en esta orden */
   let leyenda='';
   const inicialesUsadas=[];
   recs.forEach(r=>{ if(r.oper && inicialesUsadas.indexOf(r.oper)<0) inicialesUsadas.push(r.oper); });
   if(inicialesUsadas.length){
     let items='';
     inicialesUsadas.forEach(op=>{
-      const firmaImg = state.firmas && state.firmas[op];
-      const firmaCell = firmaImg
-        ? `<img src="${firmaImg}" alt="${op}" style="height:36px;max-width:160px;object-fit:contain;display:block">`
-        : `<span style="color:#888;font-size:10px">${tEN('signNone')}</span>`;
-      items+=`<div style="display:flex;align-items:center;gap:10px;border:1px solid #999;border-radius:4px;padding:6px 12px;min-width:170px">
-                <span style="font-weight:bold;font-size:14px;min-width:34px">${op}</span>
-                <span style="border-left:1px solid #ccc;padding-left:10px">${firmaCell}</span>
+      items+=`<div style="display:flex;align-items:center;gap:10px;border:1px solid #999;border-radius:4px;padding:6px 12px;min-width:90px">
+                <span style="font-weight:bold;font-size:14px">${op}</span>
               </div>`;
     });
     leyenda=`<div style="margin-top:18px">
