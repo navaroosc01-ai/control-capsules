@@ -185,8 +185,8 @@
   body.supervisor #fCodigo{pointer-events:auto;opacity:1}
   body.supervisor #tabCodigos{pointer-events:auto;opacity:1;background:var(--panel2)}
   /* Imprimir, CSV y Limpiar: solo visibles para el supervisor */
-  #btnImprimir, #btnCSV, #btnGrafica, #btnLimpiar{display:none}
-  body.supervisor #btnImprimir, body.supervisor #btnCSV, body.supervisor #btnGrafica, body.supervisor #btnLimpiar{display:inline-block !important}
+  #btnImprimir, #btnCSV, #btnGrafica, #btnLimpiar, #btnRespaldo{display:none}
+  body.supervisor #btnImprimir, body.supervisor #btnCSV, body.supervisor #btnGrafica, body.supervisor #btnLimpiar, body.supervisor #btnRespaldo{display:inline-block !important}
   /* Vista supervisor simplificada: ocultar rango/objetivo, tarjetas de stats y pill de rango */
   body.supervisor #filaRango,
   body.supervisor .stats,
@@ -264,6 +264,7 @@
   .mec-card.pend{border-left-color:var(--warn)}
   .mec-card.proc{border-left-color:#378add}
   .mec-card.res{border-left-color:var(--accent)}
+  .mec-card .mc-room{font-size:14px;font-weight:800;color:var(--ink);margin-bottom:3px;letter-spacing:.2px}
   .mec-card .mc-ord{font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);font-weight:700}
   .mec-card .mc-type{font-size:13px;font-weight:700;margin:2px 0 4px}
   .mec-card .mc-desc{font-size:12px;color:var(--ink);margin-bottom:8px;line-height:1.45}
@@ -429,6 +430,7 @@
       <button class="btn primary" id="btnImprimir" data-i18n="printSheet">🖨️ Print order sheet</button>
       <button class="btn primary" id="btnGrafica" data-i18n="printControlChart">🖨️ Print control chart (Sam's Club)</button>
       <button class="btn" id="btnCSV" data-i18n="exportCsv">📥 Export CSV (Excel)</button>
+      <button class="btn" id="btnRespaldo" data-i18n="backupJson">💾 Backup (JSON)</button>
       <button class="btn danger" id="btnLimpiar" data-i18n="clearOrder">🗑️ Clear order</button>
     </div>
   </div>
@@ -760,6 +762,7 @@ const I18N = {
     mechOrderTag:'Order', mechSavedOk:'Change saved', mechSaveErr:'Could not save the change',
     finishOrder:'Finish order', finishDesc:'When finished, a preformatted sheet is generated, ready to print or export.',
     printSheet:'🖨️ Print order sheet', exportCsv:'📥 Export CSV (Excel)', clearOrder:'🗑️ Clear order',
+    backupJson:'💾 Backup (JSON)', backupNoOrder:'No order loaded to back up.', backupOk:'Backup downloaded.',
     newSample:'New sample', sampleTime:'Sample time', sampleTimeHint:'The system time is used by default. You can change it manually.',
     weight10:'Weight of 10 capsules (g)', weightPerCap:'Weight per capsule (mg)', operatorInitials:'Operator initials', operatorPh:'Ex. JP',
     cancel:'Cancel', saveSample:'Save sample',
@@ -877,6 +880,7 @@ const I18N = {
     mechOrderTag:'Orden', mechSavedOk:'Cambio guardado', mechSaveErr:'No se pudo guardar el cambio',
     finishOrder:'Finalizar orden', finishDesc:'Al finalizar se genera la hoja con formato preestablecido lista para imprimir o exportar.',
     printSheet:'🖨️ Imprimir hoja de orden', exportCsv:'📥 Exportar CSV (Excel)', clearOrder:'🗑️ Limpiar orden',
+    backupJson:'💾 Respaldo (JSON)', backupNoOrder:'No hay una orden cargada para respaldar.', backupOk:'Respaldo descargado.',
     newSample:'Nueva muestra', sampleTime:'Hora de la toma', sampleTimeHint:'Se toma la hora del sistema por defecto. Puede modificarla manualmente.',
     weight10:'Peso de 10 cápsulas (g)', weightPerCap:'Peso por cápsula (mg)', operatorInitials:'Iniciales del operador', operatorPh:'Ej. JP',
     cancel:'Cancelar', saveSample:'Guardar muestra',
@@ -2020,7 +2024,8 @@ async function refrescarMec(){
   mecCodigos.forEach(cod=>{
     const d=mecDatos[cod];
     if(!d || !Array.isArray(d.incidencias)) return;
-    d.incidencias.forEach(inc=>{ if(inc && estadoInc(inc)!=='res') items.push({cod, inc}); });
+    const cuarto=(d.orden && d.orden.orden) ? d.orden.orden : '';
+    d.incidencias.forEach(inc=>{ if(inc && estadoInc(inc)!=='res') items.push({cod, cuarto, inc}); });
   });
 
   const buckets={pend:[],proc:[]};
@@ -2036,7 +2041,7 @@ async function refrescarMec(){
     const arr=buckets[estado];
     let inner='';
     if(!arr.length){ inner=`<div class="mec-col-empty">—</div>`; }
-    else arr.forEach(it=>{ inner+=mecCard(it.cod, it.inc); });
+    else arr.forEach(it=>{ inner+=mecCard(it.cod, it.cuarto, it.inc); });
     return `<div class="mec-col ${clase}">
       <div class="mec-col-head"><span>${titulo}</span><span class="cnt">${arr.length}</span></div>
       ${inner}
@@ -2047,7 +2052,7 @@ async function refrescarMec(){
     col('proc','proc',t('colProcessing'));
 }
 
-function mecCard(cod, inc){
+function mecCard(cod, cuarto, inc){
   const e=estadoInc(inc);
   const incDate=new Date(inc.ts);
   const esHoy = dayKey(incDate)===dayKey(new Date());
@@ -2056,7 +2061,9 @@ function mecCard(cod, inc){
   let acciones='';
   if(e==='pend') acciones=`<button class="mini-btn" onclick="mecAvanzar('${cod}','${inc.id}','proc')">${t('incidentStartWork')}</button>`;
   else if(e==='proc') acciones=`<button class="mini-btn" onclick="mecAvanzar('${cod}','${inc.id}','res')">${t('incidentResolve')}</button>`;
+  const cuartoTxt = cuarto ? String(cuarto).replace(/</g,'&lt;') : '—';
   return `<div class="mec-card ${e}">
+    <div class="mc-room">🚪 ${cuartoTxt}</div>
     <div class="mc-ord">${t('mechOrderTag')}: ${cod}</div>
     <div class="mc-type">${nombreFalla(inc.tipo)}</div>
     <div class="mc-desc">${String(inc.desc||'').replace(/</g,'&lt;')}</div>
