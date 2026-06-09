@@ -6,9 +6,9 @@
 <title>Production Control — GVIP</title>
 <style>
   :root{
-    --bg:#0f1419; --panel:#1a212b; --panel2:#222b38; --line:#2e3a4a;
-    --ink:#e9eef5; --muted:#93a1b3; --accent:#2dd4a7; --accent2:#1d9e75;
-    --warn:#f0b429; --danger:#e25555; --radius:12px;
+    --bg:#0d1218; --panel:#1b232f; --panel2:#283342; --line:#3d4c60;
+    --ink:#f4f7fb; --muted:#b9c6d6; --accent:#34e0b0; --accent2:#16b88c;
+    --warn:#ffc233; --danger:#ff6b6b; --radius:12px;
   }
   *{box-sizing:border-box;margin:0;padding:0}
   body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
@@ -223,7 +223,17 @@
     padding:16px;display:flex;flex-direction:column;gap:10px}
   .ord-card.miss{opacity:.6;border-style:dashed}
   .ord-card .oc-top{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
-  .ord-card .oc-code{font-size:15px;font-weight:700;letter-spacing:.3px}
+  .ord-card .oc-code{font-size:12px;font-weight:700;letter-spacing:.3px;color:var(--muted);margin-top:2px}
+  .ord-card .oc-room-big{font-size:20px;font-weight:800;color:var(--ink);line-height:1.1}
+  .rep-table{width:100%;border-collapse:collapse;font-size:13px}
+  .rep-table th{font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);
+    font-weight:700;text-align:left;padding:8px;border-bottom:1px solid var(--line)}
+  .rep-table td{padding:9px 8px;border-bottom:0.5px solid var(--line);color:var(--ink);font-variant-numeric:tabular-nums}
+  .rep-total{margin-top:14px;padding:12px 14px;background:var(--panel2);border-radius:8px;
+    font-size:14px;color:var(--muted);text-align:right}
+  .rep-total b{color:var(--accent);font-size:18px}
+  .ord-card .oc-inc{font-size:12px;font-weight:700;color:var(--warn);background:rgba(255,194,51,.15);
+    border-radius:20px;padding:2px 9px;white-space:nowrap}
   .ord-card .oc-prod{font-size:12px;color:var(--muted);margin-top:2px}
   .ord-card .oc-meta{font-size:11px;color:var(--muted);display:flex;gap:12px;flex-wrap:wrap}
   .ord-card .oc-meta b{color:var(--ink)}
@@ -317,6 +327,7 @@
           <input id="tabCodigos" placeholder="Ex. OP-8891, OP-8892, OP-8900" data-i18n-ph="tabCodesPh" style="text-transform:uppercase">
         </div>
         <button class="btn primary" id="tabCargar" data-i18n="show">Show</button>
+        <button class="btn" id="btnReporteDia" data-i18n="dayReportBtn">📋 Daily report</button>
         <div class="dot" id="tabDot"><i></i><span id="tabTxt">—</span></div>
       </div>
       <div class="hint" style="margin-top:8px" data-i18n="tabHint">The board refreshes automatically every 5 seconds. The list is remembered on this device.</div>
@@ -542,6 +553,18 @@
       <button class="btn" id="incEditCancel" data-i18n="cancel">Cancel</button>
       <button class="btn primary" id="incEditSave" data-i18n="save">Save</button>
     </div>
+  </div>
+</div>
+
+<!-- Modal reporte de producción del día -->
+<div class="modal-bg" id="modalReporte">
+  <div class="modal" style="max-width:680px">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:4px">
+      <h3 style="margin:0" data-i18n="dayReportTitle">Daily production report</h3>
+      <button class="btn" id="repCerrar" style="padding:6px 12px" data-i18n="close">Close</button>
+    </div>
+    <div class="sub" id="repSub">—</div>
+    <div id="repBody"></div>
   </div>
 </div>
 
@@ -804,6 +827,10 @@ const I18N = {
     updating:'Updating…', updatedAt:'Updated', updateErr:'Update error',
     orderNotFound:'Order not found', noCloudData:'No cloud data yet.', noProduct:'(no product)',
     lastDayProgress:'Last day progress:', prevDayClose:'Previous day close:', todayPartial:"Today's partial production:",
+    dayReportBtn:'📋 Daily report', dayReportTitle:'Daily production report', close:'Close',
+    dayReportSub:'Final production of the day for all open orders.',
+    repColRoom:'Room', repColOrder:'Order', repColProduct:'Product', repColToday:'Today', repColTotal:'Accum.', repColStatus:'Status',
+    repNoData:'No data for the orders on the list.', repTotalDay:'Total produced today:', repPrint:'🖨️ Print',
     dayClosedTag:'(day closed)', prodProgressLabel:'Production progress',
     accumLabel:'Accum. production:', noTargetSet:'(no target set)', batchLabel:'Batch:', roomLabel:'Room:',
     sampleCount:'sample(s)', advance:'Progress:', capsLabel:'Caps:', barrelsLabel:'Barrels:', partialLabel:'Partial:',
@@ -921,6 +948,10 @@ const I18N = {
     updating:'Actualizando…', updatedAt:'Actualizado', updateErr:'Error al actualizar',
     orderNotFound:'Orden no encontrada', noCloudData:'Sin datos en la nube todavía.', noProduct:'(sin producto)',
     lastDayProgress:'Último avance del día:', prevDayClose:'Cierre día anterior:', todayPartial:'Producción parcial de hoy:',
+    dayReportBtn:'📋 Reporte del día', dayReportTitle:'Reporte de producción del día', close:'Cerrar',
+    dayReportSub:'Producción final del día de todas las órdenes abiertas.',
+    repColRoom:'Room', repColOrder:'Orden', repColProduct:'Producto', repColToday:'Hoy', repColTotal:'Acum.', repColStatus:'Estado',
+    repNoData:'Sin datos para las órdenes de la lista.', repTotalDay:'Total producido hoy:', repPrint:'🖨️ Imprimir',
     dayClosedTag:'(día cerrado)', prodProgressLabel:'Avance de producción',
     accumLabel:'Producción acum.:', noTargetSet:'(sin objetivo definido)', batchLabel:'Batch:', roomLabel:'Room:',
     sampleCount:'muestra(s)', advance:'Avance:', capsLabel:'Cáps:', barrelsLabel:'Barriles:', partialLabel:'Parcial:',
@@ -1866,7 +1897,7 @@ const CLAVE_MECANICO = "mecanico2026";
    - Tablero superv.: ...tusitio.netlify.app/?rol=sup&clave=super2026&tablero=1
    - Manager Mecánico:...tusitio.netlify.app/?rol=mecanico&clave=mecanico2026 */
 /* ===================== TABLERO MULTI-ORDEN ===================== */
-let tableroOn=false, tabCodigos=[], tabTimer=null;
+let tableroOn=false, tabCodigos=[], tabTimer=null, tabDatos={};
 const TAB_LS_KEY='qc_tablero_codigos';
 
 function parseCodigos(txt){
@@ -1885,6 +1916,7 @@ async function refrescarTablero(){
   let datos={};
   try{ datos=await leerVarias(tabCodigos); setTabConn('ok',t('updatedAt')+' · '+fmtTime(new Date())); }
   catch(e){ setTabConn('bad',t('updateErr')); return; }
+  tabDatos=datos;
 
   let html='';
   const loc=I18N[lang].locale;
@@ -1950,46 +1982,95 @@ async function refrescarTablero(){
       prog=`<div class="oc-meta">${t('accumLabel')} <b>${prodTotal.toLocaleString(loc)}</b> ${t('capsUnit')} ${t('noTargetSet')}</div>`;
     }
 
-    /* incidencias de máquina sin resolver (pendientes + procesando) */
+    /* indicador discreto de solicitudes de mantenimiento abiertas */
     const incs=(d.incidencias||[]);
     const abiertas=incs.filter(x=>x && estadoInc(x)!=='res');
-    let incBanner='';
-    if(abiertas.length){
-      const lineas=abiertas.slice(0,3).map(x=>{
-        const e=estadoInc(x);
-        return `<div style="font-size:11px;color:var(--ink);margin-top:3px">• <span style="color:${incEstadoColor(e)};font-weight:700">${incEstadoLabel(e)}</span> · <b>${nombreFalla(x.tipo)}</b> — ${String(x.desc||'').replace(/</g,'&lt;')} <span style="color:var(--muted)">(${fmtTime(new Date(x.ts))} · ${x.oper||''})</span></div>`;
-      }).join('');
-      const extra = abiertas.length>3 ? `<div style="font-size:11px;color:var(--muted);margin-top:3px">+${abiertas.length-3}…</div>` : '';
-      incBanner=`<div style="background:rgba(240,180,41,.1);border:1px solid rgba(240,180,41,.4);border-radius:8px;padding:8px 10px;margin-top:2px">
-        <div style="font-size:11px;font-weight:700;color:var(--warn);text-transform:uppercase;letter-spacing:.5px">🛠️ ${abiertas.length} ${t('incidentsOpenTab')}</div>
-        ${lineas}${extra}
-      </div>`;
-    }
+    let incChip = abiertas.length
+      ? `<span class="oc-inc" title="${abiertas.length} ${t('incidentsOpenTab')}">🛠️ ${abiertas.length}</span>` : '';
 
     html+=`<div class="ord-card">
       <div class="oc-top">
         <div>
+          <div class="oc-room-big">${o.orden?o.orden:'—'}</div>
           <div class="oc-code">${cod}</div>
-          <div class="oc-prod">${o.producto||t('noProduct')}</div>
         </div>
         <div style="display:flex;align-items:center;gap:8px">
+          ${incChip}
           <span class="est-pill ${estCls}">${est}</span>
           <button class="oc-rm" onclick="quitarTab('${cod}')" title="${t('cancel')}">✕</button>
         </div>
       </div>
-      <div class="oc-meta">
-        ${o.lote?`<span>${t('batchLabel')} <b>${o.lote}</b></span>`:''}
-        ${o.orden?`<span>${t('roomLabel')} <b>${o.orden}</b></span>`:''}
-      </div>
       ${prog}
-      ${incBanner}
-      <div class="oc-avance">${t('lastDayProgress')} ${avanceTxt}</div>
-      <div class="oc-avance">${t('prevDayClose')} ${cierreAntTxt}${cierreAntFecha}</div>
       <div class="oc-avance">${t('todayPartial')} ${parcialHoyTxt}</div>
     </div>`;
   });
   grid.innerHTML=html;
 }
+
+/* ===== Reporte de producción del día (todas las órdenes abiertas) ===== */
+const modalReporte=$('modalReporte');
+function abrirReporteDia(){
+  const loc=I18N[lang].locale;
+  const hoyKey=dayKey(new Date());
+  const filas=[];
+  let totalHoy=0;
+  tabCodigos.forEach(cod=>{
+    const d=tabDatos[cod];
+    if(!d) return;
+    const o=d.orden||{}, dias=d.dias||{};
+    const est=estatusOrden(d);
+    /* solo órdenes abiertas (no cerradas) */
+    if(est===t('closedOrder')) return;
+    /* producción de hoy: avance del día de hoy (o su cierre si ya se cerró el día) */
+    let hoy=0; const dh=dias[hoyKey];
+    if(dh){ if(dh.closed && dh.prod!=null) hoy=Number(dh.prod); else if(dh.avance!=null) hoy=Number(dh.avance); }
+    const total=prodAcumulada(dias, true);
+    totalHoy+=hoy;
+    filas.push({room:o.orden||'—', cod, prod:o.producto||'—', hoy, total, est,
+      estCls: est===t('inProcess')?'proc':'sin'});
+  });
+
+  $('repSub').textContent = `${t('dayReportSub')} · ${fmtDate(new Date())}`;
+  const body=$('repBody');
+  if(!filas.length){
+    body.innerHTML=`<div class="tab-empty" style="margin-top:14px">${t('repNoData')}</div>`;
+  } else {
+    /* ordenar por Room */
+    filas.sort((a,b)=>String(a.room).localeCompare(String(b.room),undefined,{numeric:true}));
+    let rows='';
+    filas.forEach(f=>{
+      rows+=`<tr>
+        <td style="font-weight:700">${String(f.room).replace(/</g,'&lt;')}</td>
+        <td style="color:var(--muted)">${f.cod}</td>
+        <td>${String(f.prod).replace(/</g,'&lt;')}</td>
+        <td style="text-align:right;font-weight:700">${f.hoy.toLocaleString(loc)}</td>
+        <td style="text-align:right">${f.total.toLocaleString(loc)}</td>
+        <td style="text-align:center"><span class="est-pill ${f.estCls}" style="font-size:10px">${f.est}</span></td>
+      </tr>`;
+    });
+    body.innerHTML=`
+      <div style="overflow-x:auto;margin-top:10px">
+        <table class="rep-table">
+          <thead><tr>
+            <th>${t('repColRoom')}</th><th>${t('repColOrder')}</th><th>${t('repColProduct')}</th>
+            <th style="text-align:right">${t('repColToday')}</th><th style="text-align:right">${t('repColTotal')}</th>
+            <th style="text-align:center">${t('repColStatus')}</th>
+          </tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
+      <div class="rep-total"><span>${t('repTotalDay')}</span> <b>${totalHoy.toLocaleString(loc)}</b> ${t('capsUnit')}</div>
+      <div class="actions" style="margin-top:14px">
+        <button class="btn" onclick="window.print()">${t('repPrint')}</button>
+      </div>`;
+  }
+  modalReporte.classList.add('show');
+}
+function cerrarReporte(){ modalReporte.classList.remove('show'); }
+if($('btnReporteDia')) $('btnReporteDia').addEventListener('click',abrirReporteDia);
+if($('repCerrar')) $('repCerrar').addEventListener('click',cerrarReporte);
+modalReporte.addEventListener('click',e=>{ if(e.target===modalReporte) cerrarReporte(); });
+/* ===================================================================== */
 
 function aplicarCodigosTablero(txt, guardar){
   tabCodigos=parseCodigos(txt);
