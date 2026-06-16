@@ -773,7 +773,7 @@ const I18N = {
   en:{
     appTitle:'Production Control', appSub:'Test program · developed by Oscar Navarro',
     tabLabel:'Order codes to monitor (separated by comma or space)', tabCodesPh:'Ex. OP-8891, OP-8892, OP-8900',
-    show:'Show', tabHint:'The board refreshes automatically every 5 seconds. The list is remembered on this device.',
+    show:'Show', tabHint:'The board refreshes automatically every 5 seconds. It shows in-process orders by default; type a code to also look up another order.',
     tabEmpty:'Type one or more order codes and press "Show" to see their live progress.',
     orderCode:'Order code', orderCodePh:'Ex. OP-8891', refresh:'↻ Refresh', notConnected:'Not connected',
     supBanner:'👁️ Supervisor mode active — read-only view. Changes are disabled.',
@@ -896,7 +896,7 @@ const I18N = {
   es:{
     appTitle:'Control de Producción', appSub:'Programa de prueba · desarrollado por Oscar Navarro',
     tabLabel:'Códigos de órdenes a monitorear (separados por coma o espacio)', tabCodesPh:'Ej. OP-8891, OP-8892, OP-8900',
-    show:'Mostrar', tabHint:'El tablero se actualiza solo cada 5 segundos. La lista se recuerda en este dispositivo.',
+    show:'Mostrar', tabHint:'El tablero se actualiza solo cada 5 segundos. Muestra las órdenes en proceso por defecto; escribe un código para consultar además otra orden.',
     tabEmpty:'Escribe uno o más códigos de orden y presiona "Mostrar" para ver su avance en vivo.',
     orderCode:'Código de la orden', orderCodePh:'Ej. OP-8891', refresh:'↻ Actualizar', notConnected:'Sin conectar',
     supBanner:'👁️ Modo supervisor activo — vista de solo lectura. Los cambios están deshabilitados.',
@@ -2118,18 +2118,17 @@ function aplicarCodigosTablero(txt, guardar){
 }
 function quitarTab(cod){
   tabCodigos=tabCodigos.filter(c=>c!==cod);
-  aplicarCodigosTablero(tabCodigos.join(','), true);
+  aplicarCodigosTablero(tabCodigos.join(','), false);
 }
 
 function iniciarTablero(){
   tableroOn=true;
   document.body.classList.add('tablero');
-  /* recuperar lista guardada en este dispositivo */
-  let guardados='';
-  try{ guardados=localStorage.getItem(TAB_LS_KEY)||''; }catch(e){}
-  if(guardados){ aplicarCodigosTablero(guardados, false); }
-  $('tabCargar').addEventListener('click',()=>aplicarCodigosTablero($('tabCodigos').value, true));
-  $('tabCodigos').addEventListener('keydown',e=>{ if(e.key==='Enter'){ aplicarCodigosTablero($('tabCodigos').value, true); }});
+  /* por defecto el tablero arranca solo con las órdenes EN PROCESO (auto).
+     La lista manual es temporal: sirve para consultar otra orden en el momento,
+     pero no se carga automáticamente al abrir ni se recuerda entre sesiones. */
+  $('tabCargar').addEventListener('click',()=>aplicarCodigosTablero($('tabCodigos').value, false));
+  $('tabCodigos').addEventListener('keydown',e=>{ if(e.key==='Enter'){ aplicarCodigosTablero($('tabCodigos').value, false); }});
   if(tabTimer) clearInterval(tabTimer);
   tabTimer=setInterval(refrescarTablero, 5000);
   refrescarTablero();
