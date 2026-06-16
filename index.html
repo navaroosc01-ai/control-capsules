@@ -225,6 +225,7 @@
   .ord-card .oc-top{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
   .ord-card .oc-code{font-size:12px;font-weight:700;letter-spacing:.3px;color:var(--muted);margin-top:2px}
   .ord-card .oc-room-big{font-size:20px;font-weight:800;color:var(--ink);line-height:1.1}
+  .ord-card .oc-prod{font-size:13px;font-weight:600;color:var(--accent);margin-top:3px;line-height:1.25}
   .rep-table{width:100%;border-collapse:collapse;font-size:13px}
   .rep-table th{font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);
     font-weight:700;text-align:left;padding:8px;border-bottom:1px solid var(--line)}
@@ -2028,6 +2029,7 @@ async function refrescarTablero(){
       <div class="oc-top">
         <div>
           <div class="oc-room-big">${o.orden?o.orden:'—'}</div>
+          <div class="oc-prod">${o.producto?String(o.producto).replace(/</g,'&lt;'):'—'}</div>
           <div class="oc-code">${cod}</div>
         </div>
         <div style="display:flex;align-items:center;gap:8px">
