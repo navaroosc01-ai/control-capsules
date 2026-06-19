@@ -6,6 +6,7 @@
 <title>Production Control — GVIP</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
 <style>
   :root{
     --bg:#0d1218; --panel:#1b232f; --panel2:#283342; --line:#3d4c60;
@@ -303,6 +304,40 @@
   .mec-card .mc-act .mini-btn{flex:1;text-align:center}
   .mec-col-empty{text-align:center;color:var(--muted);font-size:12px;padding:18px 6px}
   .rol-tag.mec{background:rgba(55,138,221,.15);color:#378add}
+  .rol-tag.pack{background:rgba(52,224,176,.15);color:var(--accent)}
+
+  /* ===== Packeting: escáner de barriles ===== */
+  #packBoard{display:none}
+  body.packeting #packBoard{display:block;max-width:560px;margin:0 auto}
+  body.packeting .connbar,
+  body.packeting .sup-banner,
+  body.packeting .wrap > .card,
+  body.packeting .big-btn,
+  body.packeting #diaCerradoAviso{display:none !important}
+  .pack-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:14px;flex-wrap:wrap}
+  .pack-head h2{font-size:16px;font-weight:600;display:flex;align-items:center;gap:8px}
+  .pack-head h2 .ic{color:var(--accent)}
+  .pack-scan-wrap{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:14px;margin-bottom:14px}
+  #packReader{width:100%;border-radius:10px;overflow:hidden;margin-bottom:12px}
+  #packReader:empty{display:none}
+  #packReader video{width:100%!important;border-radius:10px;display:block}
+  .pack-scan-wrap .btn{width:100%;padding:14px;font-size:15px}
+  .pack-current{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:18px;margin-bottom:14px;text-align:center}
+  .pack-current-l{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;font-weight:600;margin-bottom:4px}
+  .pack-current-v{font-size:22px;font-weight:800;color:var(--ink);line-height:1.2;word-break:break-word}
+  .pack-current-prod{font-size:13px;color:var(--accent);font-weight:600;margin-top:2px;min-height:18px}
+  .pack-count-big{font-size:15px;color:var(--muted);margin-top:12px}
+  .pack-count-big span:first-child{font-size:40px;font-weight:800;color:var(--accent);font-variant-numeric:tabular-nums;display:block;line-height:1.1}
+  .pack-msg{text-align:center;font-size:14px;font-weight:600;min-height:24px;margin-bottom:14px;transition:.2s}
+  .pack-msg.ok{color:var(--accent)}
+  .pack-msg.dup{color:var(--warn)}
+  .pack-msg.err{color:var(--danger)}
+  .pack-log-title{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;font-weight:600;margin-bottom:8px}
+  .pack-log{display:flex;flex-direction:column;gap:6px}
+  .pack-log-item{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:9px 12px;font-size:12px;display:flex;justify-content:space-between;align-items:center;gap:8px}
+  .pack-log-item .pl-batch{font-weight:700;color:var(--ink)}
+  .pack-log-item .pl-time{color:var(--muted);font-variant-numeric:tabular-nums;font-size:11px}
+  .pack-log-empty{text-align:center;color:var(--muted);font-size:12px;padding:14px}
 </style>
 </head>
 <body>
@@ -361,6 +396,28 @@
     </div>
     <div id="mecCols" class="mec-cols"></div>
     <div id="mecEmpty" class="tab-empty" data-i18n="tabEmpty">Type one or more order codes and press "Show" to see their live progress.</div>
+  </div>
+
+  <!-- ===== Packeting: escáner de QR de barriles (?rol=packeting) ===== -->
+  <div id="packBoard">
+    <div class="pack-head">
+      <h2><span class="ic">📦</span> <span data-i18n="packTitle">Packeting — barrel scanning</span></h2>
+      <div class="dot" id="packDot"><i></i><span id="packTxt">—</span></div>
+    </div>
+    <div class="pack-scan-wrap">
+      <div id="packReader"></div>
+      <button class="btn primary" id="packStart" data-i18n="packStart">▶️ Start scanner</button>
+      <button class="btn danger" id="packStop" style="display:none" data-i18n="packStop">⏹️ Stop scanner</button>
+    </div>
+    <div class="pack-current" id="packCurrent">
+      <div class="pack-current-l" data-i18n="packLastBatch">Current batch</div>
+      <div class="pack-current-v" id="packBatch">—</div>
+      <div class="pack-current-prod" id="packProd"></div>
+      <div class="pack-count-big"><span id="packCount">0</span> <span data-i18n="packBarrels">barrels</span></div>
+    </div>
+    <div class="pack-msg" id="packMsg"></div>
+    <div class="pack-log-title" data-i18n="packLog">Recent scans</div>
+    <div id="packLog" class="pack-log"></div>
   </div>
 
   <!-- Barra de conexión / código de orden -->
@@ -425,6 +482,7 @@
       <div class="stat"><div class="v" id="sProm">—</div><div class="l" data-i18n="avgCap">Avg. capsule (mg)</div></div>
       <div class="stat"><div class="v" id="sFuera">0</div><div class="l" data-i18n="outOfRange">Out of range</div></div>
       <div class="stat"><div class="v" id="sProd">0</div><div class="l" data-i18n="accumProd">Accum. production (caps)</div></div>
+      <div class="stat"><div class="v" id="sBarriles" style="color:var(--accent)">0</div><div class="l" data-i18n="barrelsQR">Barrels scanned (QR)</div></div>
     </div>
     <div style="margin-top:12px" id="rangePillWrap"><span class="range-pill" id="rangePill" data-i18n="rangeUndef">Range: set min/max in order data</span></div>
     <div class="progress-wrap" id="progWrap" style="display:none">
@@ -669,6 +727,7 @@ const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZ
 
 let state={ orden:{producto:'',lote:'',orden:'',min:'',max:'',metaCaps:''}, registros:[], dias:{}, firmas:{}, incidencias:[] };
 let codigo='', supervisor=false, mecanico=false, lastPush=0, pollTimer=null;
+let packeting=false;
 let diasExpandidos={}; /* { dayKey: true } días con todas las muestras desplegadas */
 const TOPE_MUESTRAS=3; /* muestras visibles por día antes de "Ver todas" */
 const RECOLECCION_LS_KEY='qc_recoleccion'; /* recuerda el modo recolección en el dispositivo */
@@ -686,6 +745,7 @@ function initSupabase(){
 
 function normalizar(d){ d=d||{}; d.orden=d.orden||{producto:'',lote:'',orden:'',min:'',max:'',metaCaps:''};
   d.registros=d.registros||[]; d.dias=d.dias||{}; d.firmas=d.firmas||{}; d.incidencias=d.incidencias||[];
+  d.barrilesQR=d.barrilesQR||[];
   /* normalizar estado de incidencias: pend | proc | res (compatibilidad con datos viejos) */
   d.incidencias.forEach(inc=>{
     if(!inc) return;
@@ -935,6 +995,15 @@ const I18N = {
     lblGenerate:'Generate PDF', lblSheets:(n)=>`${n} ${n===1?'sheet':'sheets'} (6 labels per sheet)`,
     lblNeedBatch:'Enter the batch number (Lot Number).', lblNeedNet:'Enter the net weight (kg).',
     lblNeedQty:'Enter a valid number of labels.',
+    barrelsQR:'Barrels scanned (QR)',
+    packTitle:'Packeting — barrel scanning', packStart:'▶️ Start scanner', packStop:'⏹️ Stop scanner',
+    packLastBatch:'Current batch', packBarrels:'barrels', packLog:'Recent scans',
+    packReady:'Point the camera at a barrel QR code.', packScanning:'Scanning…',
+    packAdded:(b)=>`✓ Barrel added to ${b}`, packDup:'⚠️ This barrel was already scanned',
+    packBadQR:'✕ Unrecognized QR (not a barrel label)', packNoOrder:'✕ Order not found for this barrel',
+    packSaving:'Saving…', packSaveErr:'✕ Could not save, try again', packSaved:'Saved to cloud',
+    packLogEmpty:'No barrels scanned yet.', packCamErr:'Could not access the camera. Check permissions.',
+    packConnReady:'Ready', packBarrel:'Barrel',
     months:['January','February','March','April','May','June','July','August','September','October','November','December'],
     weekdays:['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'],
     dateFmt:(wd,da,mo,yr)=>`${wd}, ${mo} ${da}, ${yr}`, locale:'en'
@@ -1061,6 +1130,15 @@ const I18N = {
     lblGenerate:'Generar PDF', lblSheets:(n)=>`${n} ${n===1?'hoja':'hojas'} (6 labels por hoja)`,
     lblNeedBatch:'Ingresa el número de batch (Lot Number).', lblNeedNet:'Ingresa los kilos neto (kg).',
     lblNeedQty:'Ingresa una cantidad válida de labels.',
+    barrelsQR:'Barriles leídos (QR)',
+    packTitle:'Packeting — escaneo de barriles', packStart:'▶️ Iniciar escáner', packStop:'⏹️ Detener escáner',
+    packLastBatch:'Batch actual', packBarrels:'barriles', packLog:'Escaneos recientes',
+    packReady:'Apunta la cámara al código QR de un barril.', packScanning:'Escaneando…',
+    packAdded:(b)=>`✓ Barril agregado a ${b}`, packDup:'⚠️ Este barril ya fue escaneado',
+    packBadQR:'✕ QR no reconocido (no es un label de barril)', packNoOrder:'✕ No se encontró la orden de este barril',
+    packSaving:'Guardando…', packSaveErr:'✕ No se pudo guardar, intenta de nuevo', packSaved:'Guardado en la nube',
+    packLogEmpty:'Aún no se han escaneado barriles.', packCamErr:'No se pudo acceder a la cámara. Revisa los permisos.',
+    packConnReady:'Listo', packBarrel:'Barril',
     months:['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'],
     weekdays:['domingo','lunes','martes','miércoles','jueves','viernes','sábado'],
     dateFmt:(wd,da,mo,yr)=>`${wd}, ${da} de ${mo} de ${yr}`, locale:'es'
@@ -1319,6 +1397,10 @@ function render(){
 
   const prodTotal=prodAcumulada(state.dias, true);
   $('sProd').textContent=prodTotal.toLocaleString(I18N[lang].locale);
+
+  /* barriles escaneados por QR (packeting) */
+  const nBarriles=(state.barrilesQR||[]).length;
+  const elB=$('sBarriles'); if(elB) elB.textContent=nBarriles.toLocaleString(I18N[lang].locale);
 
   if(meta>0){
     $('progWrap').style.display='block';
@@ -1961,6 +2043,7 @@ $('fCodigo').addEventListener('input',()=>{
    El operador entra con el enlace normal y NO puede cambiar de rol. */
 const CLAVE_SUPERVISOR = "super2026";
 const CLAVE_MECANICO = "mecanico2026";
+const CLAVE_PACKETING = "packeting2026";
 /* ============================================================== */
 
 /* Enlaces:
@@ -2334,7 +2417,13 @@ function applyURL(){
     mecanico=true;
     $('rolTag').classList.add('mec');
     refrescarRol();
-    return { cod:null, tablero:false, mecanico:true };
+    return { cod:null, tablero:false, mecanico:true, packeting:false };
+  }
+  if(rol==='packeting' && clave===CLAVE_PACKETING){
+    packeting=true;
+    $('rolTag').classList.add('pack');
+    $('rolTag').textContent=t('packTitle');
+    return { cod:null, tablero:false, mecanico:false, packeting:true };
   }
   if(rol==='sup' && clave===CLAVE_SUPERVISOR){
     supervisor=true;
@@ -2352,7 +2441,7 @@ function applyURL(){
   if(cod){ $('fCodigo').value=cod.toUpperCase(); }
   /* modo tablero: solo para supervisor y con ?tablero=1 */
   const quiereTablero = supervisor && (p.get('tablero')==='1' || p.get('tablero')==='si');
-  return { cod, tablero: quiereTablero, mecanico:false };
+  return { cod, tablero: quiereTablero, mecanico:false, packeting:false };
 }
 
 $('btnRefrescar').addEventListener('click',()=>{ if(codigo) abrirOrden(codigo); });
@@ -2362,7 +2451,7 @@ let _lblOrden = { producto:'', batch:'', cuarto:'' };
 
 function abrirLabels(){
   const o = state.orden || {};
-  _lblOrden = { producto:o.producto||'', batch:o.lote||'', cuarto:o.orden||'' };
+  _lblOrden = { producto:o.producto||'', batch:o.lote||'', cuarto:o.orden||'', cod:codigo||'' };
   $('lblInfo').textContent =
     (_lblOrden.producto || t('noProduct')) + (_lblOrden.cuarto ? '  ·  Room ' + _lblOrden.cuarto : '');
   $('lblBatch').value = _lblOrden.batch || '';
@@ -2420,6 +2509,7 @@ async function generarLabelsPDF(){
 
   const doc=new jsPDF({unit:'mm',format:[PAGE_W,PAGE_H]});
   const ts=Date.now();
+  const cod=_lblOrden.cod || '';
 
   for(let i=0;i<cantidad;i++){
     const idx=i%PER_PAGE;
@@ -2427,7 +2517,9 @@ async function generarLabelsPDF(){
     const col=idx%COLS, row=Math.floor(idx/COLS);
     const x=MX+col*(LW+GAP_X), y=MY+row*(LH+GAP_Y);
     const num=numerar ? i+1 : null;
-    const payload=JSON.stringify({ p:producto, b:batch, n:neto, t:'3.2kg', i:num, ts:ts });
+    /* uid único por barril: código + batch + timestamp + índice */
+    const uid = (cod||'X')+'-'+ts+'-'+(i+1);
+    const payload=JSON.stringify({ c:cod, p:producto, b:batch, n:neto, t:'3.2kg', i:num, ts:ts, uid:uid });
     const qr=await lblQrDataURL(payload);
     dibujarLabel(doc, x, y, LW, LH, { producto, batch, neto, num, qr });
   }
@@ -2489,6 +2581,191 @@ $('lblCancel').addEventListener('click', cerrarLabels);
 $('lblGen').addEventListener('click', generarLabelsPDF);
 $('modalLabels').addEventListener('click', e=>{ if(e.target.id==='modalLabels') cerrarLabels(); });
 
+/* ===================== PACKETING: escaneo de barriles ===================== */
+let packQR=null, packBusy=false, packActual=null, packLog=[];
+let packCache={}; /* cache de órdenes leídas: { CODIGO: data } */
+
+function setPackConn(cls,txt){ const d=$('packDot'); if(!d) return; d.className='dot '+cls; $('packTxt').textContent=txt; }
+
+function packMostrarMsg(txt, tipo){
+  const m=$('packMsg'); if(!m) return;
+  m.textContent=txt; m.className='pack-msg '+(tipo||'');
+}
+
+function iniciarPacketing(){
+  document.body.classList.add('packeting');
+  setPackConn('ok', t('packConnReady'));
+  packMostrarMsg(t('packReady'), '');
+  renderPackLog();
+  $('packStart').addEventListener('click', packStart);
+  $('packStop').addEventListener('click', packStop);
+}
+
+async function packStart(){
+  if(typeof Html5Qrcode==='undefined'){ packMostrarMsg(t('packCamErr'),'err'); return; }
+  try{
+    packQR=new Html5Qrcode('packReader');
+    await packQR.start(
+      { facingMode:'environment' },
+      { fps:10, qrbox:{width:240,height:240} },
+      onPackScan,
+      ()=>{} /* ignorar fallos de frame */
+    );
+    $('packStart').style.display='none';
+    $('packStop').style.display='block';
+    packMostrarMsg(t('packScanning'),'');
+  }catch(e){
+    packMostrarMsg(t('packCamErr'),'err');
+    packQR=null;
+  }
+}
+
+async function packStop(){
+  if(packQR){
+    try{ await packQR.stop(); packQR.clear(); }catch(e){}
+    packQR=null;
+  }
+  $('packStart').style.display='block';
+  $('packStop').style.display='none';
+  packMostrarMsg(t('packReady'),'');
+}
+
+/* parsear el contenido del QR del barril */
+function parsearQRBarril(text){
+  try{
+    const o=JSON.parse(text);
+    if(o && o.uid && (o.c || o.b)) return o;
+  }catch(e){}
+  return null;
+}
+
+let _packUltimoTexto='', _packUltimoTs=0;
+async function onPackScan(decodedText){
+  /* anti-rebote: ignorar el mismo QR si se relee en <2.5s */
+  const ahora=Date.now();
+  if(decodedText===_packUltimoTexto && (ahora-_packUltimoTs)<2500) return;
+  _packUltimoTexto=decodedText; _packUltimoTs=ahora;
+
+  if(packBusy) return;
+  const datos=parsearQRBarril(decodedText);
+  if(!datos){ packMostrarMsg(t('packBadQR'),'err'); beep(false); return; }
+
+  packBusy=true;
+  packMostrarMsg(t('packSaving'),'');
+  try{
+    await procesarBarril(datos);
+  }catch(e){
+    packMostrarMsg(t('packSaveErr'),'err'); beep(false);
+  }
+  packBusy=false;
+}
+
+/* localizar la orden del barril, sumar el barril y guardar en la nube */
+async function procesarBarril(datos){
+  const cod=(datos.c||'').toUpperCase();
+  let data=null, codFinal=cod;
+
+  /* 1) intentar por código de orden directo (lo más confiable) */
+  if(cod){
+    if(packCache[cod]){ data=packCache[cod]; }
+    else{
+      try{
+        const m=await leerVarias([cod]);
+        if(m[cod]){ data=m[cod]; packCache[cod]=data; }
+      }catch(e){}
+    }
+  }
+
+  /* 2) si no hay código o no se encontró, buscar por batch entre todas las órdenes */
+  if(!data && datos.b){
+    try{
+      const url = REST + '?select=codigo,data';
+      const r = await fetch(url,{ headers: HEADERS });
+      if(r.ok){
+        const arr=await r.json();
+        for(const row of arr){
+          const d=row.data||{};
+          if(d.orden && String(d.orden.lote||'')===String(datos.b)){
+            data=d; codFinal=(row.codigo||'').toUpperCase();
+            packCache[codFinal]=d; break;
+          }
+        }
+      }
+    }catch(e){}
+  }
+
+  if(!data || !codFinal){ packMostrarMsg(t('packNoOrder'),'err'); beep(false); return; }
+
+  data=normalizar(data);
+  data.barrilesQR=data.barrilesQR||[];
+
+  /* evitar duplicados por uid del barril */
+  const yaExiste=data.barrilesQR.some(b=>b && b.uid===datos.uid);
+  if(yaExiste){
+    packActual={ cod:codFinal, batch:datos.b||(data.orden&&data.orden.lote)||'—', producto:(data.orden&&data.orden.producto)||'', count:data.barrilesQR.length };
+    actualizarPackActual();
+    packMostrarMsg(t('packDup'),'dup'); beep(false);
+    return;
+  }
+
+  /* agregar el barril */
+  data.barrilesQR.push({ uid:datos.uid, ts:Date.now(), num:datos.i||null });
+
+  /* guardar en la nube (independiente de si la orden está abierta o cerrada) */
+  const ok=await escribirOrden(codFinal, data);
+  if(!ok){ packMostrarMsg(t('packSaveErr'),'err'); beep(false); return; }
+
+  packCache[codFinal]=data;
+
+  /* si el operador tiene esta misma orden abierta, refrescar su vista en vivo */
+  if(codigo && codFinal===codigo.toUpperCase()){
+    state.barrilesQR=data.barrilesQR;
+    render();
+  }
+
+  const batch=datos.b||(data.orden&&data.orden.lote)||'—';
+  const producto=(data.orden&&data.orden.producto)||'';
+  packActual={ cod:codFinal, batch, producto, count:data.barrilesQR.length };
+  actualizarPackActual();
+
+  packMostrarMsg(t('packAdded')(batch),'ok'); beep(true);
+
+  packLog.unshift({ batch, cod:codFinal, ts:Date.now() });
+  if(packLog.length>15) packLog.pop();
+  renderPackLog();
+}
+
+function actualizarPackActual(){
+  if(!packActual) return;
+  $('packBatch').textContent=packActual.batch||'—';
+  $('packProd').textContent=packActual.producto||'';
+  $('packCount').textContent=packActual.count!=null?packActual.count:0;
+}
+
+function renderPackLog(){
+  const cont=$('packLog'); if(!cont) return;
+  if(!packLog.length){ cont.innerHTML=`<div class="pack-log-empty">${t('packLogEmpty')}</div>`; return; }
+  cont.innerHTML=packLog.map(it=>
+    `<div class="pack-log-item">
+      <span class="pl-batch">${String(it.batch).replace(/</g,'&lt;')}</span>
+      <span class="pl-time">${fmtTime(new Date(it.ts))}</span>
+    </div>`).join('');
+}
+
+/* beep corto de confirmación (Web Audio, sin archivos) */
+function beep(ok){
+  try{
+    const ctx=new (window.AudioContext||window.webkitAudioContext)();
+    const o=ctx.createOscillator(), g=ctx.createGain();
+    o.connect(g); g.connect(ctx.destination);
+    o.frequency.value = ok ? 880 : 220;
+    o.type='sine';
+    g.gain.setValueAtTime(0.18, ctx.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + (ok?0.15:0.3));
+    o.start(); o.stop(ctx.currentTime + (ok?0.15:0.3));
+  }catch(e){}
+}
+
 /* idioma: por defecto inglés; recuerda la elección en el dispositivo */
 try{ const g=localStorage.getItem(LANG_LS_KEY); if(g==='es'||g==='en') lang=g; }catch(e){}
 $('langSel').value=lang;
@@ -2500,6 +2777,8 @@ const initInfo=applyURL();
 fillOrden(); render();
 if(initInfo.mecanico){
   iniciarMecanico();
+} else if(initInfo.packeting){
+  iniciarPacketing();
 } else if(initInfo.tablero){
   iniciarTablero();
 } else if(initInfo.cod){
