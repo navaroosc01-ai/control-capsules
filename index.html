@@ -4,6 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Production Control — GVIP</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <style>
   :root{
     --bg:#0d1218; --panel:#1b232f; --panel2:#283342; --line:#3d4c60;
@@ -250,6 +252,12 @@
   .ord-card .oc-rm:hover{opacity:1;color:var(--danger)}
   .ord-card .oc-avance{font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
   .ord-card .oc-avance b{color:var(--warn)}
+  .ord-card .oc-labels{margin-top:10px}
+  .oc-lbl-btn{width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink);
+    border-radius:8px;padding:9px 12px;font-size:12px;font-weight:600;cursor:pointer;transition:.15s;
+    font-family:inherit;display:flex;align-items:center;justify-content:center;gap:6px}
+  .oc-lbl-btn:hover{border-color:var(--accent);color:var(--accent)}
+  .lbl-hojas{font-size:11px;color:var(--muted);margin-top:6px;text-transform:none;letter-spacing:0;font-weight:400}
   .tab-empty{text-align:center;color:var(--muted);padding:34px;font-size:13px;
     background:var(--panel);border:1px dashed var(--line);border-radius:var(--radius)}
 
@@ -617,6 +625,39 @@
   </div>
 </div>
 
+<!-- Modal generar labels -->
+<div class="modal-bg" id="modalLabels">
+  <div class="modal" style="max-width:400px">
+    <h3 data-i18n="lblTitle">Generate labels</h3>
+    <div class="sub" id="lblInfo">—</div>
+    <div class="row">
+      <label data-i18n="lblBatchLbl">Batch number (Lot Number)</label>
+      <input id="lblBatch" type="text" placeholder="Ex. BATCH-2024-0815">
+    </div>
+    <div class="grid g2">
+      <div class="row">
+        <label data-i18n="lblNetLbl">Net weight (kg)</label>
+        <input id="lblNeto" type="number" step="0.1" inputmode="decimal" value="25">
+      </div>
+      <div class="row">
+        <label data-i18n="lblQtyLbl">How many labels?</label>
+        <input id="lblCant" type="number" min="1" step="1" inputmode="numeric" value="6">
+        <div class="lbl-hojas" id="lblHojas">—</div>
+      </div>
+    </div>
+    <div class="row">
+      <label style="display:flex;align-items:center;gap:8px;text-transform:none;letter-spacing:0;cursor:pointer">
+        <input id="lblNumerar" type="checkbox" checked style="width:16px;height:16px;flex:0 0 auto">
+        <span data-i18n="lblNumber">Number the labels (1, 2, 3…)</span>
+      </label>
+    </div>
+    <div class="actions">
+      <button class="btn" id="lblCancel" data-i18n="cancel">Cancel</button>
+      <button class="btn primary" id="lblGen" data-i18n="lblGenerate">Generate PDF</button>
+    </div>
+  </div>
+</div>
+
 <div id="printArea"></div>
 
 <script>
@@ -889,6 +930,11 @@ const I18N = {
     pTotalSamples:'Total samples:', pAvgCap:'Avg. capsule:', pOutSamples:'Out-of-range samples:',
     pInRange:'In range', pOut:'OUT', pClosed:'Closed', pOpen:'Open',
     printPreview:'Print preview', printBtn:'🖨️ Print', closeBtn:'Close',
+    lblBtn:'Labels', lblTitle:'Generate labels', lblBatchLbl:'Batch number (Lot Number)',
+    lblNetLbl:'Net weight (kg)', lblQtyLbl:'How many labels?', lblNumber:'Number the labels (1, 2, 3…)',
+    lblGenerate:'Generate PDF', lblSheets:(n)=>`${n} ${n===1?'sheet':'sheets'} (6 labels per sheet)`,
+    lblNeedBatch:'Enter the batch number (Lot Number).', lblNeedNet:'Enter the net weight (kg).',
+    lblNeedQty:'Enter a valid number of labels.',
     months:['January','February','March','April','May','June','July','August','September','October','November','December'],
     weekdays:['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'],
     dateFmt:(wd,da,mo,yr)=>`${wd}, ${mo} ${da}, ${yr}`, locale:'en'
@@ -1010,6 +1056,11 @@ const I18N = {
     pTotalSamples:'Total muestras:', pAvgCap:'Prom. cápsula:', pOutSamples:'Muestras fuera de rango:',
     pInRange:'En rango', pOut:'FUERA', pClosed:'Cerrado', pOpen:'Abierto',
     printPreview:'Vista previa de impresión', printBtn:'🖨️ Imprimir', closeBtn:'Cerrar',
+    lblBtn:'Labels', lblTitle:'Generar labels', lblBatchLbl:'Número de batch (Lot Number)',
+    lblNetLbl:'Kilos neto (kg)', lblQtyLbl:'¿Cuántos labels?', lblNumber:'Numerar los labels (1, 2, 3…)',
+    lblGenerate:'Generar PDF', lblSheets:(n)=>`${n} ${n===1?'hoja':'hojas'} (6 labels por hoja)`,
+    lblNeedBatch:'Ingresa el número de batch (Lot Number).', lblNeedNet:'Ingresa los kilos neto (kg).',
+    lblNeedQty:'Ingresa una cantidad válida de labels.',
     months:['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'],
     weekdays:['domingo','lunes','martes','miércoles','jueves','viernes','sábado'],
     dateFmt:(wd,da,mo,yr)=>`${wd}, ${da} de ${mo} de ${yr}`, locale:'es'
@@ -2040,6 +2091,9 @@ async function refrescarTablero(){
       </div>
       ${prog}
       <div class="oc-avance">${t('todayPartial')} ${parcialHoyTxt}</div>
+      <div class="oc-labels">
+        <button class="oc-lbl-btn" onclick='abrirLabels(${JSON.stringify(o.producto||"")}, ${JSON.stringify(o.lote||"")}, ${JSON.stringify(o.orden||"")})'>🏷️ ${t('lblBtn')}</button>
+      </div>
     </div>`;
   });
   grid.innerHTML=html;
@@ -2305,6 +2359,137 @@ function applyURL(){
 }
 
 $('btnRefrescar').addEventListener('click',()=>{ if(codigo) abrirOrden(codigo); });
+
+/* ===================== LABELS "In Process Material" ===================== */
+let _lblOrden = { producto:'', batch:'', cuarto:'' };
+
+function abrirLabels(producto, batch, cuarto){
+  _lblOrden = { producto:producto||'', batch:batch||'', cuarto:cuarto||'' };
+  const loc=I18N[lang].locale;
+  $('lblInfo').textContent =
+    (_lblOrden.producto || t('noProduct')) + (cuarto ? '  ·  Room ' + cuarto : '');
+  $('lblBatch').value = _lblOrden.batch || '';
+  $('lblNeto').value  = '25';
+  $('lblCant').value  = '6';
+  $('lblNumerar').checked = true;
+  actualizarHojasLbl();
+  $('modalLabels').classList.add('show');
+}
+function cerrarLabels(){ $('modalLabels').classList.remove('show'); }
+
+function actualizarHojasLbl(){
+  const c = Math.max(1, parseInt($('lblCant').value)||1);
+  const h = Math.ceil(c/6);
+  $('lblHojas').textContent = t('lblSheets')(h);
+}
+
+/* QR -> dataURL usando qrcodejs (div oculto temporal) */
+function lblQrDataURL(text){
+  return new Promise((resolve)=>{
+    const tmp=document.createElement('div');
+    tmp.style.position='absolute'; tmp.style.left='-9999px';
+    document.body.appendChild(tmp);
+    new QRCode(tmp, { text:text, width:200, height:200, correctLevel:QRCode.CorrectLevel.M });
+    setTimeout(()=>{
+      const img=tmp.querySelector('img'), canvas=tmp.querySelector('canvas');
+      let url='';
+      if(img && img.src) url=img.src;
+      else if(canvas) url=canvas.toDataURL('image/png');
+      document.body.removeChild(tmp);
+      resolve(url);
+    }, 70);
+  });
+}
+
+async function generarLabelsPDF(){
+  const producto = _lblOrden.producto || '';
+  const batch = $('lblBatch').value.trim();
+  const neto  = $('lblNeto').value.trim();
+  const cantidad = Math.max(1, parseInt($('lblCant').value)||0);
+  const numerar = $('lblNumerar').checked;
+
+  if(!batch){ alert(t('lblNeedBatch')); return; }
+  if(!neto){ alert(t('lblNeedNet')); return; }
+  if(!cantidad){ alert(t('lblNeedQty')); return; }
+
+  const { jsPDF } = window.jspdf;
+
+  /* Carta: 215.9 x 279.4 mm, 2 columnas x 3 filas = 6 por hoja */
+  const PAGE_W=215.9, PAGE_H=279.4;
+  const COLS=2, ROWS=3, PER_PAGE=COLS*ROWS;
+  const MX=12, MY=14, GAP_X=6, GAP_Y=4;
+  const LW=(PAGE_W-2*MX-GAP_X)/COLS;
+  const LH=(PAGE_H-2*MY-(ROWS-1)*GAP_Y)/ROWS;
+
+  const doc=new jsPDF({unit:'mm',format:[PAGE_W,PAGE_H]});
+  const ts=Date.now();
+
+  for(let i=0;i<cantidad;i++){
+    const idx=i%PER_PAGE;
+    if(i>0 && idx===0) doc.addPage([PAGE_W,PAGE_H]);
+    const col=idx%COLS, row=Math.floor(idx/COLS);
+    const x=MX+col*(LW+GAP_X), y=MY+row*(LH+GAP_Y);
+    const num=numerar ? i+1 : null;
+    const payload=JSON.stringify({ p:producto, b:batch, n:neto, t:'3.2kg', i:num, ts:ts });
+    const qr=await lblQrDataURL(payload);
+    dibujarLabel(doc, x, y, LW, LH, { producto, batch, neto, num, qr });
+  }
+
+  const safe=(batch.replace(/[^a-zA-Z0-9_-]/g,'')||'orden');
+  doc.save('labels_'+safe+'.pdf');
+  cerrarLabels();
+}
+
+function dibujarLabel(doc, x, y, LW, LH, data){
+  const pad=4, ix=x+pad, iw=LW-2*pad, lineX2=ix+iw;
+  let cy=y+pad;
+
+  /* Logo placeholder (círculo negro). Reemplazable por logo real con doc.addImage(...) */
+  doc.setFillColor(0,0,0);
+  doc.circle(ix+3, cy+3.2, 3.2, 'F');
+
+  doc.setFont('helvetica','bold'); doc.setFontSize(13); doc.setTextColor(0,0,0);
+  doc.text('Sabinsa Manufacturing', ix+8, cy+4.5);
+  doc.setFont('helvetica','normal'); doc.setFontSize(9.5);
+  doc.text('In Process Material', x+LW/2, cy+9.5, {align:'center'});
+
+  /* QR esquina superior derecha */
+  const qrSize=15, qrX=x+LW-pad-qrSize, qrY=y+pad;
+  if(data.qr) doc.addImage(data.qr, 'PNG', qrX, qrY, qrSize, qrSize);
+
+  /* Número a la izquierda del QR */
+  if(data.num!=null){
+    doc.setFont('helvetica','bold'); doc.setFontSize(12);
+    doc.text(String(data.num), qrX-2, qrY+qrSize/2+2, {align:'right'});
+  }
+
+  /* Cuerpo */
+  let fy=cy+16; const rowH=(LH-(fy-y)-10)/5;
+  doc.setFont('helvetica','normal'); doc.setFontSize(10);
+  function field(label,value){
+    doc.text(label, ix, fy);
+    if(value){ const lw=doc.getTextWidth(label+' '); doc.text(String(value), ix+lw, fy); }
+    doc.setLineWidth(0.2); doc.setDrawColor(0,0,0);
+    doc.line(ix, fy+1.5, lineX2, fy+1.5);
+    fy+=rowH;
+  }
+  field('Description:', data.producto);
+  field('Lot Number:', data.batch);
+  field('Tare Weight:', '3.2kg');
+  field('Net Weight:', data.neto+' kg');
+
+  doc.text('Initials:', ix, fy);
+  doc.text('Date:', ix+iw*0.45, fy);
+
+  doc.setFont('helvetica','bold'); doc.setFontSize(8);
+  doc.text('LB0015-1', ix, y+LH-2);
+}
+
+/* listeners del modal de labels */
+$('lblCant').addEventListener('input', actualizarHojasLbl);
+$('lblCancel').addEventListener('click', cerrarLabels);
+$('lblGen').addEventListener('click', generarLabelsPDF);
+$('modalLabels').addEventListener('click', e=>{ if(e.target.id==='modalLabels') cerrarLabels(); });
 
 /* idioma: por defecto inglés; recuerda la elección en el dispositivo */
 try{ const g=localStorage.getItem(LANG_LS_KEY); if(g==='es'||g==='en') lang=g; }catch(e){}
