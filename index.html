@@ -187,8 +187,8 @@
   body.supervisor #fCodigo{pointer-events:auto;opacity:1}
   body.supervisor #tabCodigos{pointer-events:auto;opacity:1;background:var(--panel2)}
   /* Imprimir, CSV y Limpiar: solo visibles para el supervisor */
-  #btnImprimir, #btnCSV, #btnGrafica, #btnLimpiar, #btnRespaldo{display:none}
-  body.supervisor #btnImprimir, body.supervisor #btnCSV, body.supervisor #btnGrafica, body.supervisor #btnLimpiar, body.supervisor #btnRespaldo{display:inline-block !important}
+  #btnImprimir, #btnCSV, #btnGrafica, #btnLimpiar, #btnRespaldo, #btnLabels{display:none}
+  body.supervisor #btnImprimir, body.supervisor #btnCSV, body.supervisor #btnGrafica, body.supervisor #btnLimpiar, body.supervisor #btnRespaldo, body.supervisor #btnLabels{display:inline-block !important}
   /* Vista supervisor simplificada: ocultar rango/objetivo, tarjetas de stats y pill de rango */
   body.supervisor #filaRango,
   body.supervisor .stats,
@@ -252,11 +252,6 @@
   .ord-card .oc-rm:hover{opacity:1;color:var(--danger)}
   .ord-card .oc-avance{font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
   .ord-card .oc-avance b{color:var(--warn)}
-  .ord-card .oc-labels{margin-top:10px}
-  .oc-lbl-btn{width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink);
-    border-radius:8px;padding:9px 12px;font-size:12px;font-weight:600;cursor:pointer;transition:.15s;
-    font-family:inherit;display:flex;align-items:center;justify-content:center;gap:6px}
-  .oc-lbl-btn:hover{border-color:var(--accent);color:var(--accent)}
   .lbl-hojas{font-size:11px;color:var(--muted);margin-top:6px;text-transform:none;letter-spacing:0;font-weight:400}
   .tab-empty{text-align:center;color:var(--muted);padding:34px;font-size:13px;
     background:var(--panel);border:1px dashed var(--line);border-radius:var(--radius)}
@@ -460,6 +455,7 @@
     <div class="btn-row">
       <button class="btn primary" id="btnImprimir" data-i18n="printSheet">🖨️ Print order sheet</button>
       <button class="btn primary" id="btnGrafica" data-i18n="printControlChart">🖨️ Print control chart (Sam's Club)</button>
+      <button class="btn" id="btnLabels" data-i18n="lblBtnFull">🏷️ Print labels</button>
       <button class="btn" id="btnCSV" data-i18n="exportCsv">📥 Export CSV (Excel)</button>
       <button class="btn" id="btnRespaldo" data-i18n="backupJson">💾 Backup (JSON)</button>
       <button class="btn danger" id="btnLimpiar" data-i18n="clearOrder">🗑️ Clear order</button>
@@ -930,7 +926,7 @@ const I18N = {
     pTotalSamples:'Total samples:', pAvgCap:'Avg. capsule:', pOutSamples:'Out-of-range samples:',
     pInRange:'In range', pOut:'OUT', pClosed:'Closed', pOpen:'Open',
     printPreview:'Print preview', printBtn:'🖨️ Print', closeBtn:'Close',
-    lblBtn:'Labels', lblTitle:'Generate labels', lblBatchLbl:'Batch number (Lot Number)',
+    lblBtn:'Labels', lblBtnFull:'🏷️ Print labels', lblTitle:'Generate labels', lblBatchLbl:'Batch number (Lot Number)',
     lblNetLbl:'Net weight (kg)', lblQtyLbl:'How many labels?', lblNumber:'Number the labels (1, 2, 3…)',
     lblGenerate:'Generate PDF', lblSheets:(n)=>`${n} ${n===1?'sheet':'sheets'} (6 labels per sheet)`,
     lblNeedBatch:'Enter the batch number (Lot Number).', lblNeedNet:'Enter the net weight (kg).',
@@ -1056,7 +1052,7 @@ const I18N = {
     pTotalSamples:'Total muestras:', pAvgCap:'Prom. cápsula:', pOutSamples:'Muestras fuera de rango:',
     pInRange:'En rango', pOut:'FUERA', pClosed:'Cerrado', pOpen:'Abierto',
     printPreview:'Vista previa de impresión', printBtn:'🖨️ Imprimir', closeBtn:'Cerrar',
-    lblBtn:'Labels', lblTitle:'Generar labels', lblBatchLbl:'Número de batch (Lot Number)',
+    lblBtn:'Labels', lblBtnFull:'🏷️ Imprimir labels', lblTitle:'Generar labels', lblBatchLbl:'Número de batch (Lot Number)',
     lblNetLbl:'Kilos neto (kg)', lblQtyLbl:'¿Cuántos labels?', lblNumber:'Numerar los labels (1, 2, 3…)',
     lblGenerate:'Generar PDF', lblSheets:(n)=>`${n} ${n===1?'hoja':'hojas'} (6 labels por hoja)`,
     lblNeedBatch:'Ingresa el número de batch (Lot Number).', lblNeedNet:'Ingresa los kilos neto (kg).',
@@ -2091,9 +2087,6 @@ async function refrescarTablero(){
       </div>
       ${prog}
       <div class="oc-avance">${t('todayPartial')} ${parcialHoyTxt}</div>
-      <div class="oc-labels">
-        <button class="oc-lbl-btn" onclick='abrirLabels(${JSON.stringify(o.producto||"")}, ${JSON.stringify(o.lote||"")}, ${JSON.stringify(o.orden||"")})'>🏷️ ${t('lblBtn')}</button>
-      </div>
     </div>`;
   });
   grid.innerHTML=html;
@@ -2363,11 +2356,11 @@ $('btnRefrescar').addEventListener('click',()=>{ if(codigo) abrirOrden(codigo); 
 /* ===================== LABELS "In Process Material" ===================== */
 let _lblOrden = { producto:'', batch:'', cuarto:'' };
 
-function abrirLabels(producto, batch, cuarto){
-  _lblOrden = { producto:producto||'', batch:batch||'', cuarto:cuarto||'' };
-  const loc=I18N[lang].locale;
+function abrirLabels(){
+  const o = state.orden || {};
+  _lblOrden = { producto:o.producto||'', batch:o.lote||'', cuarto:o.orden||'' };
   $('lblInfo').textContent =
-    (_lblOrden.producto || t('noProduct')) + (cuarto ? '  ·  Room ' + cuarto : '');
+    (_lblOrden.producto || t('noProduct')) + (_lblOrden.cuarto ? '  ·  Room ' + _lblOrden.cuarto : '');
   $('lblBatch').value = _lblOrden.batch || '';
   $('lblNeto').value  = '25';
   $('lblCant').value  = '6';
@@ -2486,6 +2479,7 @@ function dibujarLabel(doc, x, y, LW, LH, data){
 }
 
 /* listeners del modal de labels */
+$('btnLabels').addEventListener('click', abrirLabels);
 $('lblCant').addEventListener('input', actualizarHojasLbl);
 $('lblCancel').addEventListener('click', cerrarLabels);
 $('lblGen').addEventListener('click', generarLabelsPDF);
