@@ -181,14 +181,18 @@
   body.supervisor .parcial-row .px,
   body.supervisor tbody .btn.danger{display:none !important}
   /* El supervisor VE los datos de la orden pero no puede editarlos */
-  body.supervisor input:not(#fCodigo):not(#tabCodigos):not(#incEditFecha):not(#incEditHora){pointer-events:none;opacity:.85;background:var(--panel)}
+  body.supervisor input:not(#fCodigo):not(#tabCodigos):not(#incEditFecha):not(#incEditHora):not(#lblBatch):not(#lblNeto):not(#lblCant):not(#lblNumerar){pointer-events:none;opacity:.85;background:var(--panel)}
   body.supervisor #incEditFecha,
   body.supervisor #incEditHora{pointer-events:auto;opacity:1;background:var(--panel2)}
   body.supervisor #fCodigo{pointer-events:auto;opacity:1}
   body.supervisor #tabCodigos{pointer-events:auto;opacity:1;background:var(--panel2)}
-  /* Imprimir, CSV y Limpiar: solo visibles para el supervisor */
+  body.supervisor #lblBatch,
+  body.supervisor #lblNeto,
+  body.supervisor #lblCant{pointer-events:auto;opacity:1;background:var(--panel2)}
+  body.supervisor #lblNumerar{pointer-events:auto;opacity:1}
+  /* Imprimir, CSV y Limpiar: solo visibles para el supervisor (y NO en el tablero) */
   #btnImprimir, #btnCSV, #btnGrafica, #btnLimpiar, #btnRespaldo, #btnLabels{display:none}
-  body.supervisor #btnImprimir, body.supervisor #btnCSV, body.supervisor #btnGrafica, body.supervisor #btnLimpiar, body.supervisor #btnRespaldo, body.supervisor #btnLabels{display:inline-block !important}
+  body.supervisor:not(.tablero) #btnImprimir, body.supervisor:not(.tablero) #btnCSV, body.supervisor:not(.tablero) #btnGrafica, body.supervisor:not(.tablero) #btnLimpiar, body.supervisor:not(.tablero) #btnRespaldo, body.supervisor:not(.tablero) #btnLabels{display:inline-block !important}
   /* Vista supervisor simplificada: ocultar rango/objetivo, tarjetas de stats y pill de rango */
   body.supervisor #filaRango,
   body.supervisor .stats,
