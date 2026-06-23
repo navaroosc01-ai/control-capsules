@@ -2510,6 +2510,7 @@ async function generarLabelsPDF(){
   const doc=new jsPDF({unit:'mm',format:[PAGE_W,PAGE_H]});
   const ts=Date.now();
   const cod=_lblOrden.cod || '';
+  const cuarto=_lblOrden.cuarto || '';
 
   for(let i=0;i<cantidad;i++){
     const idx=i%PER_PAGE;
@@ -2517,11 +2518,12 @@ async function generarLabelsPDF(){
     const col=idx%COLS, row=Math.floor(idx/COLS);
     const x=MX+col*(LW+GAP_X), y=MY+row*(LH+GAP_Y);
     const num=numerar ? i+1 : null;
+    const barrilNo=i+1; /* número de barril, siempre presente */
     /* uid único por barril: código + batch + timestamp + índice */
     const uid = (cod||'X')+'-'+ts+'-'+(i+1);
-    const payload=JSON.stringify({ c:cod, p:producto, b:batch, n:neto, t:'3.2kg', i:num, ts:ts, uid:uid });
+    const payload=JSON.stringify({ c:cod, p:producto, b:batch, n:neto, t:'3.2kg', r:cuarto, bn:barrilNo, i:num, ts:ts, uid:uid });
     const qr=await lblQrDataURL(payload);
-    dibujarLabel(doc, x, y, LW, LH, { producto, batch, neto, num, qr });
+    dibujarLabel(doc, x, y, LW, LH, { producto, batch, neto, cuarto, num, barrilNo, qr });
   }
 
   const safe=(batch.replace(/[^a-zA-Z0-9_-]/g,'')||'orden');
@@ -2539,7 +2541,7 @@ function dibujarLabel(doc, x, y, LW, LH, data){
 
   doc.setFont('helvetica','bold'); doc.setFontSize(13); doc.setTextColor(0,0,0);
   doc.text('Sabinsa Manufacturing', ix+8, cy+4.5);
-  doc.setFont('helvetica','normal'); doc.setFontSize(9.5);
+  doc.setFont('helvetica','bold'); doc.setFontSize(9.5);
   doc.text('In Process Material', x+LW/2, cy+9.5, {align:'center'});
 
   /* QR esquina superior derecha */
@@ -2552,12 +2554,16 @@ function dibujarLabel(doc, x, y, LW, LH, data){
     doc.text(String(data.num), qrX-2, qrY+qrSize/2+2, {align:'right'});
   }
 
-  /* Cuerpo */
+  /* Cuerpo: rótulos en negritas, valores en normal */
   let fy=cy+16; const rowH=(LH-(fy-y)-10)/5;
-  doc.setFont('helvetica','normal'); doc.setFontSize(10);
   function field(label,value){
+    doc.setFont('helvetica','bold'); doc.setFontSize(10);
     doc.text(label, ix, fy);
-    if(value){ const lw=doc.getTextWidth(label+' '); doc.text(String(value), ix+lw, fy); }
+    if(value){
+      const lw=doc.getTextWidth(label+' ');
+      doc.setFont('helvetica','normal');
+      doc.text(String(value), ix+lw, fy);
+    }
     doc.setLineWidth(0.2); doc.setDrawColor(0,0,0);
     doc.line(ix, fy+1.5, lineX2, fy+1.5);
     fy+=rowH;
@@ -2567,6 +2573,7 @@ function dibujarLabel(doc, x, y, LW, LH, data){
   field('Tare Weight:', '3.2kg');
   field('Net Weight:', data.neto+' kg');
 
+  doc.setFont('helvetica','bold'); doc.setFontSize(10);
   doc.text('Initials:', ix, fy);
   doc.text('Date:', ix+iw*0.45, fy);
 
