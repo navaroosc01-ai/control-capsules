@@ -245,7 +245,6 @@
   /* Parpadeo mientras haya problemas sin resolver */
   @keyframes incBlink{0%,100%{opacity:1;box-shadow:0 0 0 0 rgba(232,93,71,.55)}
     50%{opacity:.35;box-shadow:0 0 0 5px rgba(232,93,71,0)}}
-  .ord-card.has-inc{animation:incBlink 1s ease-in-out infinite;border-color:var(--danger)}
   .ord-card .oc-inc.blink{color:#fff;background:var(--danger);animation:incBlink 1s ease-in-out infinite}
   /* Tooltip con el detalle de la(s) falla(s) al pasar el ratón */
   .ord-card .oc-inc .inc-tip{display:none;position:absolute;top:calc(100% + 8px);right:0;z-index:50;
@@ -2195,7 +2194,7 @@ async function refrescarTablero(){
       ? `<button class="oc-rm" onclick="quitarTab('${cod}')" title="${t('cancel')}">✕</button>`
       : `<span class="oc-auto" title="${t('autoInProcessHint')}">${t('autoInProcess')}</span>`;
 
-    html+=`<div class="ord-card${abiertas.length?' has-inc':''}">
+    html+=`<div class="ord-card">
       <div class="oc-top">
         <div>
           <div class="oc-room-big">${o.orden?o.orden:'—'}</div>
