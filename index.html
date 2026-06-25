@@ -356,6 +356,29 @@
   .pack-log-item .pl-batch{font-weight:700;color:var(--ink)}
   .pack-log-item .pl-time{color:var(--muted);font-variant-numeric:tabular-nums;font-size:11px}
   .pack-log-empty{text-align:center;color:var(--muted);font-size:12px;padding:14px}
+  /* Barra de progreso de packeting */
+  .pack-prog{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:16px;margin-bottom:14px}
+  .pack-prog-head{display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-bottom:10px}
+  .pack-prog-l{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;font-weight:600}
+  .pack-prog-nums{font-size:13px;font-weight:700;color:var(--ink);font-variant-numeric:tabular-nums}
+  .pack-prog-nums b{color:var(--accent);font-size:16px}
+  .pack-prog-bar{height:14px;background:var(--panel2);border-radius:20px;overflow:hidden;position:relative}
+  .pack-prog-fill{height:100%;width:0%;background:linear-gradient(90deg,var(--accent2),var(--accent));border-radius:20px;transition:width .4s ease}
+  .pack-prog-fill.over{background:linear-gradient(90deg,var(--warn),#ff9d33)}
+  .pack-prog-pct{text-align:center;font-size:12px;color:var(--muted);margin-top:8px;font-weight:600}
+  .pack-prog-pct b{color:var(--accent);font-variant-numeric:tabular-nums}
+  .pack-prog-pct.over b{color:var(--warn)}
+  .pack-prog-none{font-size:11px;color:var(--muted);text-align:center;margin-top:6px;font-style:italic}
+  /* Motivos de des-escaneo */
+  .motivo-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:6px}
+  .motivo-btn{background:var(--panel2);border:1px solid var(--line);color:var(--ink);border-radius:8px;padding:12px 10px;font-size:13px;font-weight:600;cursor:pointer;text-align:center;transition:.15s;display:flex;flex-direction:column;align-items:center;gap:4px}
+  .motivo-btn .mi{font-size:20px}
+  .motivo-btn:hover{border-color:var(--danger);background:rgba(255,107,107,.08)}
+  .motivo-btn.sel{border-color:var(--danger);background:rgba(255,107,107,.14);color:#ffb4b4}
+  .pack-current-v.dup{color:var(--warn)}
+  .pl-out{opacity:.6}
+  .pl-out .pl-batch{text-decoration:line-through}
+  .pl-motivo{font-size:10px;color:var(--warn);font-weight:600;text-transform:uppercase;letter-spacing:.3px}
 </style>
 </head>
 <body>
@@ -434,6 +457,18 @@
       <div class="pack-count-big"><span id="packCount">0</span> <span data-i18n="packBarrels">barrels</span></div>
     </div>
     <div class="pack-msg" id="packMsg"></div>
+
+    <!-- Barra de progreso: barriles colocados vs total cerrado en encapsulación -->
+    <div class="pack-prog" id="packProg" style="display:none">
+      <div class="pack-prog-head">
+        <span class="pack-prog-l" data-i18n="packProgL">Packed progress</span>
+        <span class="pack-prog-nums"><b id="packProgCol">0</b> / <span id="packProgTot">0</span></span>
+      </div>
+      <div class="pack-prog-bar"><div class="pack-prog-fill" id="packProgFill"></div></div>
+      <div class="pack-prog-pct" id="packProgPct"><b>0%</b></div>
+      <div class="pack-prog-none" id="packProgNone" data-i18n="packProgNone">Encapsulation has not closed any day yet — no total to compare.</div>
+    </div>
+
     <div class="pack-log-title" data-i18n="packLog">Recent scans</div>
     <div id="packLog" class="pack-log"></div>
   </div>
@@ -697,6 +732,29 @@
     <div class="actions">
       <button class="btn" id="dCancel" data-i18n="cancel">Cancel</button>
       <button class="btn primary" id="dSave" data-i18n="closeDayBtn">Close day</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal des-escanear label (packeting) -->
+<div class="modal-bg" id="modalDesescan">
+  <div class="modal" style="max-width:400px">
+    <h3 data-i18n="unscanTitle">Label already scanned</h3>
+    <div class="sub" id="desescanSub">—</div>
+    <div class="row">
+      <label data-i18n="unscanReasonLbl">Reason for removing it</label>
+      <div class="motivo-grid">
+        <div class="motivo-btn" data-motivo="polvoso"><span class="mi">🌫️</span><span data-i18n="reasonDusty">Dusty</span></div>
+        <div class="motivo-btn" data-motivo="sortear"><span class="mi">⚖️</span><span data-i18n="reasonSort">To sort</span></div>
+        <div class="motivo-btn" data-motivo="error"><span class="mi">↩️</span><span data-i18n="reasonError">Scanned by error</span></div>
+        <div class="motivo-btn" data-motivo="otro"><span class="mi">✏️</span><span data-i18n="reasonOther">Other</span></div>
+      </div>
+      <input id="desescanOtro" placeholder="" data-i18n-ph="reasonOtherPh" style="display:none;margin-top:6px">
+      <div class="hint" data-i18n="unscanHint">The barrel stops counting as packed and the reason is recorded.</div>
+    </div>
+    <div class="actions">
+      <button class="btn" id="desescanCancel" data-i18n="cancel">Cancel</button>
+      <button class="btn danger" id="desescanOk" data-i18n="unscanConfirm">Remove label</button>
     </div>
   </div>
 </div>
@@ -1022,6 +1080,14 @@ const I18N = {
     packSaving:'Saving…', packSaveErr:'✕ Could not save, try again', packSaved:'Saved to cloud',
     packLogEmpty:'No barrels scanned yet.', packCamErr:'Could not access the camera. Check permissions.',
     packConnReady:'Ready', packBarrel:'Barrel',
+    packProgL:'Packed progress', packProgNone:'Encapsulation has not closed any day yet — no total to compare.',
+    unscanTitle:'Label already scanned', unscanReasonLbl:'Reason for removing it',
+    unscanHint:'The barrel stops counting as packed and the reason is recorded.',
+    unscanConfirm:'Remove label', unscanSub:(b)=>`Barrel from batch ${b}`,
+    reasonDusty:'Dusty', reasonSort:'To sort', reasonError:'Scanned by error', reasonOther:'Other',
+    reasonOtherPh:'Describe the reason…', unscanNeedReason:'Choose a reason first.',
+    packRemoved:'✓ Label removed', packReuse:'✓ Barrel re-added',
+    packAskUnscan:'⚠️ Already scanned — remove it?',
     months:['January','February','March','April','May','June','July','August','September','October','November','December'],
     weekdays:['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'],
     dateFmt:(wd,da,mo,yr)=>`${wd}, ${mo} ${da}, ${yr}`, locale:'en'
@@ -1157,6 +1223,14 @@ const I18N = {
     packSaving:'Guardando…', packSaveErr:'✕ No se pudo guardar, intenta de nuevo', packSaved:'Guardado en la nube',
     packLogEmpty:'Aún no se han escaneado barriles.', packCamErr:'No se pudo acceder a la cámara. Revisa los permisos.',
     packConnReady:'Listo', packBarrel:'Barril',
+    packProgL:'Avance empacado', packProgNone:'Encapsulación aún no cierra ningún día — no hay total para comparar.',
+    unscanTitle:'Label ya escaneado', unscanReasonLbl:'Motivo para retirarlo',
+    unscanHint:'El barril deja de contar como colocado y se registra el motivo.',
+    unscanConfirm:'Retirar label', unscanSub:(b)=>`Barril del batch ${b}`,
+    reasonDusty:'Polvoso', reasonSort:'Sortear', reasonError:'Escaneo por error', reasonOther:'Otro',
+    reasonOtherPh:'Describe el motivo…', unscanNeedReason:'Elige un motivo primero.',
+    packRemoved:'✓ Label retirado', packReuse:'✓ Barril reincorporado',
+    packAskUnscan:'⚠️ Ya escaneado — ¿retirarlo?',
     months:['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'],
     weekdays:['domingo','lunes','martes','miércoles','jueves','viernes','sábado'],
     dateFmt:(wd,da,mo,yr)=>`${wd}, ${da} de ${mo} de ${yr}`, locale:'es'
@@ -1416,8 +1490,8 @@ function render(){
   const prodTotal=prodAcumulada(state.dias, true);
   $('sProd').textContent=prodTotal.toLocaleString(I18N[lang].locale);
 
-  /* barriles escaneados por QR (packeting) */
-  const nBarriles=(state.barrilesQR||[]).length;
+  /* barriles escaneados por QR (packeting) — solo activos (no retirados) */
+  const nBarriles=(state.barrilesQR||[]).filter(b=>b && !b.removed).length;
   const elB=$('sBarriles'); if(elB) elB.textContent=nBarriles.toLocaleString(I18N[lang].locale);
 
   if(meta>0){
@@ -2741,12 +2815,32 @@ async function procesarBarril(datos){
   data=normalizar(data);
   data.barrilesQR=data.barrilesQR||[];
 
-  /* evitar duplicados por uid del barril */
-  const yaExiste=data.barrilesQR.some(b=>b && b.uid===datos.uid);
-  if(yaExiste){
-    packActual={ cod:codFinal, batch:datos.b||(data.orden&&data.orden.lote)||'—', producto:(data.orden&&data.orden.producto)||'', count:data.barrilesQR.length };
+  /* ¿ya existe este barril (por uid)? */
+  const existente=data.barrilesQR.find(b=>b && b.uid===datos.uid);
+  if(existente){
+    if(existente.removed){
+      /* estaba retirado: lo reincorporamos */
+      existente.removed=false; delete existente.motivo; delete existente.removedTs;
+      existente.ts=Date.now();
+      const ok=await escribirOrden(codFinal, data);
+      if(!ok){ packMostrarMsg(t('packSaveErr'),'err'); beep(false); return; }
+      packCache[codFinal]=data;
+      if(codigo && codFinal===codigo.toUpperCase()){ state.barrilesQR=data.barrilesQR; render(); }
+      const batchR=datos.b||(data.orden&&data.orden.lote)||'—';
+      packActual={ cod:codFinal, batch:batchR, producto:(data.orden&&data.orden.producto)||'', count:contarActivos(data.barrilesQR), total:totalCerrado(data) };
+      actualizarPackActual();
+      packMostrarMsg(t('packReuse'),'ok'); beep(true);
+      packLog.unshift({ batch:batchR, cod:codFinal, ts:Date.now() });
+      if(packLog.length>15) packLog.pop();
+      renderPackLog();
+      return;
+    }
+    /* está activo: ofrecer des-escanearlo con motivo */
+    const batchD=datos.b||(data.orden&&data.orden.lote)||'—';
+    packActual={ cod:codFinal, batch:batchD, producto:(data.orden&&data.orden.producto)||'', count:contarActivos(data.barrilesQR), total:totalCerrado(data) };
     actualizarPackActual();
-    packMostrarMsg(t('packDup'),'dup'); beep(false);
+    packMostrarMsg(t('packAskUnscan'),'dup'); beep(false);
+    abrirDesescaneo(codFinal, datos.uid, batchD, data);
     return;
   }
 
@@ -2767,7 +2861,7 @@ async function procesarBarril(datos){
 
   const batch=datos.b||(data.orden&&data.orden.lote)||'—';
   const producto=(data.orden&&data.orden.producto)||'';
-  packActual={ cod:codFinal, batch, producto, count:data.barrilesQR.length };
+  packActual={ cod:codFinal, batch, producto, count:contarActivos(data.barrilesQR), total:totalCerrado(data) };
   actualizarPackActual();
 
   packMostrarMsg(t('packAdded')(batch),'ok'); beep(true);
@@ -2777,22 +2871,125 @@ async function procesarBarril(datos){
   renderPackLog();
 }
 
+/* contar solo barriles activos (no retirados) */
+function contarActivos(arr){ return (arr||[]).filter(b=>b && !b.removed).length; }
+
+/* total de barriles de días CERRADOS en encapsulación (denominador de la barra) */
+function totalCerrado(data){
+  const dias=(data&&data.dias)||{};
+  return Object.values(dias).reduce((s,d)=>s+(d&&d.closed&&d.barriles?Number(d.barriles):0),0);
+}
+
 function actualizarPackActual(){
   if(!packActual) return;
   $('packBatch').textContent=packActual.batch||'—';
   $('packProd').textContent=packActual.producto||'';
   $('packCount').textContent=packActual.count!=null?packActual.count:0;
+  renderPackProgreso();
+}
+
+/* pintar barra de progreso: colocados / total cerrado en encapsulación */
+function renderPackProgreso(){
+  const box=$('packProg'); if(!box) return;
+  if(!packActual){ box.style.display='none'; return; }
+  box.style.display='block';
+  const col=packActual.count!=null?packActual.count:0;
+  const tot=packActual.total!=null?packActual.total:0;
+  $('packProgCol').textContent=col.toLocaleString(I18N[lang].locale);
+  $('packProgTot').textContent=tot.toLocaleString(I18N[lang].locale);
+  const fill=$('packProgFill'), pct=$('packProgPct'), none=$('packProgNone');
+  if(tot>0){
+    none.style.display='none';
+    const p=Math.round((col/tot)*100);
+    const over=col>tot;
+    fill.style.width=Math.min(p,100)+'%';
+    fill.classList.toggle('over',over);
+    pct.classList.toggle('over',over);
+    pct.innerHTML=`<b>${p}%</b>`;
+  }else{
+    none.style.display='block';
+    fill.style.width='0%'; fill.classList.remove('over');
+    pct.classList.remove('over'); pct.innerHTML='<b>—</b>';
+  }
 }
 
 function renderPackLog(){
   const cont=$('packLog'); if(!cont) return;
   if(!packLog.length){ cont.innerHTML=`<div class="pack-log-empty">${t('packLogEmpty')}</div>`; return; }
-  cont.innerHTML=packLog.map(it=>
-    `<div class="pack-log-item">
-      <span class="pl-batch">${String(it.batch).replace(/</g,'&lt;')}</span>
+  cont.innerHTML=packLog.map(it=>{
+    const out=it.removed;
+    const motivo=out?`<span class="pl-motivo">↩︎ ${nombreMotivo(it.motivo)}</span>`:'';
+    return `<div class="pack-log-item${out?' pl-out':''}">
+      <span class="pl-batch">${String(it.batch).replace(/</g,'&lt;')} ${motivo}</span>
       <span class="pl-time">${fmtTime(new Date(it.ts))}</span>
-    </div>`).join('');
+    </div>`;
+  }).join('');
 }
+
+/* etiqueta legible del motivo de des-escaneo */
+function nombreMotivo(m){
+  const map={polvoso:'reasonDusty',sortear:'reasonSort',error:'reasonError',otro:'reasonOther'};
+  if(map[m]) return t(map[m]);
+  return m||t('reasonOther');
+}
+
+/* ===== Des-escaneo (retirar label con motivo) ===== */
+let _desCtx=null;       /* { cod, uid, data } */
+let _desMotivo=null;    /* motivo seleccionado */
+const modalDesescan=$('modalDesescan');
+
+function abrirDesescaneo(cod, uid, batch, data){
+  _desCtx={ cod, uid, data };
+  _desMotivo=null;
+  $('desescanSub').textContent=t('unscanSub')(batch||'—');
+  /* limpiar selección y campo "otro" */
+  document.querySelectorAll('#modalDesescan .motivo-btn').forEach(b=>b.classList.remove('sel'));
+  const otroIn=$('desescanOtro'); otroIn.value=''; otroIn.style.display='none';
+  modalDesescan.classList.add('show');
+}
+
+document.querySelectorAll('#modalDesescan .motivo-btn').forEach(btn=>{
+  btn.addEventListener('click',()=>{
+    document.querySelectorAll('#modalDesescan .motivo-btn').forEach(b=>b.classList.remove('sel'));
+    btn.classList.add('sel');
+    _desMotivo=btn.dataset.motivo;
+    const otroIn=$('desescanOtro');
+    if(_desMotivo==='otro'){ otroIn.style.display='block'; setTimeout(()=>otroIn.focus(),40); }
+    else{ otroIn.style.display='none'; }
+  });
+});
+
+$('desescanCancel').addEventListener('click',()=>{ modalDesescan.classList.remove('show'); _desCtx=null; });
+modalDesescan.addEventListener('click',e=>{ if(e.target===modalDesescan){ modalDesescan.classList.remove('show'); _desCtx=null; } });
+
+$('desescanOk').addEventListener('click',async()=>{
+  if(!_desCtx){ modalDesescan.classList.remove('show'); return; }
+  if(!_desMotivo){ packMostrarMsg(t('unscanNeedReason'),'err'); return; }
+  let motivoFinal=_desMotivo;
+  if(_desMotivo==='otro'){
+    const txt=$('desescanOtro').value.trim();
+    motivoFinal = txt ? ('otro: '+txt) : 'otro';
+  }
+  const { cod, uid, data }=_desCtx;
+  const b=(data.barrilesQR||[]).find(x=>x && x.uid===uid);
+  if(b){
+    b.removed=true; b.motivo=motivoFinal; b.removedTs=Date.now();
+  }
+  const ok=await escribirOrden(cod, data);
+  if(!ok){ packMostrarMsg(t('packSaveErr'),'err'); beep(false); return; }
+  packCache[cod]=data;
+  if(codigo && cod===codigo.toUpperCase()){ state.barrilesQR=data.barrilesQR; render(); }
+
+  packActual={ cod, batch:packActual?packActual.batch:'—', producto:packActual?packActual.producto:'', count:contarActivos(data.barrilesQR), total:totalCerrado(data) };
+  actualizarPackActual();
+
+  packLog.unshift({ batch:packActual.batch, cod, ts:Date.now(), removed:true, motivo:motivoFinal });
+  if(packLog.length>15) packLog.pop();
+  renderPackLog();
+
+  modalDesescan.classList.remove('show'); _desCtx=null;
+  packMostrarMsg(t('packRemoved'),'ok'); beep(true);
+});
 
 /* beep corto de confirmación (Web Audio, sin archivos) */
 function beep(ok){
