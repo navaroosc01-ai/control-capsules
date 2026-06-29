@@ -344,10 +344,6 @@
   .pack-current-l{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;font-weight:600;margin-bottom:4px}
   .pack-current-v{font-size:22px;font-weight:800;color:var(--ink);line-height:1.2;word-break:break-word}
   .pack-current-prod{font-size:13px;color:var(--accent);font-weight:600;margin-top:2px;min-height:18px}
-  .pack-last-barrel{display:inline-flex;align-items:center;gap:8px;margin-top:10px;
-    background:var(--panel2);border:1px solid var(--line);border-radius:20px;padding:6px 14px}
-  .pack-last-barrel .plb-l{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;font-weight:600}
-  .pack-last-barrel .plb-n{font-size:18px;font-weight:800;color:var(--accent);font-variant-numeric:tabular-nums}
   .pack-count-big{font-size:15px;color:var(--muted);margin-top:12px}
   .pack-count-big span:first-child{font-size:40px;font-weight:800;color:var(--accent);font-variant-numeric:tabular-nums;display:block;line-height:1.1}
   .pack-msg{text-align:center;font-size:14px;font-weight:600;min-height:24px;margin-bottom:14px;transition:.2s}
@@ -358,10 +354,15 @@
   .pack-log{display:flex;flex-direction:column;gap:6px}
   .pack-log-item{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:9px 12px;font-size:12px;display:flex;justify-content:space-between;align-items:center;gap:8px}
   .pack-log-item .pl-batch{font-weight:700;color:var(--ink)}
-  .pack-log-item .pl-bn{display:inline-block;background:var(--accent);color:#06241c;
-    border-radius:6px;padding:1px 7px;font-size:11px;font-weight:800;font-variant-numeric:tabular-nums;margin-right:2px}
+  .pack-log-item .pl-bn{display:inline-block;background:var(--accent);color:#06241c;border-radius:6px;padding:1px 7px;font-size:11px;font-weight:800;font-variant-numeric:tabular-nums;margin-right:2px}
   .pack-log-item .pl-time{color:var(--muted);font-variant-numeric:tabular-nums;font-size:11px}
   .pack-log-empty{text-align:center;color:var(--muted);font-size:12px;padding:14px}
+  /* Grilla de barriles escaneados */
+  .pack-barriles{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:16px;margin-bottom:14px}
+  .pack-barriles-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;font-weight:600}
+  .pack-barriles-n b{color:var(--accent);font-size:15px;font-variant-numeric:tabular-nums}
+  .pack-barriles-grid{display:flex;flex-wrap:wrap;gap:6px}
+  .pb-chip{display:inline-flex;align-items:center;justify-content:center;min-width:38px;height:30px;padding:0 8px;background:var(--panel2);border:1px solid var(--accent);border-radius:7px;font-size:13px;font-weight:700;color:var(--accent);font-variant-numeric:tabular-nums}
   /* Barra de progreso de packeting */
   .pack-prog{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:16px;margin-bottom:14px}
   .pack-prog-head{display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-bottom:10px}
@@ -460,10 +461,6 @@
       <div class="pack-current-l" data-i18n="packLastBatch">Current batch</div>
       <div class="pack-current-v" id="packBatch">—</div>
       <div class="pack-current-prod" id="packProd"></div>
-      <div class="pack-last-barrel" id="packLastBarrel" style="display:none">
-        <span class="plb-l" data-i18n="packLastBarrel">Last barrel</span>
-        <span class="plb-n" id="packLastBarrelN">—</span>
-      </div>
       <div class="pack-count-big"><span id="packCount">0</span> <span data-i18n="packBarrels">barrels</span></div>
     </div>
     <div class="pack-msg" id="packMsg"></div>
@@ -477,6 +474,15 @@
       <div class="pack-prog-bar"><div class="pack-prog-fill" id="packProgFill"></div></div>
       <div class="pack-prog-pct" id="packProgPct"><b>0%</b></div>
       <div class="pack-prog-none" id="packProgNone" data-i18n="packProgNone">Encapsulation has not closed any day yet — no total to compare.</div>
+    </div>
+
+    <!-- Barriles escaneados de la orden actual -->
+    <div class="pack-barriles" id="packBarriles" style="display:none">
+      <div class="pack-barriles-head">
+        <span data-i18n="packScannedList">Scanned barrels</span>
+        <span class="pack-barriles-n"><b id="packBarrilesCount">0</b></span>
+      </div>
+      <div class="pack-barriles-grid" id="packBarrilesGrid"></div>
     </div>
 
     <div class="pack-log-title" data-i18n="packLog">Recent scans</div>
@@ -1077,7 +1083,7 @@ const I18N = {
     pInRange:'In range', pOut:'OUT', pClosed:'Closed', pOpen:'Open',
     printPreview:'Print preview', printBtn:'🖨️ Print', closeBtn:'Close',
     lblBtn:'Labels', lblBtnFull:'🏷️ Print labels', lblTitle:'Generate labels', lblBatchLbl:'Batch number (Lot Number)',
-    lblNetLbl:'Net weight (kg)', lblQtyLbl:'How many labels?', lblNumber:'Number the labels (1, 2, 3…)',
+    lblNetLbl:'Net weight (kg)', lblQtyLbl:'How many labels?', lblNumber:'Print barrel number (1, 2, 3…)',
     lblGenerate:'Generate PDF', lblSheets:(n)=>`${n} ${n===1?'sheet':'sheets'} (6 labels per sheet)`,
     lblNeedBatch:'Enter the batch number (Lot Number).', lblNeedNet:'Enter the net weight (kg).',
     lblNeedQty:'Enter a valid number of labels.',
@@ -1086,7 +1092,7 @@ const I18N = {
     packLastBatch:'Current batch', packBarrels:'barrels', packLog:'Recent scans',
     packReady:'Point the camera at a barrel QR code.', packScanning:'Scanning…',
     packAdded:(b)=>`✓ Barrel added to ${b}`, packDup:'⚠️ This barrel was already scanned',
-    packAddedN:(n,b)=>`✓ Barrel #${n} added to ${b}`, packLastBarrel:'Last barrel',
+    packAddedN:(n,b)=>`✓ Barrel #${n} added to ${b}`, packScannedList:'Scanned barrels',
     packBadQR:'✕ Unrecognized QR (not a barrel label)', packNoOrder:'✕ Order not found for this barrel',
     packSaving:'Saving…', packSaveErr:'✕ Could not save, try again', packSaved:'Saved to cloud',
     packLogEmpty:'No barrels scanned yet.', packCamErr:'Could not access the camera. Check permissions.',
@@ -1221,7 +1227,7 @@ const I18N = {
     pInRange:'En rango', pOut:'FUERA', pClosed:'Cerrado', pOpen:'Abierto',
     printPreview:'Vista previa de impresión', printBtn:'🖨️ Imprimir', closeBtn:'Cerrar',
     lblBtn:'Labels', lblBtnFull:'🏷️ Imprimir labels', lblTitle:'Generar labels', lblBatchLbl:'Número de batch (Lot Number)',
-    lblNetLbl:'Kilos neto (kg)', lblQtyLbl:'¿Cuántos labels?', lblNumber:'Numerar los labels (1, 2, 3…)',
+    lblNetLbl:'Kilos neto (kg)', lblQtyLbl:'¿Cuántos labels?', lblNumber:'Imprimir número de barril (1, 2, 3…)',
     lblGenerate:'Generar PDF', lblSheets:(n)=>`${n} ${n===1?'hoja':'hojas'} (6 labels por hoja)`,
     lblNeedBatch:'Ingresa el número de batch (Lot Number).', lblNeedNet:'Ingresa los kilos neto (kg).',
     lblNeedQty:'Ingresa una cantidad válida de labels.',
@@ -1230,7 +1236,7 @@ const I18N = {
     packLastBatch:'Batch actual', packBarrels:'barriles', packLog:'Escaneos recientes',
     packReady:'Apunta la cámara al código QR de un barril.', packScanning:'Escaneando…',
     packAdded:(b)=>`✓ Barril agregado a ${b}`, packDup:'⚠️ Este barril ya fue escaneado',
-    packAddedN:(n,b)=>`✓ Barril #${n} agregado a ${b}`, packLastBarrel:'Último barril',
+    packAddedN:(n,b)=>`✓ Barril #${n} agregado a ${b}`, packScannedList:'Barriles escaneados',
     packBadQR:'✕ QR no reconocido (no es un label de barril)', packNoOrder:'✕ No se encontró la orden de este barril',
     packSaving:'Guardando…', packSaveErr:'✕ No se pudo guardar, intenta de nuevo', packSaved:'Guardado en la nube',
     packLogEmpty:'Aún no se han escaneado barriles.', packCamErr:'No se pudo acceder a la cámara. Revisa los permisos.',
@@ -2596,7 +2602,7 @@ function lblQrDataURL(text){
     const tmp=document.createElement('div');
     tmp.style.position='absolute'; tmp.style.left='-9999px';
     document.body.appendChild(tmp);
-    new QRCode(tmp, { text:text, width:200, height:200, correctLevel:QRCode.CorrectLevel.M });
+    new QRCode(tmp, { text:text, width:240, height:240, correctLevel:QRCode.CorrectLevel.Q });
     setTimeout(()=>{
       const img=tmp.querySelector('img'), canvas=tmp.querySelector('canvas');
       let url='';
@@ -2639,12 +2645,14 @@ async function generarLabelsPDF(){
     const col=idx%COLS, row=Math.floor(idx/COLS);
     const x=MX+col*(LW+GAP_X), y=MY+row*(LH+GAP_Y);
     const num=numerar ? i+1 : null;
-    const barrilNo=i+1; /* número de barril, siempre presente */
-    /* uid único por barril: código + batch + timestamp + índice */
-    const uid = (cod||'X')+'-'+ts+'-'+(i+1);
-    const payload=JSON.stringify({ c:cod, p:producto, b:batch, n:neto, t:'3.2kg', r:cuarto, bn:barrilNo, i:num, ts:ts, uid:uid });
+    const barrilNo=i+1; /* número de barril, siempre presente (va en el QR) */
+    /* QR LIVIANO: solo lo necesario. uid se deriva de batch + número de barril
+       (confirmado único por barril dentro de su lote). El código de orden (c) va
+       OCULTO en el QR para localizar la orden, pero NO se imprime en la etiqueta. */
+    const uid = batch + '#' + barrilNo;
+    const payload=JSON.stringify({ p:producto, b:batch, r:cuarto, n:neto, bn:barrilNo, c:cod });
     const qr=await lblQrDataURL(payload);
-    dibujarLabel(doc, x, y, LW, LH, { producto, batch, neto, cuarto, num, barrilNo, qr });
+    dibujarLabel(doc, x, y, LW, LH, { producto, batch, neto, cuarto, num, barrilNo, qr, printNum:numerar });
   }
 
   const safe=(batch.replace(/[^a-zA-Z0-9_-]/g,'')||'orden');
@@ -2669,10 +2677,13 @@ function dibujarLabel(doc, x, y, LW, LH, data){
   const qrSize=15, qrX=x+LW-pad-qrSize, qrY=y+pad;
   if(data.qr) doc.addImage(data.qr, 'PNG', qrX, qrY, qrSize, qrSize);
 
-  /* Número a la izquierda del QR */
-  if(data.num!=null){
-    doc.setFont('helvetica','bold'); doc.setFontSize(12);
-    doc.text(String(data.num), qrX-2, qrY+qrSize/2+2, {align:'right'});
+  /* Número de barril a la izquierda del QR, destacado (si está activado el numerado) */
+  if(data.printNum && data.barrilNo!=null){
+    doc.setFont('helvetica','bold'); doc.setFontSize(7); doc.setTextColor(90,90,90);
+    doc.text('Barrel No.', qrX-2, qrY+3, {align:'right'});
+    doc.setFontSize(20); doc.setTextColor(0,0,0);
+    doc.text(String(data.barrilNo), qrX-2, qrY+qrSize-1, {align:'right'});
+    doc.setTextColor(0,0,0);
   }
 
   /* Cuerpo: rótulos en negritas, valores en normal */
@@ -2732,40 +2743,50 @@ function iniciarPacketing(){
 async function packStart(){
   if(typeof Html5Qrcode==='undefined'){ packMostrarMsg(t('packCamErr'),'err'); return; }
   try{
-    /* opciones del constructor con protección por si la librería no expone algún global */
-    const opts={ experimentalFeatures:{ useBarCodeDetectorIfSupported:true } };
+    /* opciones del constructor: usar el detector de QR nativo del navegador (más rápido) */
+    const opts={ verbose:false, experimentalFeatures:{ useBarCodeDetectorIfSupported:true } };
     if(typeof Html5QrcodeSupportedFormats!=='undefined'){
       opts.formatsToSupport=[ Html5QrcodeSupportedFormats.QR_CODE ];
     }
     packQR=new Html5Qrcode('packReader', opts);
 
-    /* configuración optimizada para velocidad */
+    /* Config pensada para QR DENSOS (mucha info): pedir cámara de alta resolución,
+       enfoque continuo, y un recuadro grande para que cada módulo del QR caiga en
+       suficientes píxeles. */
     const config={
-      fps:25,                         /* más cuadros por segundo = detecta antes */
-      qrbox:{width:200,height:200},   /* recuadro más chico = analiza menos píxeles por cuadro */
+      fps:15,
+      qrbox:(vw,vh)=>{ const m=Math.floor(Math.min(vw,vh)*0.8); return {width:m,height:m}; },
       aspectRatio:1.0,
-      disableFlip:true                /* el QR del barril nunca está espejado: ahorra trabajo */
+      disableFlip:true,
+      videoConstraints:{
+        facingMode:'environment',
+        width:{ ideal:1920 },
+        height:{ ideal:1080 },
+        advanced:[{ focusMode:'continuous' }]
+      }
     };
 
-    /* preferir la cámara trasera recordada; si no, facingMode environment */
+    /* preferir la cámara trasera recordada; si no, la config de arriba.
+       Pasamos deviceId DENTRO de las constraints para no perder la alta resolución. */
     const camId=await elegirCamaraPack();
-    const fuente = camId || { facingMode:'environment' };
+    const fuente = camId
+      ? Object.assign({}, config.videoConstraints, { deviceId:{ exact:camId } })
+      : config.videoConstraints;
 
     try{
-      await packQR.start(fuente, config, onPackScan, ()=>{} /* ignorar fallos de cuadro */);
+      await packQR.start(fuente, config, onPackScan, ()=>{});
     }catch(err){
-      /* la cámara recordada falló (otro equipo, desconectada): olvidarla y reintentar genérico */
+      /* la cámara recordada falló (otro equipo / desconectada): olvidarla y reintentar */
       if(camId){
         try{ localStorage.removeItem('packCamId'); }catch(_){}
-        await packQR.start({ facingMode:'environment' }, config, onPackScan, ()=>{});
-      }else{
-        throw err;
-      }
+        await packQR.start(config.videoConstraints, config, onPackScan, ()=>{});
+      }else{ throw err; }
     }
 
     $('packStart').style.display='none';
     $('packStop').style.display='block';
     packMostrarMsg(t('packScanning'),'');
+    intentarMejorarEnfoque();
   }catch(e){
     packMostrarMsg(t('packCamErr'),'err');
     packQR=null;
@@ -2775,19 +2796,29 @@ async function packStart(){
 /* elige (y recuerda) la mejor cámara trasera para acelerar el arranque */
 async function elegirCamaraPack(){
   try{
-    /* si ya guardamos una que funcionó antes, usarla directo */
     const guardada=localStorage.getItem('packCamId');
     if(guardada) return guardada;
-
     const cams=await Html5Qrcode.getCameras();
     if(!cams || !cams.length) return null;
-
-    /* buscar una trasera por nombre */
     const tras=cams.find(c=>/back|rear|tras|environment/i.test(c.label||''));
-    const elegida=(tras||cams[cams.length-1]).id;  /* normalmente la última es la trasera */
+    const elegida=(tras||cams[cams.length-1]).id;
     localStorage.setItem('packCamId', elegida);
     return elegida;
   }catch(e){ return null; }
+}
+
+/* tras arrancar, intentar fijar enfoque continuo en el track de video (ayuda con QR de cerca) */
+function intentarMejorarEnfoque(){
+  try{
+    const video=document.querySelector('#packReader video');
+    const stream=video && video.srcObject;
+    const track=stream && stream.getVideoTracks && stream.getVideoTracks()[0];
+    if(!track || !track.getCapabilities) return;
+    const caps=track.getCapabilities();
+    const adv=[];
+    if(caps.focusMode && caps.focusMode.includes('continuous')) adv.push({ focusMode:'continuous' });
+    if(adv.length) track.applyConstraints({ advanced:adv }).catch(()=>{});
+  }catch(e){}
 }
 
 async function packStop(){
@@ -2800,11 +2831,23 @@ async function packStop(){
   packMostrarMsg(t('packReady'),'');
 }
 
-/* parsear el contenido del QR del barril */
+/* parsear el contenido del QR del barril.
+   Soporta DOS formatos:
+   - Antiguo (etiquetas ya impresas): trae uid largo + ts.
+   - Nuevo liviano: { p, b, r, n, bn, c } — el uid se deriva de batch + número. */
 function parsearQRBarril(text){
   try{
     const o=JSON.parse(text);
-    if(o && o.uid && (o.c || o.b)) return o;
+    if(!o) return null;
+
+    /* formato antiguo: ya trae uid */
+    if(o.uid && (o.c || o.b)) return o;
+
+    /* formato nuevo liviano: derivar uid de batch + número de barril */
+    if(o.b && o.bn!=null){
+      o.uid = String(o.b) + '#' + o.bn;
+      return o;
+    }
   }catch(e){}
   return null;
 }
@@ -2881,7 +2924,7 @@ async function procesarBarril(datos){
       packCache[codFinal]=data;
       if(codigo && codFinal===codigo.toUpperCase()){ state.barrilesQR=data.barrilesQR; render(); }
       const batchR=datos.b||(data.orden&&data.orden.lote)||'—';
-      packActual={ cod:codFinal, batch:batchR, producto:(data.orden&&data.orden.producto)||'', count:contarActivos(data.barrilesQR), total:totalCerrado(data), ultimoBarril:datos.bn||null };
+      packActual={ cod:codFinal, batch:batchR, producto:(data.orden&&data.orden.producto)||'', count:contarActivos(data.barrilesQR), total:totalCerrado(data), barriles:(data.barrilesQR||[]).slice(), ultimoBarril:datos.bn||null };
       actualizarPackActual();
       packMostrarMsg(t('packReuse'),'ok'); beep(true);
       packLog.unshift({ batch:batchR, cod:codFinal, bn:datos.bn||null, ts:Date.now() });
@@ -2891,7 +2934,7 @@ async function procesarBarril(datos){
     }
     /* está activo: ofrecer des-escanearlo con motivo */
     const batchD=datos.b||(data.orden&&data.orden.lote)||'—';
-    packActual={ cod:codFinal, batch:batchD, producto:(data.orden&&data.orden.producto)||'', count:contarActivos(data.barrilesQR), total:totalCerrado(data) };
+    packActual={ cod:codFinal, batch:batchD, producto:(data.orden&&data.orden.producto)||'', count:contarActivos(data.barrilesQR), total:totalCerrado(data), barriles:(data.barrilesQR||[]).slice(), ultimoBarril:datos.bn||null };
     actualizarPackActual();
     packMostrarMsg(t('packAskUnscan'),'dup'); beep(false);
     abrirDesescaneo(codFinal, datos.uid, batchD, data);
@@ -2915,7 +2958,7 @@ async function procesarBarril(datos){
 
   const batch=datos.b||(data.orden&&data.orden.lote)||'—';
   const producto=(data.orden&&data.orden.producto)||'';
-  packActual={ cod:codFinal, batch, producto, count:contarActivos(data.barrilesQR), total:totalCerrado(data), ultimoBarril:datos.bn||null };
+  packActual={ cod:codFinal, batch, producto, count:contarActivos(data.barrilesQR), total:totalCerrado(data), barriles:(data.barrilesQR||[]).slice(), ultimoBarril:datos.bn||null };
   actualizarPackActual();
 
   packMostrarMsg(datos.bn ? t('packAddedN')(datos.bn, batch) : t('packAdded')(batch),'ok'); beep(true);
@@ -2939,16 +2982,29 @@ function actualizarPackActual(){
   $('packBatch').textContent=packActual.batch||'—';
   $('packProd').textContent=packActual.producto||'';
   $('packCount').textContent=packActual.count!=null?packActual.count:0;
-  const lb=$('packLastBarrel');
-  if(lb){
-    if(packActual.ultimoBarril!=null){
-      lb.style.display='inline-flex';
-      $('packLastBarrelN').textContent='#'+packActual.ultimoBarril;
-    }else{
-      lb.style.display='none';
-    }
-  }
   renderPackProgreso();
+  renderPackBarriles();
+}
+
+/* grilla de barriles escaneados de la orden actual (con número y estado) */
+function renderPackBarriles(){
+  const box=$('packBarriles'); if(!box) return;
+  const lista=(packActual&&packActual.barriles)||[];
+  const activos=lista.filter(b=>b && !b.removed);
+  if(!activos.length){ box.style.display='none'; return; }
+  box.style.display='block';
+
+  /* ordenar por número de barril (los que no tienen bn van al final por hora) */
+  const conNum=activos.filter(b=>b.bn!=null).sort((a,b)=>a.bn-b.bn);
+  const sinNum=activos.filter(b=>b.bn==null).sort((a,b)=>(a.ts||0)-(b.ts||0));
+  const orden=conNum.concat(sinNum);
+
+  $('packBarrilesCount').textContent=activos.length.toLocaleString(I18N[lang].locale);
+  const grid=$('packBarrilesGrid');
+  grid.innerHTML=orden.map(b=>{
+    const etq = b.bn!=null ? ('#'+b.bn) : '•';
+    return `<span class="pb-chip" title="${fmtTime(new Date(b.ts||Date.now()))}">${etq}</span>`;
+  }).join('');
 }
 
 /* pintar barra de progreso: colocados / total cerrado en encapsulación */
@@ -3044,7 +3100,7 @@ $('desescanOk').addEventListener('click',async()=>{
   packCache[cod]=data;
   if(codigo && cod===codigo.toUpperCase()){ state.barrilesQR=data.barrilesQR; render(); }
 
-  packActual={ cod, batch:packActual?packActual.batch:'—', producto:packActual?packActual.producto:'', count:contarActivos(data.barrilesQR), total:totalCerrado(data), ultimoBarril:(b&&b.bn!=null)?b.bn:null };
+  packActual={ cod, batch:packActual?packActual.batch:'—', producto:packActual?packActual.producto:'', count:contarActivos(data.barrilesQR), total:totalCerrado(data), barriles:(data.barrilesQR||[]).slice(), ultimoBarril:(b&&b.bn!=null)?b.bn:null };
   actualizarPackActual();
 
   packLog.unshift({ batch:packActual.batch, cod, bn:(b&&b.bn!=null)?b.bn:null, ts:Date.now(), removed:true, motivo:motivoFinal });
