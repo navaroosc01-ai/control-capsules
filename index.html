@@ -476,7 +476,7 @@
       </div>
       <div class="pack-prog-bar"><div class="pack-prog-fill" id="packProgFill"></div></div>
       <div class="pack-prog-pct" id="packProgPct"><b>0%</b></div>
-      <div class="pack-prog-none" id="packProgNone" data-i18n="packProgNone">Encapsulation has not closed any day yet — no total to compare.</div>
+      <div class="pack-prog-none" id="packProgNone" data-i18n="packProgNone">No barrel total registered in Encapsulation yet — nothing to compare.</div>
     </div>
 
     <!-- Barriles escaneados de la orden actual -->
@@ -1097,7 +1097,7 @@ const I18N = {
     packSaving:'Saving…', packSaveErr:'✕ Could not save, try again', packSaved:'Saved to cloud',
     packLogEmpty:'No barrels scanned yet.', packCamErr:'Could not access the camera. Check permissions.',
     packConnReady:'Ready', packBarrel:'Barrel',
-    packProgL:'Packed progress', packProgNone:'Encapsulation has not closed any day yet — no total to compare.',
+    packProgL:'Packed progress', packProgNone:'No barrel total registered in Encapsulation yet — nothing to compare.',
     unscanTitle:'Label already scanned', unscanReasonLbl:'Reason for removing it',
     unscanHint:'The barrel stops counting as packed and the reason is recorded.',
     unscanConfirm:'Remove label', unscanSub:(b)=>`Barrel from batch ${b}`,
@@ -1105,6 +1105,7 @@ const I18N = {
     reasonOtherPh:'Describe the reason…', unscanNeedReason:'Choose a reason first.',
     packRemoved:'✓ Label removed', packReuse:'✓ Barrel re-added',
     packAskUnscan:'⚠️ Already scanned — remove it?',
+    packConfirmUnscan:(n)=> n!=null ? `Barrel #${n} was already scanned in Encapsulation.\n\nDo you want to remove it?` : 'This barrel was already scanned in Encapsulation.\n\nDo you want to remove it?',
     months:['January','February','March','April','May','June','July','August','September','October','November','December'],
     weekdays:['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'],
     dateFmt:(wd,da,mo,yr)=>`${wd}, ${mo} ${da}, ${yr}`, locale:'en'
@@ -1241,7 +1242,7 @@ const I18N = {
     packSaving:'Guardando…', packSaveErr:'✕ No se pudo guardar, intenta de nuevo', packSaved:'Guardado en la nube',
     packLogEmpty:'Aún no se han escaneado barriles.', packCamErr:'No se pudo acceder a la cámara. Revisa los permisos.',
     packConnReady:'Listo', packBarrel:'Barril',
-    packProgL:'Avance empacado', packProgNone:'Encapsulación aún no cierra ningún día — no hay total para comparar.',
+    packProgL:'Avance empacado', packProgNone:'Encapsulación aún no registra barriles — no hay total para comparar.',
     unscanTitle:'Label ya escaneado', unscanReasonLbl:'Motivo para retirarlo',
     unscanHint:'El barril deja de contar como colocado y se registra el motivo.',
     unscanConfirm:'Retirar label', unscanSub:(b)=>`Barril del batch ${b}`,
@@ -1249,6 +1250,7 @@ const I18N = {
     reasonOtherPh:'Describe el motivo…', unscanNeedReason:'Elige un motivo primero.',
     packRemoved:'✓ Label retirado', packReuse:'✓ Barril reincorporado',
     packAskUnscan:'⚠️ Ya escaneado — ¿retirarlo?',
+    packConfirmUnscan:(n)=> n!=null ? `El barril #${n} ya fue escaneado en Encapsulación.\n\n¿Deseas retirarlo?` : 'Este barril ya fue escaneado en Encapsulación.\n\n¿Deseas retirarlo?',
     months:['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'],
     weekdays:['domingo','lunes','martes','miércoles','jueves','viernes','sábado'],
     dateFmt:(wd,da,mo,yr)=>`${wd}, ${da} de ${mo} de ${yr}`, locale:'es'
@@ -2926,11 +2928,18 @@ async function procesarBarril(datos){
       packMostrarMsg(t('packReuse'),'ok'); beep(true);
       return;
     }
-    /* está activo: ofrecer des-escanearlo con motivo */
+    /* está activo: pedir confirmación ANTES de des-escanear */
     const batchD=datos.b||(data.orden&&data.orden.lote)||'—';
     packActual={ cod:codFinal, batch:batchD, producto:(data.orden&&data.orden.producto)||'', count:contarActivos(data.barrilesQR), total:totalCerrado(data), barriles:(data.barrilesQR||[]).slice(), ultimoBarril:datos.bn||null };
     actualizarPackActual();
     packMostrarMsg(t('packAskUnscan'),'dup'); beep(false);
+
+    const confirmar = confirm(t('packConfirmUnscan')(datos.bn!=null?datos.bn:null));
+    if(!confirmar){
+      /* el usuario canceló: el barril sigue contando, no se hace nada */
+      packMostrarMsg(t('packReady'),'');
+      return;
+    }
     abrirDesescaneo(codFinal, datos.uid, batchD, data);
     return;
   }
@@ -2961,10 +2970,10 @@ async function procesarBarril(datos){
 /* contar solo barriles activos (no retirados) */
 function contarActivos(arr){ return (arr||[]).filter(b=>b && !b.removed).length; }
 
-/* total de barriles de días CERRADOS en encapsulación (denominador de la barra) */
+/* total acumulado de barriles de la orden (TODOS los días, abiertos o cerrados) — denominador de la barra */
 function totalCerrado(data){
   const dias=(data&&data.dias)||{};
-  return Object.values(dias).reduce((s,d)=>s+(d&&d.closed&&d.barriles?Number(d.barriles):0),0);
+  return Object.values(dias).reduce((s,d)=>s+(d&&d.barriles?Number(d.barriles):0),0);
 }
 
 function actualizarPackActual(){
