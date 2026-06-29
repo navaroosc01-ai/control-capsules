@@ -2679,11 +2679,8 @@ function dibujarLabel(doc, x, y, LW, LH, data){
 
   /* Número de barril a la izquierda del QR, destacado (si está activado el numerado) */
   if(data.printNum && data.barrilNo!=null){
-    doc.setFont('helvetica','bold'); doc.setFontSize(7); doc.setTextColor(90,90,90);
-    doc.text('Barrel No.', qrX-2, qrY+3, {align:'right'});
-    doc.setFontSize(20); doc.setTextColor(0,0,0);
-    doc.text(String(data.barrilNo), qrX-2, qrY+qrSize-1, {align:'right'});
-    doc.setTextColor(0,0,0);
+    doc.setFont('helvetica','bold'); doc.setFontSize(20); doc.setTextColor(0,0,0);
+    doc.text(String(data.barrilNo), qrX-2, qrY+qrSize/2+2, {align:'right'});
   }
 
   /* Cuerpo: rótulos en negritas, valores en normal */
