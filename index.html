@@ -344,6 +344,10 @@
   .pack-current-l{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;font-weight:600;margin-bottom:4px}
   .pack-current-v{font-size:22px;font-weight:800;color:var(--ink);line-height:1.2;word-break:break-word}
   .pack-current-prod{font-size:13px;color:var(--accent);font-weight:600;margin-top:2px;min-height:18px}
+  .pack-last-barrel{display:inline-flex;align-items:center;gap:8px;margin-top:10px;
+    background:var(--panel2);border:1px solid var(--line);border-radius:20px;padding:6px 14px}
+  .pack-last-barrel .plb-l{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;font-weight:600}
+  .pack-last-barrel .plb-n{font-size:18px;font-weight:800;color:var(--accent);font-variant-numeric:tabular-nums}
   .pack-count-big{font-size:15px;color:var(--muted);margin-top:12px}
   .pack-count-big span:first-child{font-size:40px;font-weight:800;color:var(--accent);font-variant-numeric:tabular-nums;display:block;line-height:1.1}
   .pack-msg{text-align:center;font-size:14px;font-weight:600;min-height:24px;margin-bottom:14px;transition:.2s}
@@ -354,6 +358,8 @@
   .pack-log{display:flex;flex-direction:column;gap:6px}
   .pack-log-item{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:9px 12px;font-size:12px;display:flex;justify-content:space-between;align-items:center;gap:8px}
   .pack-log-item .pl-batch{font-weight:700;color:var(--ink)}
+  .pack-log-item .pl-bn{display:inline-block;background:var(--accent);color:#06241c;
+    border-radius:6px;padding:1px 7px;font-size:11px;font-weight:800;font-variant-numeric:tabular-nums;margin-right:2px}
   .pack-log-item .pl-time{color:var(--muted);font-variant-numeric:tabular-nums;font-size:11px}
   .pack-log-empty{text-align:center;color:var(--muted);font-size:12px;padding:14px}
   /* Barra de progreso de packeting */
@@ -454,6 +460,10 @@
       <div class="pack-current-l" data-i18n="packLastBatch">Current batch</div>
       <div class="pack-current-v" id="packBatch">—</div>
       <div class="pack-current-prod" id="packProd"></div>
+      <div class="pack-last-barrel" id="packLastBarrel" style="display:none">
+        <span class="plb-l" data-i18n="packLastBarrel">Last barrel</span>
+        <span class="plb-n" id="packLastBarrelN">—</span>
+      </div>
       <div class="pack-count-big"><span id="packCount">0</span> <span data-i18n="packBarrels">barrels</span></div>
     </div>
     <div class="pack-msg" id="packMsg"></div>
@@ -1076,6 +1086,7 @@ const I18N = {
     packLastBatch:'Current batch', packBarrels:'barrels', packLog:'Recent scans',
     packReady:'Point the camera at a barrel QR code.', packScanning:'Scanning…',
     packAdded:(b)=>`✓ Barrel added to ${b}`, packDup:'⚠️ This barrel was already scanned',
+    packAddedN:(n,b)=>`✓ Barrel #${n} added to ${b}`, packLastBarrel:'Last barrel',
     packBadQR:'✕ Unrecognized QR (not a barrel label)', packNoOrder:'✕ Order not found for this barrel',
     packSaving:'Saving…', packSaveErr:'✕ Could not save, try again', packSaved:'Saved to cloud',
     packLogEmpty:'No barrels scanned yet.', packCamErr:'Could not access the camera. Check permissions.',
@@ -1219,6 +1230,7 @@ const I18N = {
     packLastBatch:'Batch actual', packBarrels:'barriles', packLog:'Escaneos recientes',
     packReady:'Apunta la cámara al código QR de un barril.', packScanning:'Escaneando…',
     packAdded:(b)=>`✓ Barril agregado a ${b}`, packDup:'⚠️ Este barril ya fue escaneado',
+    packAddedN:(n,b)=>`✓ Barril #${n} agregado a ${b}`, packLastBarrel:'Último barril',
     packBadQR:'✕ QR no reconocido (no es un label de barril)', packNoOrder:'✕ No se encontró la orden de este barril',
     packSaving:'Guardando…', packSaveErr:'✕ No se pudo guardar, intenta de nuevo', packSaved:'Guardado en la nube',
     packLogEmpty:'Aún no se han escaneado barriles.', packCamErr:'No se pudo acceder a la cámara. Revisa los permisos.',
@@ -2720,13 +2732,37 @@ function iniciarPacketing(){
 async function packStart(){
   if(typeof Html5Qrcode==='undefined'){ packMostrarMsg(t('packCamErr'),'err'); return; }
   try{
-    packQR=new Html5Qrcode('packReader');
-    await packQR.start(
-      { facingMode:'environment' },
-      { fps:10, qrbox:{width:240,height:240} },
-      onPackScan,
-      ()=>{} /* ignorar fallos de frame */
-    );
+    /* opciones del constructor con protección por si la librería no expone algún global */
+    const opts={ experimentalFeatures:{ useBarCodeDetectorIfSupported:true } };
+    if(typeof Html5QrcodeSupportedFormats!=='undefined'){
+      opts.formatsToSupport=[ Html5QrcodeSupportedFormats.QR_CODE ];
+    }
+    packQR=new Html5Qrcode('packReader', opts);
+
+    /* configuración optimizada para velocidad */
+    const config={
+      fps:25,                         /* más cuadros por segundo = detecta antes */
+      qrbox:{width:200,height:200},   /* recuadro más chico = analiza menos píxeles por cuadro */
+      aspectRatio:1.0,
+      disableFlip:true                /* el QR del barril nunca está espejado: ahorra trabajo */
+    };
+
+    /* preferir la cámara trasera recordada; si no, facingMode environment */
+    const camId=await elegirCamaraPack();
+    const fuente = camId || { facingMode:'environment' };
+
+    try{
+      await packQR.start(fuente, config, onPackScan, ()=>{} /* ignorar fallos de cuadro */);
+    }catch(err){
+      /* la cámara recordada falló (otro equipo, desconectada): olvidarla y reintentar genérico */
+      if(camId){
+        try{ localStorage.removeItem('packCamId'); }catch(_){}
+        await packQR.start({ facingMode:'environment' }, config, onPackScan, ()=>{});
+      }else{
+        throw err;
+      }
+    }
+
     $('packStart').style.display='none';
     $('packStop').style.display='block';
     packMostrarMsg(t('packScanning'),'');
@@ -2734,6 +2770,24 @@ async function packStart(){
     packMostrarMsg(t('packCamErr'),'err');
     packQR=null;
   }
+}
+
+/* elige (y recuerda) la mejor cámara trasera para acelerar el arranque */
+async function elegirCamaraPack(){
+  try{
+    /* si ya guardamos una que funcionó antes, usarla directo */
+    const guardada=localStorage.getItem('packCamId');
+    if(guardada) return guardada;
+
+    const cams=await Html5Qrcode.getCameras();
+    if(!cams || !cams.length) return null;
+
+    /* buscar una trasera por nombre */
+    const tras=cams.find(c=>/back|rear|tras|environment/i.test(c.label||''));
+    const elegida=(tras||cams[cams.length-1]).id;  /* normalmente la última es la trasera */
+    localStorage.setItem('packCamId', elegida);
+    return elegida;
+  }catch(e){ return null; }
 }
 
 async function packStop(){
@@ -2827,10 +2881,10 @@ async function procesarBarril(datos){
       packCache[codFinal]=data;
       if(codigo && codFinal===codigo.toUpperCase()){ state.barrilesQR=data.barrilesQR; render(); }
       const batchR=datos.b||(data.orden&&data.orden.lote)||'—';
-      packActual={ cod:codFinal, batch:batchR, producto:(data.orden&&data.orden.producto)||'', count:contarActivos(data.barrilesQR), total:totalCerrado(data) };
+      packActual={ cod:codFinal, batch:batchR, producto:(data.orden&&data.orden.producto)||'', count:contarActivos(data.barrilesQR), total:totalCerrado(data), ultimoBarril:datos.bn||null };
       actualizarPackActual();
       packMostrarMsg(t('packReuse'),'ok'); beep(true);
-      packLog.unshift({ batch:batchR, cod:codFinal, ts:Date.now() });
+      packLog.unshift({ batch:batchR, cod:codFinal, bn:datos.bn||null, ts:Date.now() });
       if(packLog.length>15) packLog.pop();
       renderPackLog();
       return;
@@ -2845,7 +2899,7 @@ async function procesarBarril(datos){
   }
 
   /* agregar el barril */
-  data.barrilesQR.push({ uid:datos.uid, ts:Date.now(), num:datos.i||null });
+  data.barrilesQR.push({ uid:datos.uid, ts:Date.now(), num:datos.i||null, bn:datos.bn||null });
 
   /* guardar en la nube (independiente de si la orden está abierta o cerrada) */
   const ok=await escribirOrden(codFinal, data);
@@ -2861,12 +2915,12 @@ async function procesarBarril(datos){
 
   const batch=datos.b||(data.orden&&data.orden.lote)||'—';
   const producto=(data.orden&&data.orden.producto)||'';
-  packActual={ cod:codFinal, batch, producto, count:contarActivos(data.barrilesQR), total:totalCerrado(data) };
+  packActual={ cod:codFinal, batch, producto, count:contarActivos(data.barrilesQR), total:totalCerrado(data), ultimoBarril:datos.bn||null };
   actualizarPackActual();
 
-  packMostrarMsg(t('packAdded')(batch),'ok'); beep(true);
+  packMostrarMsg(datos.bn ? t('packAddedN')(datos.bn, batch) : t('packAdded')(batch),'ok'); beep(true);
 
-  packLog.unshift({ batch, cod:codFinal, ts:Date.now() });
+  packLog.unshift({ batch, cod:codFinal, bn:datos.bn||null, ts:Date.now() });
   if(packLog.length>15) packLog.pop();
   renderPackLog();
 }
@@ -2885,6 +2939,15 @@ function actualizarPackActual(){
   $('packBatch').textContent=packActual.batch||'—';
   $('packProd').textContent=packActual.producto||'';
   $('packCount').textContent=packActual.count!=null?packActual.count:0;
+  const lb=$('packLastBarrel');
+  if(lb){
+    if(packActual.ultimoBarril!=null){
+      lb.style.display='inline-flex';
+      $('packLastBarrelN').textContent='#'+packActual.ultimoBarril;
+    }else{
+      lb.style.display='none';
+    }
+  }
   renderPackProgreso();
 }
 
@@ -2919,8 +2982,9 @@ function renderPackLog(){
   cont.innerHTML=packLog.map(it=>{
     const out=it.removed;
     const motivo=out?`<span class="pl-motivo">↩︎ ${nombreMotivo(it.motivo)}</span>`:'';
+    const bn=(it.bn!=null)?`<span class="pl-bn">#${it.bn}</span>`:'';
     return `<div class="pack-log-item${out?' pl-out':''}">
-      <span class="pl-batch">${String(it.batch).replace(/</g,'&lt;')} ${motivo}</span>
+      <span class="pl-batch">${bn} ${String(it.batch).replace(/</g,'&lt;')} ${motivo}</span>
       <span class="pl-time">${fmtTime(new Date(it.ts))}</span>
     </div>`;
   }).join('');
@@ -2980,10 +3044,10 @@ $('desescanOk').addEventListener('click',async()=>{
   packCache[cod]=data;
   if(codigo && cod===codigo.toUpperCase()){ state.barrilesQR=data.barrilesQR; render(); }
 
-  packActual={ cod, batch:packActual?packActual.batch:'—', producto:packActual?packActual.producto:'', count:contarActivos(data.barrilesQR), total:totalCerrado(data) };
+  packActual={ cod, batch:packActual?packActual.batch:'—', producto:packActual?packActual.producto:'', count:contarActivos(data.barrilesQR), total:totalCerrado(data), ultimoBarril:(b&&b.bn!=null)?b.bn:null };
   actualizarPackActual();
 
-  packLog.unshift({ batch:packActual.batch, cod, ts:Date.now(), removed:true, motivo:motivoFinal });
+  packLog.unshift({ batch:packActual.batch, cod, bn:(b&&b.bn!=null)?b.bn:null, ts:Date.now(), removed:true, motivo:motivoFinal });
   if(packLog.length>15) packLog.pop();
   renderPackLog();
 
