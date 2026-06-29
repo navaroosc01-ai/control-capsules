@@ -363,6 +363,9 @@
   .pack-barriles-n b{color:var(--accent);font-size:15px;font-variant-numeric:tabular-nums}
   .pack-barriles-grid{display:flex;flex-wrap:wrap;gap:6px}
   .pb-chip{display:inline-flex;align-items:center;justify-content:center;min-width:38px;height:30px;padding:0 8px;background:var(--panel2);border:1px solid var(--accent);border-radius:7px;font-size:13px;font-weight:700;color:var(--accent);font-variant-numeric:tabular-nums}
+  .pb-removed-head{flex-basis:100%;width:100%;margin-top:10px;font-size:10px;color:var(--danger);text-transform:uppercase;letter-spacing:.5px;font-weight:700}
+  .pb-chip-out{border-color:var(--danger);color:var(--danger);background:rgba(255,107,107,.08);text-decoration:line-through;gap:5px;text-decoration-thickness:1px}
+  .pb-chip-out .pb-mot{font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.2px;text-decoration:none;opacity:.85}
   /* Barra de progreso de packeting */
   .pack-prog{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:16px;margin-bottom:14px}
   .pack-prog-head{display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-bottom:10px}
@@ -484,9 +487,6 @@
       </div>
       <div class="pack-barriles-grid" id="packBarrilesGrid"></div>
     </div>
-
-    <div class="pack-log-title" data-i18n="packLog">Recent scans</div>
-    <div id="packLog" class="pack-log"></div>
   </div>
 
   <!-- Barra de conexión / código de orden -->
@@ -1089,7 +1089,7 @@ const I18N = {
     lblNeedQty:'Enter a valid number of labels.',
     barrelsQR:'Barrels scanned (QR)',
     packTitle:'Packeting — barrel scanning', packStart:'▶️ Start scanner', packStop:'⏹️ Stop scanner',
-    packLastBatch:'Current batch', packBarrels:'barrels', packLog:'Recent scans',
+    packLastBatch:'Current batch', packBarrels:'barrels', packLog:'Recent scans', packRemovedList:'Removed',
     packReady:'Point the camera at a barrel QR code.', packScanning:'Scanning…',
     packAdded:(b)=>`✓ Barrel added to ${b}`, packDup:'⚠️ This barrel was already scanned',
     packAddedN:(n,b)=>`✓ Barrel #${n} added to ${b}`, packScannedList:'Scanned barrels',
@@ -1233,7 +1233,7 @@ const I18N = {
     lblNeedQty:'Ingresa una cantidad válida de labels.',
     barrelsQR:'Barriles leídos (QR)',
     packTitle:'Packeting — escaneo de barriles', packStart:'▶️ Iniciar escáner', packStop:'⏹️ Detener escáner',
-    packLastBatch:'Batch actual', packBarrels:'barriles', packLog:'Escaneos recientes',
+    packLastBatch:'Batch actual', packBarrels:'barriles', packLog:'Escaneos recientes', packRemovedList:'Retirados',
     packReady:'Apunta la cámara al código QR de un barril.', packScanning:'Escaneando…',
     packAdded:(b)=>`✓ Barril agregado a ${b}`, packDup:'⚠️ Este barril ya fue escaneado',
     packAddedN:(n,b)=>`✓ Barril #${n} agregado a ${b}`, packScannedList:'Barriles escaneados',
@@ -2721,7 +2721,7 @@ $('lblGen').addEventListener('click', generarLabelsPDF);
 $('modalLabels').addEventListener('click', e=>{ if(e.target.id==='modalLabels') cerrarLabels(); });
 
 /* ===================== PACKETING: escaneo de barriles ===================== */
-let packQR=null, packBusy=false, packActual=null, packLog=[];
+let packQR=null, packBusy=false, packActual=null;
 let packCache={}; /* cache de órdenes leídas: { CODIGO: data } */
 
 function setPackConn(cls,txt){ const d=$('packDot'); if(!d) return; d.className='dot '+cls; $('packTxt').textContent=txt; }
@@ -2735,7 +2735,7 @@ function iniciarPacketing(){
   document.body.classList.add('packeting');
   setPackConn('ok', t('packConnReady'));
   packMostrarMsg(t('packReady'), '');
-  renderPackLog();
+  renderPackBarriles();
   $('packStart').addEventListener('click', packStart);
   $('packStop').addEventListener('click', packStop);
 }
@@ -2927,9 +2927,6 @@ async function procesarBarril(datos){
       packActual={ cod:codFinal, batch:batchR, producto:(data.orden&&data.orden.producto)||'', count:contarActivos(data.barrilesQR), total:totalCerrado(data), barriles:(data.barrilesQR||[]).slice(), ultimoBarril:datos.bn||null };
       actualizarPackActual();
       packMostrarMsg(t('packReuse'),'ok'); beep(true);
-      packLog.unshift({ batch:batchR, cod:codFinal, bn:datos.bn||null, ts:Date.now() });
-      if(packLog.length>15) packLog.pop();
-      renderPackLog();
       return;
     }
     /* está activo: ofrecer des-escanearlo con motivo */
@@ -2962,10 +2959,6 @@ async function procesarBarril(datos){
   actualizarPackActual();
 
   packMostrarMsg(datos.bn ? t('packAddedN')(datos.bn, batch) : t('packAdded')(batch),'ok'); beep(true);
-
-  packLog.unshift({ batch, cod:codFinal, bn:datos.bn||null, ts:Date.now() });
-  if(packLog.length>15) packLog.pop();
-  renderPackLog();
 }
 
 /* contar solo barriles activos (no retirados) */
@@ -2986,25 +2979,46 @@ function actualizarPackActual(){
   renderPackBarriles();
 }
 
-/* grilla de barriles escaneados de la orden actual (con número y estado) */
+/* grilla de barriles de la orden actual: activos + des-escaneados (tachados con motivo) */
 function renderPackBarriles(){
   const box=$('packBarriles'); if(!box) return;
   const lista=(packActual&&packActual.barriles)||[];
   const activos=lista.filter(b=>b && !b.removed);
-  if(!activos.length){ box.style.display='none'; return; }
+  const retirados=lista.filter(b=>b && b.removed);
+
+  if(!activos.length && !retirados.length){ box.style.display='none'; return; }
   box.style.display='block';
 
-  /* ordenar por número de barril (los que no tienen bn van al final por hora) */
-  const conNum=activos.filter(b=>b.bn!=null).sort((a,b)=>a.bn-b.bn);
-  const sinNum=activos.filter(b=>b.bn==null).sort((a,b)=>(a.ts||0)-(b.ts||0));
-  const orden=conNum.concat(sinNum);
+  /* ordenar por número de barril; los sin número, por hora */
+  const ordenar=arr=>{
+    const con=arr.filter(b=>b.bn!=null).sort((a,b)=>a.bn-b.bn);
+    const sin=arr.filter(b=>b.bn==null).sort((a,b)=>(a.ts||0)-(b.ts||0));
+    return con.concat(sin);
+  };
 
   $('packBarrilesCount').textContent=activos.length.toLocaleString(I18N[lang].locale);
+
   const grid=$('packBarrilesGrid');
-  grid.innerHTML=orden.map(b=>{
+  let html='';
+
+  /* activos */
+  html += ordenar(activos).map(b=>{
     const etq = b.bn!=null ? ('#'+b.bn) : '•';
     return `<span class="pb-chip" title="${fmtTime(new Date(b.ts||Date.now()))}">${etq}</span>`;
   }).join('');
+
+  /* des-escaneados: bloque aparte, tachados, con su motivo */
+  if(retirados.length){
+    html += `<div class="pb-removed-head">${t('packRemovedList')} (${retirados.length})</div>`;
+    html += ordenar(retirados).map(b=>{
+      const etq = b.bn!=null ? ('#'+b.bn) : '•';
+      const mot = b.motivo ? nombreMotivo(b.motivo) : '';
+      const ttl = mot ? mot : t('packRemovedList');
+      return `<span class="pb-chip pb-chip-out" title="${ttl}">${etq}<span class="pb-mot">${mot}</span></span>`;
+    }).join('');
+  }
+
+  grid.innerHTML=html;
 }
 
 /* pintar barra de progreso: colocados / total cerrado en encapsulación */
@@ -3030,20 +3044,6 @@ function renderPackProgreso(){
     fill.style.width='0%'; fill.classList.remove('over');
     pct.classList.remove('over'); pct.innerHTML='<b>—</b>';
   }
-}
-
-function renderPackLog(){
-  const cont=$('packLog'); if(!cont) return;
-  if(!packLog.length){ cont.innerHTML=`<div class="pack-log-empty">${t('packLogEmpty')}</div>`; return; }
-  cont.innerHTML=packLog.map(it=>{
-    const out=it.removed;
-    const motivo=out?`<span class="pl-motivo">↩︎ ${nombreMotivo(it.motivo)}</span>`:'';
-    const bn=(it.bn!=null)?`<span class="pl-bn">#${it.bn}</span>`:'';
-    return `<div class="pack-log-item${out?' pl-out':''}">
-      <span class="pl-batch">${bn} ${String(it.batch).replace(/</g,'&lt;')} ${motivo}</span>
-      <span class="pl-time">${fmtTime(new Date(it.ts))}</span>
-    </div>`;
-  }).join('');
 }
 
 /* etiqueta legible del motivo de des-escaneo */
@@ -3102,10 +3102,6 @@ $('desescanOk').addEventListener('click',async()=>{
 
   packActual={ cod, batch:packActual?packActual.batch:'—', producto:packActual?packActual.producto:'', count:contarActivos(data.barrilesQR), total:totalCerrado(data), barriles:(data.barrilesQR||[]).slice(), ultimoBarril:(b&&b.bn!=null)?b.bn:null };
   actualizarPackActual();
-
-  packLog.unshift({ batch:packActual.batch, cod, bn:(b&&b.bn!=null)?b.bn:null, ts:Date.now(), removed:true, motivo:motivoFinal });
-  if(packLog.length>15) packLog.pop();
-  renderPackLog();
 
   modalDesescan.classList.remove('show'); _desCtx=null;
   packMostrarMsg(t('packRemoved'),'ok'); beep(true);
