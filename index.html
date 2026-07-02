@@ -279,6 +279,24 @@
   .tab-empty{text-align:center;color:var(--muted);padding:34px;font-size:13px;
     background:var(--panel);border:1px dashed var(--line);border-radius:var(--radius)}
 
+  /* ===== Banner de Change Over en tarjeta del tablero ===== */
+  .ord-card.co{border-color:var(--warn);box-shadow:0 0 0 1px rgba(240,180,41,.25)}
+  .oc-co-banner{background:linear-gradient(90deg, rgba(240,180,41,.18), rgba(240,180,41,.06));
+    border:1px solid rgba(240,180,41,.35);border-radius:10px;padding:10px 12px;
+    display:flex;justify-content:space-between;align-items:center;gap:10px;margin:-4px 0 4px}
+  .oc-co-banner .oc-co-left{display:flex;flex-direction:column;gap:2px;min-width:0}
+  .oc-co-banner .oc-co-title{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.6px;color:var(--warn)}
+  .oc-co-banner .oc-co-from{font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .oc-co-banner .oc-co-from b{color:var(--ink)}
+  .oc-co-timer{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    font-size:18px;font-weight:800;font-variant-numeric:tabular-nums;
+    color:var(--warn);background:rgba(0,0,0,.25);border-radius:8px;padding:5px 10px;white-space:nowrap}
+  .oc-co-timer.warn{color:#ff8c42}
+  .oc-co-timer.alert{color:#fff;background:var(--danger);animation:coBlink 1s ease-in-out infinite}
+  @keyframes coBlink{0%,100%{opacity:1;box-shadow:0 0 0 0 rgba(232,93,71,.55)}
+    50%{opacity:.4;box-shadow:0 0 0 6px rgba(232,93,71,0)}}
+  .est-pill.co{background:rgba(240,180,41,.15);color:var(--warn)}
+
   /* ===== Tablero del Manager Mecánico ===== */
   #mecBoard{display:none}
   body.mecanico #mecBoard{display:block}
@@ -591,6 +609,14 @@
       <button class="btn" id="btnRespaldo" data-i18n="backupJson">💾 Backup (JSON)</button>
       <button class="btn danger" id="btnLimpiar" data-i18n="clearOrder">🗑️ Clear order</button>
     </div>
+    <!-- Change over: aparece solo cuando la orden esta CERRADA (todos los dias cerrados)
+         y solo para el operador. Al presionarlo, se abre modal para capturar la nueva orden. -->
+    <div id="changeOverPanel" style="display:none;margin-top:14px;padding:14px;background:var(--panel2);border:1px dashed var(--warn);border-radius:10px">
+      <div style="font-size:13px;color:var(--muted);margin-bottom:10px" data-i18n="changeOverHint">
+        This order is closed. When you are ready to start the next order in this room, press "Change over".
+      </div>
+      <button class="btn warn" id="btnChangeOver" data-i18n="changeOverBtn">🔄 Change over to next order</button>
+    </div>
   </div>
 
 </div>
@@ -808,6 +834,56 @@
   </div>
 </div>
 
+<!-- Modal Change over: capturar los datos de la nueva orden a iniciar en el mismo cuarto -->
+<div class="modal-bg" id="modalChangeOver">
+  <div class="modal" style="max-width:520px">
+    <h3 data-i18n="changeOverTitle">🔄 Start change over</h3>
+    <div class="sub" id="coStamp">—</div>
+    <div class="alert" id="coAlert"></div>
+    <div style="font-size:12px;color:var(--muted);margin-bottom:14px;padding:10px;background:var(--panel2);border-radius:8px">
+      <span data-i18n="changeOverDesc">Fill in the data of the new order. The timer will start when you confirm and will stop when you register the first sample of the new order.</span>
+    </div>
+    <div class="row">
+      <label data-i18n="changeOverNewCode">New order code</label>
+      <input id="coNewCode" type="text" placeholder="Ex. OP-8892" style="text-transform:uppercase">
+      <div class="hint" data-i18n="changeOverNewCodeHint">Must be different from the current order and unique.</div>
+    </div>
+    <div class="grid g2">
+      <div class="row">
+        <label data-i18n="product">Product</label>
+        <input id="coProducto" type="text" data-i18n-ph="productPh" placeholder="Ex. Vitamin C 500mg">
+      </div>
+      <div class="row">
+        <label data-i18n="batch">Batch No.</label>
+        <input id="coLote" type="text" data-i18n-ph="batchPh" placeholder="Ex. B-2026-0142">
+      </div>
+    </div>
+    <div class="row">
+      <label data-i18n="roomLabel">Room:</label>
+      <input id="coCuarto" type="text" data-i18n-ph="roomPh" placeholder="Ex. Room 3">
+      <div class="hint" data-i18n="changeOverRoomHint">Pre-filled with the current room. Change it only if the new order runs in another room.</div>
+    </div>
+    <div class="grid g2">
+      <div class="row">
+        <label data-i18n="minWeight">Min weight per capsule (mg)</label>
+        <input id="coMin" type="number" step="0.001" inputmode="decimal" data-i18n-ph="minPh" placeholder="Ex. 490">
+      </div>
+      <div class="row">
+        <label data-i18n="maxWeight">Max weight per capsule (mg)</label>
+        <input id="coMax" type="number" step="0.001" inputmode="decimal" data-i18n-ph="maxPh" placeholder="Ex. 510">
+      </div>
+    </div>
+    <div class="row">
+      <label data-i18n="targetCaps">Total capsule target</label>
+      <input id="coMeta" type="number" step="1" inputmode="numeric" data-i18n-ph="targetPh" placeholder="Ex. 500000">
+    </div>
+    <div class="actions">
+      <button class="btn" id="coCancel" data-i18n="cancel">Cancel</button>
+      <button class="btn warn" id="coConfirm" data-i18n="changeOverConfirm">🔄 Start change over</button>
+    </div>
+  </div>
+</div>
+
 <div id="printArea"></div>
 
 <script>
@@ -838,6 +914,14 @@ function initSupabase(){
 function normalizar(d){ d=d||{}; d.orden=d.orden||{producto:'',lote:'',orden:'',min:'',max:'',metaCaps:''};
   d.registros=d.registros||[]; d.dias=d.dias||{}; d.firmas=d.firmas||{}; d.incidencias=d.incidencias||[];
   d.barrilesQR=d.barrilesQR||[];
+  /* change over: trazabilidad entre ordenes consecutivas del mismo cuarto */
+  if(d.orden.ordenAnterior===undefined) d.orden.ordenAnterior=null;
+  if(d.orden.ordenSiguiente===undefined) d.orden.ordenSiguiente=null;
+  /* changeOverFrom: presente en la orden NUEVA mientras dura el change over.
+     Estructura: { fromCode, startTs, endTs, durationMs } */
+  if(d.changeOverFrom===undefined) d.changeOverFrom=null;
+  /* changeOverInicio: marca en la orden ANTERIOR de que ya inicio change over hacia otra */
+  if(d.changeOverInicio===undefined) d.changeOverInicio=null;
   /* normalizar estado de incidencias: pend | proc | res (compatibilidad con datos viejos) */
   d.incidencias.forEach(inc=>{
     if(!inc) return;
@@ -874,7 +958,8 @@ async function leerVarias(codigos){
   return out;
 }
 
-/* Leer TODAS las órdenes y devolver los códigos de las que están EN PROCESO */
+/* Leer TODAS las órdenes y devolver los códigos de las que están EN PROCESO
+   o en CHANGE OVER activo (change over sin finalizar = orden nueva que aun no tiene primera muestra) */
 async function codigosEnProceso(){
   if(!CONFIGURED) return [];
   const url = REST + '?select=codigo,data';
@@ -885,9 +970,25 @@ async function codigosEnProceso(){
   arr.forEach(row=>{
     const cod=(row.codigo||'').toUpperCase();
     if(!cod) return;
-    if(estatusOrden(row.data, true)===tEN('inProcess')) out.push(cod);
+    const dd=row.data||{};
+    /* Change over activo: orden nueva con startTs y sin endTs */
+    const coActivo = dd.changeOverFrom && dd.changeOverFrom.startTs && !dd.changeOverFrom.endTs;
+    if(coActivo){ out.push(cod); return; }
+    if(estatusOrden(dd, true)===tEN('inProcess')) out.push(cod);
   });
   return out;
+}
+
+/* Verificar si un codigo de orden ya existe en la nube (para validar change over) */
+async function existeOrden(cod){
+  if(!CONFIGURED || !cod) return false;
+  try{
+    const url = REST + '?codigo=eq.' + encodeURIComponent(cod) + '&select=codigo';
+    const r = await fetch(url, { headers: HEADERS });
+    if(!r.ok) return false;
+    const arr = await r.json();
+    return arr && arr.length>0;
+  }catch(e){ return false; }
 }
 
 /* Abrir orden: carga inicial + arranca sondeo en vivo */
@@ -959,6 +1060,122 @@ async function escribirOrden(cod, data){
   }catch(e){ return false; }
 }
 
+/* ===================== CHANGE OVER ===================== */
+/* Umbral de alerta (2h): pasado este tiempo el cronometro se pone rojo y parpadea */
+const CO_ALERTA_MS = 2*60*60*1000;
+const CO_WARN_MS   = 60*60*1000;  /* naranja despues de 1h */
+
+/* Formatear duracion en mm:ss (si <1h) o HH:mm:ss (si >=1h) */
+function fmtDuracionCO(ms){
+  if(!(ms>=0)) return '00:00';
+  const total=Math.floor(ms/1000);
+  const h=Math.floor(total/3600), m=Math.floor((total%3600)/60), s=total%60;
+  const pad=n=>String(n).padStart(2,'0');
+  if(h>0) return pad(h)+':'+pad(m)+':'+pad(s);
+  return pad(m)+':'+pad(s);
+}
+function claseCronometro(ms){
+  if(ms>=CO_ALERTA_MS) return 'alert';
+  if(ms>=CO_WARN_MS) return 'warn';
+  return '';
+}
+
+/* Abrir modal de change over — solo operador, solo orden cerrada */
+function abrirModalChangeOver(){
+  if(supervisor || mecanico || packeting){ return; }
+  if(!codigo){ return; }
+  /* validar que la orden este cerrada */
+  const dd=state.dias||{};
+  const claves=Object.keys(dd);
+  const todosCerrados = claves.length>0 && claves.every(k=>dd[k] && dd[k].closed);
+  if(!todosCerrados){ return; }
+  /* validar que no se haya iniciado ya un change over */
+  if(state.changeOverInicio && state.changeOverInicio.ts){ return; }
+
+  const m=$('modalChangeOver');
+  const now=new Date();
+  $('coStamp').textContent=`${fmtDate(now)} · ${fmtTime(now)}`;
+  $('coAlert').classList.remove('show'); $('coAlert').textContent='';
+  $('coNewCode').value='';
+  $('coProducto').value='';
+  $('coLote').value='';
+  $('coCuarto').value=(state.orden && state.orden.orden) ? state.orden.orden : '';
+  $('coMin').value='';
+  $('coMax').value='';
+  $('coMeta').value='';
+  m.classList.add('show');
+  setTimeout(()=>$('coNewCode').focus(),50);
+}
+function cerrarModalChangeOver(){ $('modalChangeOver').classList.remove('show'); }
+
+/* Confirmar change over: valida datos, verifica que el codigo no exista,
+   marca la orden actual con changeOverInicio, crea la orden nueva con
+   changeOverFrom apuntando a la actual, y redirige */
+async function confirmarChangeOver(){
+  const al=$('coAlert');
+  al.classList.remove('show'); al.textContent='';
+  const showErr=(msg)=>{ al.textContent=msg; al.classList.add('show'); };
+
+  const nuevoCod=($('coNewCode').value||'').trim().toUpperCase();
+  if(!nuevoCod){ showErr(t('alCoCodeReq')); $('coNewCode').focus(); return; }
+  if(nuevoCod===codigo.toUpperCase()){ showErr(t('alCoCodeSame')); $('coNewCode').focus(); return; }
+
+  const btn=$('coConfirm');
+  btn.disabled=true; const txtOrig=btn.textContent; btn.textContent=t('coStarting');
+
+  /* Verificar unicidad en la nube */
+  let existe=false;
+  try{ existe = await existeOrden(nuevoCod); }
+  catch(e){ showErr(t('alCoCheckErr')); btn.disabled=false; btn.textContent=txtOrig; return; }
+  if(existe){ showErr(t('alCoCodeExists')); btn.disabled=false; btn.textContent=txtOrig; $('coNewCode').focus(); return; }
+
+  const now=Date.now();
+  const codActual=codigo.toUpperCase();
+
+  /* 1) Marcar orden ACTUAL como origen de change over */
+  state.orden.ordenSiguiente = nuevoCod;
+  state.changeOverInicio = { ts: now, nextCode: nuevoCod };
+
+  const okActual = await escribirOrden(codActual, state);
+  if(!okActual){
+    /* revertir en memoria si fallo */
+    state.orden.ordenSiguiente = null;
+    state.changeOverInicio = null;
+    showErr(t('alCoSaveErr')); btn.disabled=false; btn.textContent=txtOrig; return;
+  }
+  lastPush=Date.now();
+
+  /* 2) Crear la orden NUEVA con changeOverFrom apuntando a la actual */
+  const nuevaData = normalizar({
+    orden:{
+      producto:($('coProducto').value||'').trim(),
+      lote:($('coLote').value||'').trim(),
+      orden:($('coCuarto').value||'').trim(),
+      min:($('coMin').value||'').trim(),
+      max:($('coMax').value||'').trim(),
+      metaCaps:($('coMeta').value||'').trim(),
+      ordenAnterior: codActual,
+      ordenSiguiente: null
+    },
+    registros:[], dias:{}, firmas:{}, incidencias:[], barrilesQR:[],
+    changeOverFrom:{ fromCode: codActual, startTs: now, endTs: null, durationMs: null },
+    changeOverInicio: null
+  });
+
+  const okNueva = await escribirOrden(nuevoCod, nuevaData);
+  if(!okNueva){
+    /* la orden actual ya quedo marcada; el operador puede reintentar y
+       la validacion de unicidad usara el nuevo estado */
+    showErr(t('alCoSaveErr')); btn.disabled=false; btn.textContent=txtOrig; return;
+  }
+
+  /* 3) Redirigir a la nueva orden (recarga limpia — evita estado colgado) */
+  btn.textContent=t('coRedirect');
+  const params=new URLSearchParams(location.search);
+  params.set('orden', nuevoCod);
+  location.href = location.pathname + '?' + params.toString();
+}
+
 const $=id=>document.getElementById(id);
 
 /* ===================== INTERNACIONALIZACIÓN (i18n) ===================== */
@@ -1007,6 +1224,22 @@ const I18N = {
     finishOrder:'Finish order', finishDesc:'When finished, a preformatted sheet is generated, ready to print or export.',
     printSheet:'🖨️ Print order sheet', exportCsv:'📥 Export CSV (Excel)', clearOrder:'🗑️ Clear order',
     backupJson:'💾 Backup (JSON)', backupNoOrder:'No order loaded to back up.', backupOk:'Backup downloaded.',
+    /* change over */
+    changeOverHint:'This order is closed. When you are ready to start the next order in this room, press "Change over".',
+    changeOverBtn:'🔄 Change over to next order',
+    changeOverTitle:'🔄 Start change over',
+    changeOverDesc:'Fill in the data of the new order. The timer will start when you confirm and will stop when you register the first sample of the new order.',
+    changeOverNewCode:'New order code', changeOverNewCodeHint:'Must be different from the current order and unique.',
+    changeOverRoomHint:'Pre-filled with the current room. Change it only if the new order runs in another room.',
+    changeOverConfirm:'🔄 Start change over',
+    changeOverBanner:'CHANGE OVER', changeOverFromLabel:'from', changeOverElapsed:'Elapsed',
+    alCoCodeReq:'Enter the code of the new order.',
+    alCoCodeSame:'The new code must be different from the current one.',
+    alCoCodeExists:'That order code already exists in the cloud. Choose a different one.',
+    alCoCheckErr:'Could not verify the new code. Check your connection and try again.',
+    alCoSaveErr:'Could not save the new order. Check your connection and try again.',
+    coStarting:'Creating new order…', coRedirect:'Opening the new order…',
+    coStatusPill:'CHANGE OVER',
     newSample:'New sample', sampleTime:'Sample time', sampleTimeHint:'The system time is used by default. You can change it manually.',
     weight10:'Weight of 10 capsules (g)', weightPerCap:'Weight per capsule (mg)', operatorInitials:'Operator initials', operatorPh:'Ex. JP',
     cancel:'Cancel', saveSample:'Save sample',
@@ -1154,6 +1387,22 @@ const I18N = {
     finishOrder:'Finalizar orden', finishDesc:'Al finalizar se genera la hoja con formato preestablecido lista para imprimir o exportar.',
     printSheet:'🖨️ Imprimir hoja de orden', exportCsv:'📥 Exportar CSV (Excel)', clearOrder:'🗑️ Limpiar orden',
     backupJson:'💾 Respaldo (JSON)', backupNoOrder:'No hay una orden cargada para respaldar.', backupOk:'Respaldo descargado.',
+    /* change over */
+    changeOverHint:'Esta orden está cerrada. Cuando esté listo para iniciar la siguiente orden en este cuarto, presione "Change over".',
+    changeOverBtn:'🔄 Change over a la siguiente orden',
+    changeOverTitle:'🔄 Iniciar change over',
+    changeOverDesc:'Complete los datos de la nueva orden. El cronómetro inicia al confirmar y se detiene cuando registre la primera muestra de la nueva orden.',
+    changeOverNewCode:'Código de la nueva orden', changeOverNewCodeHint:'Debe ser distinto al actual y único.',
+    changeOverRoomHint:'Precargado con el cuarto actual. Cámbielo solo si la nueva orden corre en otro cuarto.',
+    changeOverConfirm:'🔄 Iniciar change over',
+    changeOverBanner:'CHANGE OVER', changeOverFromLabel:'desde', changeOverElapsed:'Transcurrido',
+    alCoCodeReq:'Ingrese el código de la nueva orden.',
+    alCoCodeSame:'El nuevo código debe ser distinto al actual.',
+    alCoCodeExists:'Ese código de orden ya existe en la nube. Elija uno diferente.',
+    alCoCheckErr:'No se pudo verificar el nuevo código. Revise su conexión e intente de nuevo.',
+    alCoSaveErr:'No se pudo guardar la nueva orden. Revise su conexión e intente de nuevo.',
+    coStarting:'Creando la nueva orden…', coRedirect:'Abriendo la nueva orden…',
+    coStatusPill:'CHANGE OVER',
     newSample:'Nueva muestra', sampleTime:'Hora de la toma', sampleTimeHint:'Se toma la hora del sistema por defecto. Puede modificarla manualmente.',
     weight10:'Peso de 10 cápsulas (g)', weightPerCap:'Peso por cápsula (mg)', operatorInitials:'Iniciales del operador', operatorPh:'Ej. JP',
     cancel:'Cancelar', saveSample:'Guardar muestra',
@@ -1385,6 +1634,14 @@ $('mSave').addEventListener('click',()=>{
     base.setHours(hh,mm,ss,0);
     ts=base.toISOString();
   }
+  /* Detectar PRIMERA muestra en una orden con change over activo:
+     cerramos el cronometro guardando endTs y durationMs. */
+  const esPrimeraMuestra = (state.registros.length===0);
+  if(esPrimeraMuestra && state.changeOverFrom && state.changeOverFrom.startTs && !state.changeOverFrom.endTs){
+    const nowMs = Date.now();
+    state.changeOverFrom.endTs = nowMs;
+    state.changeOverFrom.durationMs = nowMs - state.changeOverFrom.startTs;
+  }
   state.registros.push({ ts, diez, prom:diez*100, oper });
   save(); closeModal(); render();
 });
@@ -1490,6 +1747,18 @@ function render(){
     btn.disabled=cerradoHoy;
     $('btnNuevoTxt').textContent = cerradoHoy ? t('dayClosedBtn') : t('registerSample');
     $('diaCerradoAviso').style.display = cerradoHoy ? 'block' : 'none';
+  }
+
+  /* Panel Change over: aparece SOLO para operador, cuando la orden esta CERRADA
+     y aun no se ha iniciado un change over hacia otra orden. */
+  const panelCO=$('changeOverPanel');
+  if(panelCO){
+    const dd=state.dias||{};
+    const claves=Object.keys(dd);
+    const todosCerrados = claves.length>0 && claves.every(k=>dd[k] && dd[k].closed);
+    const yaHizoCO = !!(state.changeOverInicio && state.changeOverInicio.ts);
+    const mostrar = !supervisor && !mecanico && !packeting && todosCerrados && !yaHizoCO && !!codigo;
+    panelCO.style.display = mostrar ? 'block' : 'none';
   }
 
   $('sCount').textContent=recs.length;
@@ -1781,6 +2050,14 @@ $('btnLimpiar').addEventListener('click',()=>{
     state={orden:{producto:'',lote:'',orden:'',min:'',max:'',metaCaps:''},registros:[],dias:{},firmas:{},incidencias:[]};
     escribirNube(); fillOrden(); render();
   }
+});
+
+/* ===== Change Over: botones ===== */
+if($('btnChangeOver')) $('btnChangeOver').addEventListener('click', abrirModalChangeOver);
+if($('coCancel'))      $('coCancel').addEventListener('click', cerrarModalChangeOver);
+if($('coConfirm'))     $('coConfirm').addEventListener('click', confirmarChangeOver);
+if($('modalChangeOver')) $('modalChangeOver').addEventListener('click', e=>{
+  if(e.target===$('modalChangeOver')) cerrarModalChangeOver();
 });
 
 /* ===== Modo recolección (operador) ===== */
@@ -2288,7 +2565,30 @@ async function refrescarTablero(){
       ? `<button class="oc-rm" onclick="quitarTab('${cod}')" title="${t('cancel')}">✕</button>`
       : `<span class="oc-auto" title="${t('autoInProcessHint')}">${t('autoInProcess')}</span>`;
 
-    html+=`<div class="ord-card">
+    /* CHANGE OVER: si esta orden es nueva y tiene changeOverFrom con startTs y sin endTs,
+       mostramos un banner con cronometro en vivo. Cuando llega la primera muestra,
+       el endTs queda guardado y el banner desaparece en el siguiente refresh. */
+    const cof = d.changeOverFrom;
+    const enChangeOver = cof && cof.startTs && !cof.endTs;
+    let coBanner='';
+    let extraCard='';
+    let estPill = `<span class="est-pill ${estCls}">${est}</span>`;
+    if(enChangeOver){
+      extraCard=' co';
+      const elapsed = Date.now() - cof.startTs;
+      const cls = claseCronometro(elapsed);
+      estPill = `<span class="est-pill co">${t('coStatusPill')}</span>`;
+      coBanner = `<div class="oc-co-banner">
+        <div class="oc-co-left">
+          <span class="oc-co-title">🔄 ${t('changeOverBanner')}</span>
+          <span class="oc-co-from">${t('changeOverFromLabel')} <b>${String(cof.fromCode||'—').replace(/</g,'&lt;')}</b></span>
+        </div>
+        <div class="oc-co-timer ${cls}" data-costart="${cof.startTs}">${fmtDuracionCO(elapsed)}</div>
+      </div>`;
+    }
+
+    html+=`<div class="ord-card${extraCard}">
+      ${coBanner}
       <div class="oc-top">
         <div>
           <div class="oc-room-big">${o.orden?o.orden:'—'}</div>
@@ -2297,7 +2597,7 @@ async function refrescarTablero(){
         </div>
         <div style="display:flex;align-items:center;gap:8px">
           ${incChip}
-          <span class="est-pill ${estCls}">${est}</span>
+          ${estPill}
           ${btnQuitar}
         </div>
       </div>
@@ -2306,6 +2606,28 @@ async function refrescarTablero(){
     </div>`;
   });
   grid.innerHTML=html;
+}
+
+/* Cronometros en vivo del tablero: actualiza cada segundo SOLO los timers de change over.
+   No refresca el tablero completo (eso ocurre cada 5s por refrescarTablero). */
+let coTimerInterval=null;
+function iniciarCronometrosCO(){
+  if(coTimerInterval) return;
+  coTimerInterval = setInterval(()=>{
+    const nodos=document.querySelectorAll('.oc-co-timer[data-costart]');
+    if(!nodos.length) return;
+    const now=Date.now();
+    nodos.forEach(n=>{
+      const start=parseInt(n.getAttribute('data-costart'),10);
+      if(!(start>0)) return;
+      const elapsed = now - start;
+      const nuevaCls = claseCronometro(elapsed);
+      /* actualizar clase sin quitar otras (aquí solo tenemos las de estado del cronometro) */
+      n.classList.remove('warn','alert');
+      if(nuevaCls) n.classList.add(nuevaCls);
+      n.textContent = fmtDuracionCO(elapsed);
+    });
+  }, 1000);
 }
 
 /* ===== Reporte de producción del día (todas las órdenes abiertas) ===== */
@@ -2395,6 +2717,8 @@ function iniciarTablero(){
   if(tabTimer) clearInterval(tabTimer);
   tabTimer=setInterval(refrescarTablero, 5000);
   refrescarTablero();
+  /* cronometros vivos de change over (independiente del refresh de 5s) */
+  iniciarCronometrosCO();
 }
 /* =============================================================== */
 
