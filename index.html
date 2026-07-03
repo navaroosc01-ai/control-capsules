@@ -297,6 +297,29 @@
     50%{opacity:.4;box-shadow:0 0 0 6px rgba(232,93,71,0)}}
   .est-pill.co{background:rgba(240,180,41,.15);color:var(--warn)}
 
+  /* ===== Registro de paros ===== */
+  .paro-box{display:flex;flex-direction:column;gap:14px}
+  .paro-empty{color:var(--muted);font-size:13px;padding:14px;background:var(--panel2);border-radius:10px;text-align:center}
+  .paro-total{background:linear-gradient(90deg, rgba(232,93,71,.15), rgba(232,93,71,.03));
+    border:1px solid rgba(232,93,71,.35);border-radius:10px;padding:14px 16px;
+    display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+  .paro-total .pt-label{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.6px;color:var(--danger)}
+  .paro-total .pt-value{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    font-size:22px;font-weight:800;font-variant-numeric:tabular-nums;color:var(--danger)}
+  .paro-total .pt-inprog{font-size:11px;color:var(--warn);font-weight:700;text-transform:uppercase;letter-spacing:.4px;
+    background:rgba(240,180,41,.15);padding:3px 8px;border-radius:12px}
+  .paro-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px}
+  .paro-row{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:12px 14px;
+    display:flex;flex-direction:column;gap:4px}
+  .paro-row .pr-tag{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;color:var(--muted)}
+  .paro-row .pr-name{font-size:13px;font-weight:600;color:var(--ink);display:flex;align-items:center;gap:6px}
+  .paro-row .pr-time{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    font-size:16px;font-weight:700;font-variant-numeric:tabular-nums;color:var(--accent);margin-top:2px}
+  .paro-row .pr-count{font-size:11px;color:var(--muted);margin-top:2px}
+  .paro-row.zero{opacity:.4}
+  .paro-row.zero .pr-time{color:var(--muted)}
+  .paro-row.co .pr-time{color:var(--warn)}
+
   /* ===== Tablero del Manager Mecánico ===== */
   #mecBoard{display:none}
   body.mecanico #mecBoard{display:block}
@@ -594,6 +617,16 @@
       <button class="btn warn" id="btnIncidente" data-i18n="incidentReport">⚠️ Report issue</button>
     </h2>
     <div id="incidentList"><div class="empty" data-i18n="noIncidents">No issues reported.</div></div>
+  </div>
+
+  <!-- Registro de paros: totales acumulados de change over + mantenimiento -->
+  <div class="card">
+    <h2><span class="ic">⏱️</span> <span data-i18n="downtimeTitle">Downtime log</span></h2>
+    <p style="font-size:13px;color:var(--muted);margin-bottom:14px" data-i18n="downtimeSub">
+      Accumulated downtime for this order (change over on startup + resolved maintenance incidents).</p>
+    <div id="paroBox" class="paro-box">
+      <div class="paro-empty" data-i18n="downtimeEmpty">No downtime recorded yet.</div>
+    </div>
   </div>
 
   <!-- Acciones finales -->
@@ -1080,6 +1113,117 @@ function claseCronometro(ms){
   return '';
 }
 
+/* ===================== REGISTRO DE PAROS ===================== */
+/* Calcula el resumen de paros de una orden.
+   Fuentes:
+   - Change over de ENTRADA: state.changeOverFrom (durationMs si finalizo; si no, "en curso")
+   - Mantenimiento: state.incidencias con estado 'res' (resTs - ts = tiempo total del paro,
+     desde reporte hasta resolucion). Se agrupan por inc.tipo.
+   Devuelve: { totalMs, coMs, coEnCurso, mantMs, porTipo, incResueltas, incAbiertas }
+*/
+function resumenParos(st){
+  st=st||{};
+  const out={
+    coMs:0, coEnCurso:false,
+    mantMs:0,
+    porTipo:{ mech:{ms:0,count:0}, elec:{ms:0,count:0}, sw:{ms:0,count:0}, mat:{ms:0,count:0}, other:{ms:0,count:0} },
+    incResueltas:0, incAbiertas:0,
+    totalMs:0
+  };
+  /* Change over de entrada */
+  const cof=st.changeOverFrom;
+  if(cof && cof.startTs){
+    if(cof.endTs && cof.durationMs>=0){
+      out.coMs = cof.durationMs;
+    } else {
+      /* en curso: contamos el tiempo transcurrido hasta ahora pero marcamos "en curso" */
+      out.coMs = Math.max(0, Date.now() - cof.startTs);
+      out.coEnCurso = true;
+    }
+  }
+  /* Mantenimiento: cada incidencia resuelta cuenta como paro completo */
+  const incs = Array.isArray(st.incidencias) ? st.incidencias : [];
+  incs.forEach(inc=>{
+    if(!inc) return;
+    const estado = inc.estado || (inc.resuelto?'res':'pend');
+    if(estado==='res' && inc.ts && inc.resTs){
+      const dur = new Date(inc.resTs) - new Date(inc.ts);
+      if(dur>=0){
+        out.mantMs += dur;
+        out.incResueltas++;
+        const tipo = ['mech','elec','sw','mat','other'].indexOf(inc.tipo)>=0 ? inc.tipo : 'other';
+        out.porTipo[tipo].ms += dur;
+        out.porTipo[tipo].count++;
+      }
+    } else if(estado!=='res'){
+      out.incAbiertas++;
+    }
+  });
+  out.totalMs = out.coMs + out.mantMs;
+  return out;
+}
+
+/* Nombre localizado de cada tipo de falla (usa las mismas claves i18n que el modal de reportar) */
+function nombreTipoParo(tipo){
+  const map={ mech:'ftMechanical', elec:'ftElectrical', sw:'ftSoftware', mat:'ftMaterial', other:'ftOther' };
+  return t(map[tipo]||'ftOther');
+}
+
+/* Renderiza la card "Registro de paros" con base en state actual */
+function renderParos(){
+  const box=$('paroBox');
+  if(!box) return;
+  const r=resumenParos(state);
+  const sinParos = (r.totalMs===0 && !r.coEnCurso && r.incAbiertas===0);
+  if(sinParos){
+    box.innerHTML=`<div class="paro-empty">${t('downtimeEmpty')}</div>`;
+    return;
+  }
+  /* Total */
+  const totalTxt = fmtDuracionCO(r.totalMs);
+  const inProg = r.coEnCurso
+    ? `<span class="pt-inprog">🔄 ${t('downtimeCoRunning')}</span>` : '';
+  const incAbTxt = r.incAbiertas>0
+    ? `<span class="pt-inprog" style="background:rgba(232,93,71,.15);color:var(--danger)">⚠️ ${r.incAbiertas} ${t('downtimeIncOpen')}</span>` : '';
+
+  let html=`<div class="paro-total">
+    <div>
+      <div class="pt-label">${t('downtimeTotal')}</div>
+      <div class="pt-value">${totalTxt}</div>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end">${inProg}${incAbTxt}</div>
+  </div>`;
+
+  /* Desglose */
+  html+=`<div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-top:4px">${t('downtimeBreakdown')}</div>`;
+  html+=`<div class="paro-list">`;
+
+  /* Fila: Change over */
+  const coCls = r.coMs===0 ? 'zero' : 'co';
+  const coDetalle = r.coEnCurso
+    ? `<span style="color:var(--warn)">${t('downtimeInProgress')}</span>`
+    : (r.coMs>0 ? t('downtimeCoIn') : '—');
+  html+=`<div class="paro-row ${coCls}">
+    <span class="pr-tag">${t('downtimeChangeOver')}</span>
+    <span class="pr-time">${fmtDuracionCO(r.coMs)}</span>
+    <span class="pr-count">${coDetalle}</span>
+  </div>`;
+
+  /* Filas por tipo de mantenimiento */
+  ['mech','elec','sw','mat','other'].forEach(tp=>{
+    const info=r.porTipo[tp];
+    const cls = info.ms===0 ? 'zero' : '';
+    html+=`<div class="paro-row ${cls}">
+      <span class="pr-tag">🛠️ ${nombreTipoParo(tp)}</span>
+      <span class="pr-time">${fmtDuracionCO(info.ms)}</span>
+      <span class="pr-count">${info.count} ${t('downtimeIncidents')}</span>
+    </div>`;
+  });
+
+  html+=`</div>`;
+  box.innerHTML=html;
+}
+
 /* Abrir modal de change over — solo operador, solo orden cerrada */
 function abrirModalChangeOver(){
   if(supervisor || mecanico || packeting){ return; }
@@ -1240,6 +1384,19 @@ const I18N = {
     alCoSaveErr:'Could not save the new order. Check your connection and try again.',
     coStarting:'Creating new order…', coRedirect:'Opening the new order…',
     coStatusPill:'CHANGE OVER',
+    /* Registro de paros */
+    downtimeTitle:'Downtime log',
+    downtimeSub:'Accumulated downtime for this order (change over on startup + resolved maintenance incidents).',
+    downtimeEmpty:'No downtime recorded yet.',
+    downtimeTotal:'Total downtime',
+    downtimeInProgress:'In progress',
+    downtimeChangeOver:'🔄 Change over',
+    downtimeMaintenance:'🛠️ Maintenance',
+    downtimeBreakdown:'Breakdown by type',
+    downtimeIncidents:'incident(s)',
+    downtimeCoIn:'from previous order',
+    downtimeCoRunning:'change over in progress',
+    downtimeIncOpen:'unresolved incident(s)',
     newSample:'New sample', sampleTime:'Sample time', sampleTimeHint:'The system time is used by default. You can change it manually.',
     weight10:'Weight of 10 capsules (g)', weightPerCap:'Weight per capsule (mg)', operatorInitials:'Operator initials', operatorPh:'Ex. JP',
     cancel:'Cancel', saveSample:'Save sample',
@@ -1403,6 +1560,19 @@ const I18N = {
     alCoSaveErr:'No se pudo guardar la nueva orden. Revise su conexión e intente de nuevo.',
     coStarting:'Creando la nueva orden…', coRedirect:'Abriendo la nueva orden…',
     coStatusPill:'CHANGE OVER',
+    /* Registro de paros */
+    downtimeTitle:'Registro de paros',
+    downtimeSub:'Tiempo acumulado de paro de esta orden (change over de arranque + incidencias de mantenimiento resueltas).',
+    downtimeEmpty:'Sin paros registrados todavía.',
+    downtimeTotal:'Tiempo total de paro',
+    downtimeInProgress:'En curso',
+    downtimeChangeOver:'🔄 Change over',
+    downtimeMaintenance:'🛠️ Mantenimiento',
+    downtimeBreakdown:'Desglose por tipo',
+    downtimeIncidents:'incidencia(s)',
+    downtimeCoIn:'desde la orden anterior',
+    downtimeCoRunning:'change over en curso',
+    downtimeIncOpen:'incidencia(s) sin resolver',
     newSample:'Nueva muestra', sampleTime:'Hora de la toma', sampleTimeHint:'Se toma la hora del sistema por defecto. Puede modificarla manualmente.',
     weight10:'Peso de 10 cápsulas (g)', weightPerCap:'Peso por cápsula (mg)', operatorInitials:'Iniciales del operador', operatorPh:'Ej. JP',
     cancel:'Cancelar', saveSample:'Guardar muestra',
@@ -1724,6 +1894,7 @@ function reopenDay(key){
 /* ---- render ---- */
 function render(){
   renderIncidencias();
+  renderParos();
   const {min,max}=getRange();
   const meta=parseFloat(state.orden.metaCaps);
   const recs=state.registros.slice().sort((a,b)=>new Date(a.ts)-new Date(b.ts));
