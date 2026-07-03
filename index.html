@@ -320,6 +320,40 @@
   .paro-row.zero .pr-time{color:var(--muted)}
   .paro-row.co .pr-time{color:var(--warn)}
 
+  /* ===== Rol QC: dashboard de ordenes activas + escaner ===== */
+  #qcBoard{display:none}
+  body.qc #qcBoard{display:block}
+  /* modo dashboard: ocultar interfaz de orden individual */
+  body.qc.qc-dash .connbar,
+  body.qc.qc-dash .sup-banner,
+  body.qc.qc-dash .wrap > .card,
+  body.qc.qc-dash .big-btn,
+  body.qc.qc-dash #diaCerradoAviso{display:none !important}
+  /* modo orden: mostrar interfaz normal + ocultar dashboard/pack */
+  body.qc.qc-orden #qcBoard{display:none}
+  body.qc.qc-orden #packBoard{display:none !important}
+  /* modo packeting dentro de QC: mostrar packBoard, ocultar dashboard */
+  body.qc.qc-pack #qcBoard{display:none}
+  body.qc.qc-pack #packBoard{display:block;max-width:560px;margin:0 auto}
+  body.qc.qc-pack .connbar,
+  body.qc.qc-pack .sup-banner,
+  body.qc.qc-pack .wrap > .card,
+  body.qc.qc-pack .big-btn,
+  body.qc.qc-pack #diaCerradoAviso{display:none !important}
+  /* barra superior "volver" cuando QC entra a una orden */
+  .qc-topbar{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);
+    padding:10px 14px;margin-bottom:14px;display:none;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+  body.qc.qc-orden .qc-topbar{display:flex}
+  .qc-topbar .qc-tag{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;
+    color:var(--panel);background:var(--accent);border-radius:20px;padding:4px 10px}
+  /* toolbar del dashboard */
+  .qc-toolbar-actions{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:10px}
+  /* boton de accion dentro de tarjeta QC */
+  .qc-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px}
+  .qc-actions .btn{flex:1;min-width:0;padding:8px 10px;font-size:12px}
+  .qc-search-hit{margin-top:10px;padding:10px 12px;background:var(--panel2);border:1px dashed var(--line);
+    border-radius:8px;font-size:12px;color:var(--muted)}
+
   /* ===== Tablero del Manager Mecánico ===== */
   #mecBoard{display:none}
   body.mecanico #mecBoard{display:block}
@@ -528,6 +562,35 @@
       </div>
       <div class="pack-barriles-grid" id="packBarrilesGrid"></div>
     </div>
+  </div>
+
+  <!-- ===== Rol QC: dashboard de ordenes activas (?rol=qc) ===== -->
+  <div id="qcBoard">
+    <div class="tab-toolbar">
+      <label data-i18n="qcLabel">Search any order by code (optional)</label>
+      <div class="tab-input-row">
+        <div class="field">
+          <input id="qcSearchCode" placeholder="Ex. OP-8891" data-i18n-ph="orderCodePh" style="text-transform:uppercase">
+        </div>
+        <button class="btn primary" id="qcSearchBtn" data-i18n="qcSearchBtn">🔍 Open</button>
+        <div class="dot" id="qcDot"><i></i><span id="qcTxt">—</span></div>
+      </div>
+      <div class="qc-toolbar-actions">
+        <button class="btn" id="qcGoPack" data-i18n="qcGoPack">📦 Packeting scanner</button>
+        <span class="hint" style="margin:0" data-i18n="qcHint">The active orders (in process or change over) are shown automatically. The board refreshes every 5 seconds.</span>
+      </div>
+    </div>
+    <div id="qcGrid" class="tab-grid"></div>
+    <div id="qcEmpty" class="tab-empty" data-i18n="qcEmpty">No active orders right now.</div>
+  </div>
+
+  <!-- Barra superior QC dentro de una orden: boton para volver al dashboard -->
+  <div class="qc-topbar" id="qcTopbar">
+    <div style="display:flex;align-items:center;gap:10px">
+      <span class="qc-tag" data-i18n="qcTag">🧪 QC</span>
+      <span style="font-size:12px;color:var(--muted)" data-i18n="qcInOrderHint">You are editing an active order as QC. Changes are saved to the cloud.</span>
+    </div>
+    <button class="btn" id="qcBack" data-i18n="qcBack">← Back to active orders</button>
   </div>
 
   <!-- Barra de conexión / código de orden -->
@@ -929,6 +992,7 @@ const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZ
 let state={ orden:{producto:'',lote:'',orden:'',min:'',max:'',metaCaps:''}, registros:[], dias:{}, firmas:{}, incidencias:[] };
 let codigo='', supervisor=false, mecanico=false, lastPush=0, pollTimer=null;
 let packeting=false;
+let qc=false;
 let diasExpandidos={}; /* { dayKey: true } días con todas las muestras desplegadas */
 const TOPE_MUESTRAS=3; /* muestras visibles por día antes de "Ver todas" */
 const RECOLECCION_LS_KEY='qc_recoleccion'; /* recuerda el modo recolección en el dispositivo */
@@ -1397,6 +1461,20 @@ const I18N = {
     downtimeCoIn:'from previous order',
     downtimeCoRunning:'change over in progress',
     downtimeIncOpen:'unresolved incident(s)',
+    /* QC (Quality Control) role */
+    qcTag:'🧪 QC',
+    qcLabel:'Search any order by code (optional)',
+    qcSearchBtn:'🔍 Open',
+    qcGoPack:'📦 Packeting scanner',
+    qcHint:'The active orders (in process or change over) are shown automatically. The board refreshes every 5 seconds.',
+    qcEmpty:'No active orders right now.',
+    qcInOrderHint:'You are editing an active order as QC. Changes are saved to the cloud.',
+    qcBack:'← Back to active orders',
+    qcNoDayYet:'No sample today yet',
+    qcFirstSample:'➕ Take first sample',
+    qcSampleBtn:'➕ New sample',
+    qcAdvanceBtn:'📈 Update progress',
+    qcDayClosedTitle:'Day already closed — cannot register more samples.',
     newSample:'New sample', sampleTime:'Sample time', sampleTimeHint:'The system time is used by default. You can change it manually.',
     weight10:'Weight of 10 capsules (g)', weightPerCap:'Weight per capsule (mg)', operatorInitials:'Operator initials', operatorPh:'Ex. JP',
     cancel:'Cancel', saveSample:'Save sample',
@@ -1573,6 +1651,20 @@ const I18N = {
     downtimeCoIn:'desde la orden anterior',
     downtimeCoRunning:'change over en curso',
     downtimeIncOpen:'incidencia(s) sin resolver',
+    /* Rol QC (Control de Calidad) */
+    qcTag:'🧪 QC',
+    qcLabel:'Buscar una orden por código (opcional)',
+    qcSearchBtn:'🔍 Abrir',
+    qcGoPack:'📦 Escáner packeting',
+    qcHint:'Las órdenes activas (en proceso o change over) se muestran automáticamente. El tablero se refresca cada 5 segundos.',
+    qcEmpty:'No hay órdenes activas en este momento.',
+    qcInOrderHint:'Está editando una orden activa como QC. Los cambios se guardan en la nube.',
+    qcBack:'← Volver a órdenes activas',
+    qcNoDayYet:'Sin muestras hoy todavía',
+    qcFirstSample:'➕ Tomar primera muestra',
+    qcSampleBtn:'➕ Nueva muestra',
+    qcAdvanceBtn:'📈 Actualizar avance',
+    qcDayClosedTitle:'Día ya cerrado — no se pueden registrar más muestras.',
     newSample:'Nueva muestra', sampleTime:'Hora de la toma', sampleTimeHint:'Se toma la hora del sistema por defecto. Puede modificarla manualmente.',
     weight10:'Peso de 10 cápsulas (g)', weightPerCap:'Peso por cápsula (mg)', operatorInitials:'Iniciales del operador', operatorPh:'Ej. JP',
     cancel:'Cancelar', saveSample:'Guardar muestra',
@@ -1928,7 +2020,8 @@ function render(){
     const claves=Object.keys(dd);
     const todosCerrados = claves.length>0 && claves.every(k=>dd[k] && dd[k].closed);
     const yaHizoCO = !!(state.changeOverInicio && state.changeOverInicio.ts);
-    const mostrar = !supervisor && !mecanico && !packeting && todosCerrados && !yaHizoCO && !!codigo;
+    /* Change over lo inicia solo el operador de la orden, no QC ni supervisor ni otros roles */
+    const mostrar = !supervisor && !mecanico && !packeting && !qc && todosCerrados && !yaHizoCO && !!codigo;
     panelCO.style.display = mostrar ? 'block' : 'none';
   }
 
@@ -2604,6 +2697,7 @@ $('fCodigo').addEventListener('input',()=>{
 const CLAVE_SUPERVISOR = "super2026";
 const CLAVE_MECANICO = "mecanico2026";
 const CLAVE_PACKETING = "packeting2026";
+const CLAVE_QC = "qc2026";
 /* ============================================================== */
 
 /* Enlaces:
@@ -3029,8 +3123,177 @@ function iniciarMecanico(){
 }
 /* =============================================================== */
 
+/* ===================== ROL QC ===================== */
+let qcOn=false, qcTimer=null, qcDatos={};
+
+function setQcConn(cls,txt){ const d=$('qcDot'); if(!d) return; d.className='dot '+cls; $('qcTxt').textContent=txt; }
+
+async function refrescarQC(){
+  if(!qcOn) return;
+  setQcConn('sync', t('updating'));
+  try{
+    /* Detectar solo ordenes activas (en proceso o change over) */
+    const codigos = await codigosEnProceso();
+    /* Cargar los datos completos de cada una */
+    qcDatos = {};
+    for(const cod of codigos){
+      try{
+        const url = REST + '?codigo=eq.' + encodeURIComponent(cod) + '&select=data';
+        const r = await fetch(url,{ headers: HEADERS });
+        if(r.ok){
+          const arr = await r.json();
+          if(arr && arr[0]) qcDatos[cod] = normalizar(arr[0].data);
+        }
+      }catch(e){}
+    }
+    renderQC(codigos);
+    setQcConn('ok', t('updatedAt')+' '+fmtTime(new Date()));
+    /* arrancar cronometros vivos si hay change over en el grid */
+    iniciarCronometrosCO();
+  }catch(e){
+    setQcConn('bad', t('updateErr'));
+  }
+}
+
+function renderQC(codigos){
+  const grid=$('qcGrid'), empty=$('qcEmpty');
+  if(!codigos || !codigos.length){
+    grid.innerHTML=''; empty.style.display='block'; return;
+  }
+  empty.style.display='none';
+  const loc=I18N[lang].locale;
+  let html='';
+  codigos.forEach(cod=>{
+    const d = qcDatos[cod];
+    if(!d){
+      html+=`<div class="ord-card miss">
+        <div class="oc-top"><div><div class="oc-code">${cod}</div>
+          <div class="oc-prod">${t('orderNotFound')}</div></div></div></div>`;
+      return;
+    }
+    const o=d.orden||{}, dias=d.dias||{}, meta=parseFloat(o.metaCaps);
+    const prodTotal=prodAcumulada(dias, true);
+
+    /* progreso */
+    let prog='';
+    if(meta>0){
+      const pctReal=prodTotal/meta*100, pct=Math.min(100,pctReal);
+      const color = pctReal<=30?'var(--danger)':(pctReal<=70?'var(--warn)':'var(--accent)');
+      prog=`<div>
+        <div class="oc-prog-top"><span>${t('prodProgressLabel')}</span><b>${pct.toFixed(1)}%</b></div>
+        <div class="bar"><span style="width:${pct}%;background:${color}"></span></div>
+        <div class="oc-prog-top" style="margin-top:5px;margin-bottom:0">
+          <span style="color:var(--muted)">${prodTotal.toLocaleString(loc)} / ${meta.toLocaleString(loc)} ${t('capsUnit')}</span></div>
+      </div>`;
+    } else {
+      prog=`<div class="oc-meta">${t('accumLabel')} <b>${prodTotal.toLocaleString(loc)}</b> ${t('capsUnit')} ${t('noTargetSet')}</div>`;
+    }
+
+    /* banner change over si aplica */
+    const cof=d.changeOverFrom;
+    const enChangeOver = cof && cof.startTs && !cof.endTs;
+    let coBanner='', extraCard='';
+    if(enChangeOver){
+      extraCard=' co';
+      const elapsed = Date.now() - cof.startTs;
+      const cls = claseCronometro(elapsed);
+      coBanner = `<div class="oc-co-banner">
+        <div class="oc-co-left">
+          <span class="oc-co-title">🔄 ${t('changeOverBanner')}</span>
+          <span class="oc-co-from">${t('changeOverFromLabel')} <b>${String(cof.fromCode||'—').replace(/</g,'&lt;')}</b></span>
+        </div>
+        <div class="oc-co-timer ${cls}" data-costart="${cof.startTs}">${fmtDuracionCO(elapsed)}</div>
+      </div>`;
+    }
+
+    /* estado hoy */
+    const hoyKey=dayKey(new Date());
+    const dHoy=dias[hoyKey];
+    const diaAbierto = dHoy && !dHoy.closed;
+    const diaCerrado = dHoy && dHoy.closed;
+    const sinDia = !dHoy;
+
+    let hoyTxt='';
+    if(diaAbierto && dHoy.avance!=null) hoyTxt=`<b>${Number(dHoy.avance).toLocaleString(loc)}</b> ${t('capsUnit')}`;
+    else if(diaCerrado) hoyTxt=`<b>${Number(dHoy.prod||0).toLocaleString(loc)}</b> ${t('capsUnit')} <span style="color:var(--accent)">${t('dayClosedTag')}</span>`;
+    else hoyTxt=`<span style="color:var(--muted)">${t('qcNoDayYet')}</span>`;
+
+    /* acciones QC */
+    const abrirUrl = `?rol=qc&clave=${CLAVE_QC}&orden=${encodeURIComponent(cod)}`;
+    const btnMuestra = sinDia
+      ? `<button class="btn primary" onclick="location.href='${abrirUrl}&qc-first=1'">${t('qcFirstSample')}</button>`
+      : (diaCerrado
+          ? `<button class="btn" disabled title="${t('qcDayClosedTitle')}">🔒 ${t('qcSampleBtn')}</button>`
+          : `<button class="btn primary" onclick="location.href='${abrirUrl}'">${t('qcSampleBtn')}</button>`);
+    const btnAvance = (diaAbierto)
+      ? `<button class="btn" onclick="location.href='${abrirUrl}&qc-avance=1'">${t('qcAdvanceBtn')}</button>`
+      : '';
+
+    html+=`<div class="ord-card${extraCard}">
+      ${coBanner}
+      <div class="oc-top">
+        <div>
+          <div class="oc-room-big">${o.orden?String(o.orden).replace(/</g,'&lt;'):'—'}</div>
+          <div class="oc-prod">${o.producto?String(o.producto).replace(/</g,'&lt;'):'—'}</div>
+          <div class="oc-code">${cod}</div>
+        </div>
+      </div>
+      ${prog}
+      <div class="oc-avance">${t('todayPartial')} ${hoyTxt}</div>
+      <div class="qc-actions">${btnMuestra}${btnAvance}</div>
+    </div>`;
+  });
+  grid.innerHTML=html;
+}
+
+function iniciarQC(){
+  qcOn=true;
+  /* boton buscar codigo manual: abre esa orden */
+  $('qcSearchBtn').addEventListener('click',()=>{
+    const c=($('qcSearchCode').value||'').trim().toUpperCase();
+    if(!c) return;
+    location.href = `?rol=qc&clave=${CLAVE_QC}&orden=${encodeURIComponent(c)}`;
+  });
+  $('qcSearchCode').addEventListener('keydown',e=>{
+    if(e.key==='Enter'){ $('qcSearchBtn').click(); }
+  });
+  /* boton ir al escaner packeting */
+  $('qcGoPack').addEventListener('click',()=>{
+    location.href = `?rol=qc&clave=${CLAVE_QC}&pack=1`;
+  });
+  /* boton volver al dashboard (dentro de una orden) */
+  if($('qcBack')){
+    $('qcBack').addEventListener('click',()=>{
+      location.href = `?rol=qc&clave=${CLAVE_QC}`;
+    });
+  }
+  if(qcTimer) clearInterval(qcTimer);
+  qcTimer=setInterval(refrescarQC, 5000);
+  refrescarQC();
+}
+
+/* Cuando QC entra a una orden con un flag de accion inmediata,
+   abrir el modal correspondiente automaticamente despues del render inicial */
+function ejecutarAccionQC(){
+  if(!qc) return;
+  const p=new URLSearchParams(location.search);
+  const first = p.get('qc-first');
+  const avance = p.get('qc-avance');
+  if(first==='1'){
+    /* abrir modal de nueva muestra directamente */
+    setTimeout(()=>{ if(typeof openModal==='function') openModal(); }, 400);
+  } else if(avance==='1'){
+    /* abrir modal parcial para el dia actual */
+    setTimeout(()=>{
+      const k=dayKey(new Date());
+      if(typeof openParcialModal==='function') openParcialModal(k);
+    }, 400);
+  }
+}
+/* =============================================================== */
+
 function refrescarRol(){
-  $('rolTag').textContent = mecanico ? t('mechTag') : (supervisor ? t('supervisor') : t('operator'));
+  $('rolTag').textContent = qc ? t('qcTag') : (mecanico ? t('mechTag') : (supervisor ? t('supervisor') : t('operator')));
 }
 
 function applyURL(){
@@ -3041,13 +3304,37 @@ function applyURL(){
     mecanico=true;
     $('rolTag').classList.add('mec');
     refrescarRol();
-    return { cod:null, tablero:false, mecanico:true, packeting:false };
+    return { cod:null, tablero:false, mecanico:true, packeting:false, qc:false };
   }
   if(rol==='packeting' && clave===CLAVE_PACKETING){
     packeting=true;
     $('rolTag').classList.add('pack');
     $('rolTag').textContent=t('packTitle');
-    return { cod:null, tablero:false, mecanico:false, packeting:true };
+    return { cod:null, tablero:false, mecanico:false, packeting:true, qc:false };
+  }
+  /* Rol QC: puede ver dashboard, editar cualquier orden como operador, y usar el escaner packeting.
+     Con ?rol=qc&clave=qc2026 => dashboard
+     Con ?rol=qc&clave=qc2026&orden=CODIGO => entra a esa orden (modo operador con topbar de regreso)
+     Con ?rol=qc&clave=qc2026&pack=1 => modo escaner packeting */
+  if(rol==='qc' && clave===CLAVE_QC){
+    qc=true;
+    document.body.classList.add('qc');
+    $('rolTag').classList.add('sup');
+    $('rolTag').textContent=t('qcTag');
+    refrescarRol();
+    const pack1 = (p.get('pack')==='1');
+    if(pack1){
+      packeting=true;  /* reutilizamos toda la logica de packeting cuando QC va al escaner */
+      document.body.classList.add('qc-pack');
+      return { cod:null, tablero:false, mecanico:false, packeting:true, qc:true, qcPack:true };
+    }
+    if(cod){
+      $('fCodigo').value=cod.toUpperCase();
+      document.body.classList.add('qc-orden');
+      return { cod, tablero:false, mecanico:false, packeting:false, qc:true, qcPack:false };
+    }
+    document.body.classList.add('qc-dash');
+    return { cod:null, tablero:false, mecanico:false, packeting:false, qc:true, qcPack:false };
   }
   if(rol==='sup' && clave===CLAVE_SUPERVISOR){
     supervisor=true;
@@ -3065,7 +3352,7 @@ function applyURL(){
   if(cod){ $('fCodigo').value=cod.toUpperCase(); }
   /* modo tablero: solo para supervisor y con ?tablero=1 */
   const quiereTablero = supervisor && (p.get('tablero')==='1' || p.get('tablero')==='si');
-  return { cod, tablero: quiereTablero, mecanico:false, packeting:false };
+  return { cod, tablero: quiereTablero, mecanico:false, packeting:false, qc:false };
 }
 
 $('btnRefrescar').addEventListener('click',()=>{ if(codigo) abrirOrden(codigo); });
@@ -3631,7 +3918,19 @@ aplicarIdioma();
 initSupabase();
 const initInfo=applyURL();
 fillOrden(); render();
-if(initInfo.mecanico){
+if(initInfo.qc){
+  /* QC: siempre iniciamos el dashboard (registra listeners, timers).
+     Si ademas hay orden en URL, cargamos esa orden como operador.
+     Si hay pack=1, iniciamos packeting. */
+  iniciarQC();
+  if(initInfo.qcPack){
+    iniciarPacketing();
+  } else if(initInfo.cod){
+    abrirOrden(initInfo.cod);
+    /* al terminar de cargar, ejecutar accion automatica si viene en la URL */
+    setTimeout(ejecutarAccionQC, 800);
+  }
+} else if(initInfo.mecanico){
   iniciarMecanico();
 } else if(initInfo.packeting){
   iniciarPacketing();
