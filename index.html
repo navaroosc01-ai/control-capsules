@@ -528,7 +528,10 @@
   <div id="packBoard">
     <div class="pack-head">
       <h2><span class="ic">📦</span> <span data-i18n="packTitle">Packeting — barrel scanning</span></h2>
-      <div class="dot" id="packDot"><i></i><span id="packTxt">—</span></div>
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+        <button class="btn" id="qcBackFromPack" data-i18n="qcBack" style="display:none">← Back to active orders</button>
+        <div class="dot" id="packDot"><i></i><span id="packTxt">—</span></div>
+      </div>
     </div>
     <div class="pack-scan-wrap">
       <div id="packReader"></div>
@@ -3264,6 +3267,13 @@ function iniciarQC(){
   /* boton volver al dashboard (dentro de una orden) */
   if($('qcBack')){
     $('qcBack').addEventListener('click',()=>{
+      location.href = `?rol=qc&clave=${CLAVE_QC}`;
+    });
+  }
+  /* boton volver al dashboard desde el escaner de packeting */
+  if($('qcBackFromPack')){
+    $('qcBackFromPack').style.display='inline-flex';
+    $('qcBackFromPack').addEventListener('click',()=>{
       location.href = `?rol=qc&clave=${CLAVE_QC}`;
     });
   }
