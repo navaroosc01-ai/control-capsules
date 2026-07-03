@@ -1495,6 +1495,7 @@ const I18N = {
     qcInOrderHint:'You are editing an active order as QC. Changes are saved to the cloud.',
     qcBack:'← Back to active orders',
     qcNoDayYet:'No production update today yet',
+    qcSamplesTakenNoAdvance:'Samples taken · no update yet',
     qcFirstSample:'Take first sample',
     qcUpdateProd:'Update production',
     qcDayClosedTitle:'Day already closed — production cannot be updated.',
@@ -1686,6 +1687,7 @@ const I18N = {
     qcInOrderHint:'Está editando una orden activa como QC. Los cambios se guardan en la nube.',
     qcBack:'← Volver a órdenes activas',
     qcNoDayYet:'Sin actualización de producción hoy',
+    qcSamplesTakenNoAdvance:'Muestras tomadas · sin actualizar',
     qcFirstSample:'Tomar primera muestra',
     qcUpdateProd:'Actualizar producción',
     qcDayClosedTitle:'Día ya cerrado — no se puede actualizar producción.',
@@ -3275,15 +3277,23 @@ function renderQC(codigos){
       </div>`;
     }
 
-    /* estado hoy */
+    /* estado hoy — deteccion robusta:
+       - si hay muestras registradas hoy en state.registros: dia abierto (retrocompat)
+       - si state.dias[hoyKey] existe: usar su estado (abierto/cerrado)
+       - si nada: sin dia */
     const hoyKey=dayKey(new Date());
     const dHoy=dias[hoyKey];
-    const diaAbierto = dHoy && !dHoy.closed;
-    const diaCerrado = dHoy && dHoy.closed;
-    const sinDia = !dHoy;
+    const hayMuestrasHoy = (d.registros||[]).some(r=>{
+      if(!r || !r.ts) return false;
+      try { return dayKey(new Date(r.ts)) === hoyKey; } catch(e){ return false; }
+    });
+    const diaCerrado = !!(dHoy && dHoy.closed);
+    const diaAbierto = !diaCerrado && (!!(dHoy && !dHoy.closed) || hayMuestrasHoy);
+    const sinDia = !diaCerrado && !diaAbierto;
 
     let hoyTxt='';
-    if(diaAbierto && dHoy.avance!=null) hoyTxt=`<b>${Number(dHoy.avance).toLocaleString(loc)}</b> ${t('capsUnit')}`;
+    if(diaAbierto && dHoy && dHoy.avance!=null) hoyTxt=`<b>${Number(dHoy.avance).toLocaleString(loc)}</b> ${t('capsUnit')}`;
+    else if(diaAbierto && hayMuestrasHoy) hoyTxt=`<span style="color:var(--muted)">${t('qcSamplesTakenNoAdvance')}</span>`;
     else if(diaCerrado) hoyTxt=`<b>${Number(dHoy.prod||0).toLocaleString(loc)}</b> ${t('capsUnit')} <span style="color:var(--accent)">${t('dayClosedTag')}</span>`;
     else hoyTxt=`<span style="color:var(--muted)">${t('qcNoDayYet')}</span>`;
 
@@ -3368,23 +3378,47 @@ function volverDashboardQC(msg){
 }
 function ejecutarAccionQC(){
   if(!qc) return;
+  qcAccionRapida = true;
+  document.body.classList.add('qc-quick');
+  /* Decidir automaticamente qué modal abrir segun el estado REAL del dia y las muestras.
+     Los flags de URL (qc-first, qc-avance) sirven de pista pero el estado gana. */
   const p=new URLSearchParams(location.search);
-  const first = p.get('qc-first');
-  const avance = p.get('qc-avance');
-  if(first==='1' || avance==='1'){
-    qcAccionRapida = true;
-    document.body.classList.add('qc-quick');
-  }
-  if(first==='1'){
-    /* abrir modal de nueva muestra (esto abrira el dia al guardarla) */
-    setTimeout(()=>{ if(typeof openModal==='function') openModal(); }, 400);
-  } else if(avance==='1'){
-    /* abrir modal parcial (avance) para el dia actual */
+  const flagFirst = (p.get('qc-first')==='1');
+  const flagAvance = (p.get('qc-avance')==='1');
+
+  const hoyKey = dayKey(new Date());
+  const dHoy = state.dias[hoyKey];
+  const hayMuestrasHoy = (state.registros||[]).some(r=>{
+    if(!r || !r.ts) return false;
+    try { return dayKey(new Date(r.ts)) === hoyKey; } catch(e){ return false; }
+  });
+  const diaCerrado = !!(dHoy && dHoy.closed);
+  const diaAbierto = !diaCerrado && (!!(dHoy && !dHoy.closed) || hayMuestrasHoy);
+
+  /* Si el dia esta cerrado: no se puede hacer nada, avisar y volver */
+  if(diaCerrado){
     setTimeout(()=>{
+      alert(t('qcDayClosedTitle'));
+      volverDashboardQC();
+    }, 300);
+    return;
+  }
+
+  /* Decision:
+     - Si el dia ya esta abierto (o hay muestras hoy) => actualizar produccion
+     - Si no hay muestras ni dia => primera muestra (para abrir dia)
+     Los flags de URL solo mandan cuando el estado no lo decide (raro) */
+  const abrirAvance = diaAbierto || (flagAvance && !flagFirst);
+  const abrirMuestra = !abrirAvance;
+
+  setTimeout(()=>{
+    if(abrirMuestra){
+      if(typeof openModal==='function') openModal();
+    } else {
       const k=dayKey(new Date());
       if(typeof openParcialModal==='function') openParcialModal(k);
-    }, 400);
-  }
+    }
+  }, 300);
 }
 /* =============================================================== */
 
@@ -3427,6 +3461,9 @@ function applyURL(){
     if(cod){
       $('fCodigo').value=cod.toUpperCase();
       document.body.classList.add('qc-orden');
+      /* QC siempre entra a una orden en modo "accion rapida": solo se ve el modal,
+         no la interfaz completa. Aplicamos la clase desde ya para evitar el flash */
+      document.body.classList.add('qc-quick');
       return { cod, tablero:false, mecanico:false, packeting:false, qc:true, qcPack:false };
     }
     document.body.classList.add('qc-dash');
