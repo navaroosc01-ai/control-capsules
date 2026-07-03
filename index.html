@@ -353,6 +353,21 @@
   .qc-actions .btn{flex:1;min-width:0;padding:8px 10px;font-size:12px}
   .qc-search-hit{margin-top:10px;padding:10px 12px;background:var(--panel2);border:1px dashed var(--line);
     border-radius:8px;font-size:12px;color:var(--muted)}
+  /* modo QC accion rapida: solo se ve el modal; la interfaz de orden queda oculta */
+  body.qc.qc-quick .wrap > .card,
+  body.qc.qc-quick .qc-topbar,
+  body.qc.qc-quick .connbar,
+  body.qc.qc-quick .sup-banner,
+  body.qc.qc-quick .big-btn,
+  body.qc.qc-quick #diaCerradoAviso{display:none !important}
+  body.qc.qc-quick #qcQuickLoading{display:flex}
+  /* pequeña card centrada mientras se carga o cuando el modal no esta activo */
+  .qc-quick-loading{display:none;flex-direction:column;align-items:center;justify-content:center;
+    min-height:200px;gap:10px;padding:30px;background:var(--panel);border:1px solid var(--line);
+    border-radius:var(--radius);color:var(--muted);font-size:13px}
+  .qc-quick-loading .qc-quick-spin{width:32px;height:32px;border:3px solid var(--line);
+    border-top-color:var(--accent);border-radius:50%;animation:qcSpin 0.9s linear infinite}
+  @keyframes qcSpin{to{transform:rotate(360deg)}}
 
   /* ===== Tablero del Manager Mecánico ===== */
   #mecBoard{display:none}
@@ -594,6 +609,12 @@
       <span style="font-size:12px;color:var(--muted)" data-i18n="qcInOrderHint">You are editing an active order as QC. Changes are saved to the cloud.</span>
     </div>
     <button class="btn" id="qcBack" data-i18n="qcBack">← Back to active orders</button>
+  </div>
+
+  <!-- Loading card visible solo en modo QC accion rapida mientras carga la orden -->
+  <div id="qcQuickLoading" class="qc-quick-loading">
+    <div class="qc-quick-spin"></div>
+    <div data-i18n="qcQuickLoading">Loading order…</div>
   </div>
 
   <!-- Barra de conexión / código de orden -->
@@ -1478,6 +1499,8 @@ const I18N = {
     qcSampleBtn:'➕ New sample',
     qcAdvanceBtn:'📈 Update progress',
     qcDayClosedTitle:'Day already closed — cannot register more samples.',
+    qcQuickLoading:'Loading order…',
+    qcSaved:'Saved. Returning to active orders…',
     newSample:'New sample', sampleTime:'Sample time', sampleTimeHint:'The system time is used by default. You can change it manually.',
     weight10:'Weight of 10 capsules (g)', weightPerCap:'Weight per capsule (mg)', operatorInitials:'Operator initials', operatorPh:'Ex. JP',
     cancel:'Cancel', saveSample:'Save sample',
@@ -1668,6 +1691,8 @@ const I18N = {
     qcSampleBtn:'➕ Nueva muestra',
     qcAdvanceBtn:'📈 Actualizar avance',
     qcDayClosedTitle:'Día ya cerrado — no se pueden registrar más muestras.',
+    qcQuickLoading:'Cargando orden…',
+    qcSaved:'Guardado. Volviendo a órdenes activas…',
     newSample:'Nueva muestra', sampleTime:'Hora de la toma', sampleTimeHint:'Se toma la hora del sistema por defecto. Puede modificarla manualmente.',
     weight10:'Peso de 10 cápsulas (g)', weightPerCap:'Peso por cápsula (mg)', operatorInitials:'Iniciales del operador', operatorPh:'Ej. JP',
     cancel:'Cancelar', saveSample:'Guardar muestra',
@@ -1863,8 +1888,16 @@ function openModal(){
 }
 function closeModal(){ modal.classList.remove('show'); }
 $('btnNuevo').addEventListener('click',openModal);
-$('mCancel').addEventListener('click',closeModal);
-modal.addEventListener('click',e=>{if(e.target===modal)closeModal();});
+$('mCancel').addEventListener('click',()=>{
+  closeModal();
+  if(qcAccionRapida){ volverDashboardQC(t('qcBack').replace('← ','')); }
+});
+modal.addEventListener('click',e=>{
+  if(e.target===modal){
+    closeModal();
+    if(qcAccionRapida){ volverDashboardQC(t('qcBack').replace('← ','')); }
+  }
+});
 
 $('mDiez').addEventListener('input',()=>{
   const v=parseFloat($('mDiez').value);
@@ -1909,6 +1942,8 @@ $('mSave').addEventListener('click',()=>{
   }
   state.registros.push({ ts, diez, prom:diez*100, oper });
   save(); closeModal(); render();
+  /* Si es QC en modo accion rapida: mostrar confirmacion breve y volver al dashboard */
+  if(qcAccionRapida){ volverDashboardQC(); }
 });
 
 
@@ -1929,8 +1964,16 @@ function openParcialModal(key){
   $('pAlert').classList.remove('show'); $('pAlert').textContent='';
   modalParcial.classList.add('show'); setTimeout(()=>$('pProd').focus(),50);
 }
-$('pCancel').addEventListener('click',()=>modalParcial.classList.remove('show'));
-modalParcial.addEventListener('click',e=>{if(e.target===modalParcial)modalParcial.classList.remove('show');});
+$('pCancel').addEventListener('click',()=>{
+  modalParcial.classList.remove('show');
+  if(qcAccionRapida){ volverDashboardQC(t('qcBack').replace('← ','')); }
+});
+modalParcial.addEventListener('click',e=>{
+  if(e.target===modalParcial){
+    modalParcial.classList.remove('show');
+    if(qcAccionRapida){ volverDashboardQC(t('qcBack').replace('← ','')); }
+  }
+});
 $('pSave').addEventListener('click',()=>{
   const key=modalParcial.dataset.key;
   const info=state.dias[key];
@@ -1943,6 +1986,8 @@ $('pSave').addEventListener('click',()=>{
   dia.avance = prod;              /* sustituye el valor anterior */
   dia.avanceTs = new Date().toISOString();
   save(); modalParcial.classList.remove('show'); render();
+  /* Si es QC en modo accion rapida: mostrar confirmacion breve y volver al dashboard */
+  if(qcAccionRapida){ volverDashboardQC(); }
 });
 
 /* ---- modal cerrar día ---- */
@@ -3283,12 +3328,29 @@ function iniciarQC(){
 }
 
 /* Cuando QC entra a una orden con un flag de accion inmediata,
-   abrir el modal correspondiente automaticamente despues del render inicial */
+   abrir el modal correspondiente automaticamente despues del render inicial.
+   En este modo se oculta la interfaz completa (solo se ve el modal) y al
+   guardar o cancelar se regresa automaticamente al dashboard QC. */
+let qcAccionRapida = false;
+function volverDashboardQC(msg){
+  /* mostrar un breve mensaje de confirmacion antes de volver */
+  const load=$('qcQuickLoading');
+  if(load){
+    load.innerHTML = `<div style="font-size:15px;color:var(--accent);font-weight:600">✓ ${msg||t('qcSaved')}</div>`;
+  }
+  setTimeout(()=>{
+    location.href = `?rol=qc&clave=${CLAVE_QC}`;
+  }, 700);
+}
 function ejecutarAccionQC(){
   if(!qc) return;
   const p=new URLSearchParams(location.search);
   const first = p.get('qc-first');
   const avance = p.get('qc-avance');
+  if(first==='1' || avance==='1'){
+    qcAccionRapida = true;
+    document.body.classList.add('qc-quick');
+  }
   if(first==='1'){
     /* abrir modal de nueva muestra directamente */
     setTimeout(()=>{ if(typeof openModal==='function') openModal(); }, 400);
