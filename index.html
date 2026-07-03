@@ -1494,11 +1494,10 @@ const I18N = {
     qcEmpty:'No active orders right now.',
     qcInOrderHint:'You are editing an active order as QC. Changes are saved to the cloud.',
     qcBack:'← Back to active orders',
-    qcNoDayYet:'No sample today yet',
-    qcFirstSample:'➕ Take first sample',
-    qcSampleBtn:'➕ New sample',
-    qcAdvanceBtn:'📈 Update progress',
-    qcDayClosedTitle:'Day already closed — cannot register more samples.',
+    qcNoDayYet:'No production update today yet',
+    qcFirstSample:'Take first sample',
+    qcUpdateProd:'Update production',
+    qcDayClosedTitle:'Day already closed — production cannot be updated.',
     qcQuickLoading:'Loading order…',
     qcSaved:'Saved. Returning to active orders…',
     newSample:'New sample', sampleTime:'Sample time', sampleTimeHint:'The system time is used by default. You can change it manually.',
@@ -1686,11 +1685,10 @@ const I18N = {
     qcEmpty:'No hay órdenes activas en este momento.',
     qcInOrderHint:'Está editando una orden activa como QC. Los cambios se guardan en la nube.',
     qcBack:'← Volver a órdenes activas',
-    qcNoDayYet:'Sin muestras hoy todavía',
-    qcFirstSample:'➕ Tomar primera muestra',
-    qcSampleBtn:'➕ Nueva muestra',
-    qcAdvanceBtn:'📈 Actualizar avance',
-    qcDayClosedTitle:'Día ya cerrado — no se pueden registrar más muestras.',
+    qcNoDayYet:'Sin actualización de producción hoy',
+    qcFirstSample:'Tomar primera muestra',
+    qcUpdateProd:'Actualizar producción',
+    qcDayClosedTitle:'Día ya cerrado — no se puede actualizar producción.',
     qcQuickLoading:'Cargando orden…',
     qcSaved:'Guardado. Volviendo a órdenes activas…',
     newSample:'Nueva muestra', sampleTime:'Hora de la toma', sampleTimeHint:'Se toma la hora del sistema por defecto. Puede modificarla manualmente.',
@@ -1941,9 +1939,24 @@ $('mSave').addEventListener('click',()=>{
     state.changeOverFrom.durationMs = nowMs - state.changeOverFrom.startTs;
   }
   state.registros.push({ ts, diez, prom:diez*100, oper });
-  save(); closeModal(); render();
-  /* Si es QC en modo accion rapida: mostrar confirmacion breve y volver al dashboard */
-  if(qcAccionRapida){ volverDashboardQC(); }
+  /* Abrir el dia implicitamente si aun no existe (asi el dashboard QC lo detecta como "dia abierto"
+     despues del guardado y muestra el boton "Actualizar produccion" en vez de "Tomar primera muestra"). */
+  const hoyK = dayKey(new Date());
+  if(!state.dias[hoyK]){
+    state.dias[hoyK] = { closed:false, prod:null, barriles:null, parcial:null, avance:null };
+  }
+  /* Si es QC en modo accion rapida: guardar SINCRONO y esperar confirmacion
+     antes de redirigir, para que el dashboard cargue con datos frescos */
+  if(qcAccionRapida){
+    closeModal(); render();
+    (async ()=>{
+      if(saveTimer){ clearTimeout(saveTimer); saveTimer=null; }
+      await pushNow();
+      volverDashboardQC();
+    })();
+  } else {
+    save(); closeModal(); render();
+  }
 });
 
 
@@ -1985,9 +1998,17 @@ $('pSave').addEventListener('click',()=>{
   const dia=getDia(key);
   dia.avance = prod;              /* sustituye el valor anterior */
   dia.avanceTs = new Date().toISOString();
-  save(); modalParcial.classList.remove('show'); render();
-  /* Si es QC en modo accion rapida: mostrar confirmacion breve y volver al dashboard */
-  if(qcAccionRapida){ volverDashboardQC(); }
+  /* QC modo accion rapida: esperar guardado antes de redirigir */
+  if(qcAccionRapida){
+    modalParcial.classList.remove('show'); render();
+    (async ()=>{
+      if(saveTimer){ clearTimeout(saveTimer); saveTimer=null; }
+      await pushNow();
+      volverDashboardQC();
+    })();
+  } else {
+    save(); modalParcial.classList.remove('show'); render();
+  }
 });
 
 /* ---- modal cerrar día ---- */
@@ -3266,16 +3287,19 @@ function renderQC(codigos){
     else if(diaCerrado) hoyTxt=`<b>${Number(dHoy.prod||0).toLocaleString(loc)}</b> ${t('capsUnit')} <span style="color:var(--accent)">${t('dayClosedTag')}</span>`;
     else hoyTxt=`<span style="color:var(--muted)">${t('qcNoDayYet')}</span>`;
 
-    /* acciones QC */
+    /* Boton segun estado del dia:
+       - Sin dia: tomar la primera muestra (esto abre el dia automaticamente al guardarla)
+       - Dia abierto: actualizar produccion
+       - Dia cerrado: deshabilitado */
     const abrirUrl = `?rol=qc&clave=${CLAVE_QC}&orden=${encodeURIComponent(cod)}`;
-    const btnMuestra = sinDia
-      ? `<button class="btn primary" onclick="location.href='${abrirUrl}&qc-first=1'">${t('qcFirstSample')}</button>`
-      : (diaCerrado
-          ? `<button class="btn" disabled title="${t('qcDayClosedTitle')}">🔒 ${t('qcSampleBtn')}</button>`
-          : `<button class="btn primary" onclick="location.href='${abrirUrl}'">${t('qcSampleBtn')}</button>`);
-    const btnAvance = (diaAbierto)
-      ? `<button class="btn" onclick="location.href='${abrirUrl}&qc-avance=1'">${t('qcAdvanceBtn')}</button>`
-      : '';
+    let btnAccion;
+    if(diaCerrado){
+      btnAccion = `<button class="btn" disabled title="${t('qcDayClosedTitle')}">🔒 ${t('qcUpdateProd')}</button>`;
+    } else if(sinDia){
+      btnAccion = `<button class="btn primary" onclick="location.href='${abrirUrl}&qc-first=1'">➕ ${t('qcFirstSample')}</button>`;
+    } else {
+      btnAccion = `<button class="btn primary" onclick="location.href='${abrirUrl}&qc-avance=1'">📈 ${t('qcUpdateProd')}</button>`;
+    }
 
     html+=`<div class="ord-card${extraCard}">
       ${coBanner}
@@ -3288,7 +3312,7 @@ function renderQC(codigos){
       </div>
       ${prog}
       <div class="oc-avance">${t('todayPartial')} ${hoyTxt}</div>
-      <div class="qc-actions">${btnMuestra}${btnAvance}</div>
+      <div class="qc-actions">${btnAccion}</div>
     </div>`;
   });
   grid.innerHTML=html;
@@ -3352,10 +3376,10 @@ function ejecutarAccionQC(){
     document.body.classList.add('qc-quick');
   }
   if(first==='1'){
-    /* abrir modal de nueva muestra directamente */
+    /* abrir modal de nueva muestra (esto abrira el dia al guardarla) */
     setTimeout(()=>{ if(typeof openModal==='function') openModal(); }, 400);
   } else if(avance==='1'){
-    /* abrir modal parcial para el dia actual */
+    /* abrir modal parcial (avance) para el dia actual */
     setTimeout(()=>{
       const k=dayKey(new Date());
       if(typeof openParcialModal==='function') openParcialModal(k);
