@@ -178,6 +178,7 @@
   .rol-tag.sup{background:rgba(240,180,41,.15);color:var(--warn)}
   body.supervisor .big-btn,
   body.supervisor #btnIncidente,
+  body.supervisor #btnMP,
   body.supervisor .day-head .mini-btn:not(.btn-reabrir):not(.inc-resolve),
   body.supervisor .parcial-row .px,
   body.supervisor tbody .btn.danger{display:none !important}
@@ -706,6 +707,17 @@
     <div id="incidentList"><div class="empty" data-i18n="noIncidents">No issues reported.</div></div>
   </div>
 
+  <!-- Materia prima: reportes de material que requirió reproceso -->
+  <div class="card">
+    <h2 style="justify-content:space-between">
+      <span style="display:flex;align-items:center;gap:8px"><span class="ic">📦</span> <span data-i18n="mpTitle">Raw material — reprocess</span></span>
+      <button class="btn warn" id="btnMP" data-i18n="mpReport">📦 Report material</button>
+    </h2>
+    <p style="font-size:12px;color:var(--muted);margin-bottom:10px" data-i18n="mpSub">
+      When the machine stops because material must be sent back for reprocessing (sieving, sorting, etc.), report it here. The stop counts in the downtime log until the material is reincorporated.</p>
+    <div id="mpList"><div class="empty" data-i18n="mpEmpty">No raw material reports.</div></div>
+  </div>
+
   <!-- Registro de paros: totales acumulados de change over + mantenimiento -->
   <div class="card">
     <h2><span class="ic">⏱️</span> <span data-i18n="downtimeTitle">Downtime log</span></h2>
@@ -1004,6 +1016,32 @@
   </div>
 </div>
 
+<!-- Modal reporte de materia prima -->
+<div class="modal-bg" id="modalMP">
+  <div class="modal" style="max-width:460px">
+    <h3 data-i18n="mpModalTitle">📦 Report raw material for reprocess</h3>
+    <div class="sub" id="mpStamp">—</div>
+    <div class="alert" id="mpAlert"></div>
+    <div class="row">
+      <label data-i18n="mpDesc">What happened with the material</label>
+      <input id="mpDescIn" maxlength="180" placeholder="Ex. Powder too coarse, sent back for sieving" data-i18n-ph="mpDescPh">
+    </div>
+    <div class="row">
+      <label data-i18n="mpLote">Material batch (optional)</label>
+      <input id="mpLoteIn" maxlength="40" placeholder="Ex. MP-2026-088" data-i18n-ph="mpLotePh">
+    </div>
+    <div class="row">
+      <label data-i18n="incidentReporter">Reported by (initials)</label>
+      <input id="mpOperIn" maxlength="5" placeholder="Ex. JP" data-i18n-ph="operatorPh" style="text-transform:uppercase">
+    </div>
+    <div class="hint" data-i18n="mpHint">The stop timer starts now and stops when the material is marked as reincorporated.</div>
+    <div class="actions">
+      <button class="btn" id="mpCancel" data-i18n="cancel">Cancel</button>
+      <button class="btn warn" id="mpSave" data-i18n="mpSaveBtn">📦 Report material</button>
+    </div>
+  </div>
+</div>
+
 <div id="printArea"></div>
 
 <script>
@@ -1035,6 +1073,9 @@ function initSupabase(){
 function normalizar(d){ d=d||{}; d.orden=d.orden||{producto:'',lote:'',orden:'',min:'',max:'',metaCaps:''};
   d.registros=d.registros||[]; d.dias=d.dias||{}; d.firmas=d.firmas||{}; d.incidencias=d.incidencias||[];
   d.barrilesQR=d.barrilesQR||[];
+  /* materia prima: reportes de material que requirio reproceso (tamizar, sortear, etc.)
+     estados: pend (reportada) -> proc (en reproceso) -> res (reincorporada) */
+  d.materiaPrima=d.materiaPrima||[];
   /* change over: trazabilidad entre ordenes consecutivas del mismo cuarto */
   if(d.orden.ordenAnterior===undefined) d.orden.ordenAnterior=null;
   if(d.orden.ordenSiguiente===undefined) d.orden.ordenSiguiente=null;
@@ -1216,6 +1257,10 @@ function resumenParos(st){
     mantMs:0,
     porTipo:{ mech:{ms:0,count:0}, elec:{ms:0,count:0}, sw:{ms:0,count:0}, mat:{ms:0,count:0}, other:{ms:0,count:0} },
     incResueltas:0, incAbiertas:0,
+    /* barriles devueltos por QC (tiempo entre retiro y reincorporacion) */
+    barMs:0, barCerrados:0, barAbiertos:0,
+    /* materia prima en reproceso (tiempo entre reporte y reincorporacion) */
+    mpMs:0, mpResueltas:0, mpAbiertas:0,
     totalMs:0
   };
   /* Change over de entrada */
@@ -1247,7 +1292,40 @@ function resumenParos(st){
       out.incAbiertas++;
     }
   });
-  out.totalMs = out.coMs + out.mantMs;
+  /* Barriles devueltos: sumamos las devoluciones CERRADAS (con reintegroTs).
+     Excluimos motivo 'error' (escaneo por error no es tiempo perdido real).
+     Contamos tambien los barriles actualmente retirados (devoluciones abiertas). */
+  const barriles = Array.isArray(st.barrilesQR) ? st.barrilesQR : [];
+  barriles.forEach(b=>{
+    if(!b) return;
+    if(Array.isArray(b.devoluciones)){
+      b.devoluciones.forEach(dv=>{
+        if(!dv || !dv.removedTs) return;
+        const esError = String(dv.motivo||'').indexOf('error')===0;
+        if(dv.reintegroTs && dv.durationMs>=0){
+          if(!esError){ out.barMs += dv.durationMs; out.barCerrados++; }
+        } else if(!dv.reintegroTs){
+          if(!esError) out.barAbiertos++;
+        }
+      });
+    } else if(b.removed && b.removedTs){
+      /* retrocompat: barril retirado antes de esta version, sin historial */
+      const esError = String(b.motivo||'').indexOf('error')===0;
+      if(!esError) out.barAbiertos++;
+    }
+  });
+  /* Materia prima: reportes resueltos suman su duracion completa */
+  const mps = Array.isArray(st.materiaPrima) ? st.materiaPrima : [];
+  mps.forEach(mp=>{
+    if(!mp) return;
+    if(mp.estado==='res' && mp.ts && mp.resTs){
+      const dur = new Date(mp.resTs) - new Date(mp.ts);
+      if(dur>=0){ out.mpMs += dur; out.mpResueltas++; }
+    } else if(mp.estado!=='res'){
+      out.mpAbiertas++;
+    }
+  });
+  out.totalMs = out.coMs + out.mantMs + out.barMs + out.mpMs;
   return out;
 }
 
@@ -1262,7 +1340,7 @@ function renderParos(){
   const box=$('paroBox');
   if(!box) return;
   const r=resumenParos(state);
-  const sinParos = (r.totalMs===0 && !r.coEnCurso && r.incAbiertas===0);
+  const sinParos = (r.totalMs===0 && !r.coEnCurso && r.incAbiertas===0 && r.barAbiertos===0 && r.mpAbiertas===0);
   if(sinParos){
     box.innerHTML=`<div class="paro-empty">${t('downtimeEmpty')}</div>`;
     return;
@@ -1273,13 +1351,17 @@ function renderParos(){
     ? `<span class="pt-inprog">🔄 ${t('downtimeCoRunning')}</span>` : '';
   const incAbTxt = r.incAbiertas>0
     ? `<span class="pt-inprog" style="background:rgba(232,93,71,.15);color:var(--danger)">⚠️ ${r.incAbiertas} ${t('downtimeIncOpen')}</span>` : '';
+  const barAbTxt = r.barAbiertos>0
+    ? `<span class="pt-inprog" style="background:rgba(55,138,221,.15);color:#378add">🛢️ ${r.barAbiertos} ${t('downtimeBarOpen')}</span>` : '';
+  const mpAbTxt = r.mpAbiertas>0
+    ? `<span class="pt-inprog" style="background:rgba(240,180,41,.15);color:var(--warn)">📦 ${r.mpAbiertas} ${t('downtimeMpOpen')}</span>` : '';
 
   let html=`<div class="paro-total">
     <div>
       <div class="pt-label">${t('downtimeTotal')}</div>
       <div class="pt-value">${totalTxt}</div>
     </div>
-    <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end">${inProg}${incAbTxt}</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end">${inProg}${incAbTxt}${barAbTxt}${mpAbTxt}</div>
   </div>`;
 
   /* Desglose */
@@ -1308,8 +1390,107 @@ function renderParos(){
     </div>`;
   });
 
+  /* Fila: barriles devueltos por QC */
+  const barCls = r.barMs===0 ? 'zero' : '';
+  const barDet = r.barAbiertos>0
+    ? `${r.barCerrados} ${t('downtimeBarClosed')} · <span style="color:#378add">${r.barAbiertos} ${t('downtimeBarStillOut')}</span>`
+    : `${r.barCerrados} ${t('downtimeBarClosed')}`;
+  html+=`<div class="paro-row ${barCls}">
+    <span class="pr-tag">🛢️ ${t('downtimeBarrels')}</span>
+    <span class="pr-time">${fmtDuracionCO(r.barMs)}</span>
+    <span class="pr-count">${barDet}</span>
+  </div>`;
+
+  /* Fila: materia prima en reproceso */
+  const mpCls = r.mpMs===0 ? 'zero' : '';
+  const mpDet = r.mpAbiertas>0
+    ? `${r.mpResueltas} ${t('downtimeMpDone')} · <span style="color:var(--warn)">${r.mpAbiertas} ${t('downtimeMpStillOpen')}</span>`
+    : `${r.mpResueltas} ${t('downtimeMpDone')}`;
+  html+=`<div class="paro-row ${mpCls}">
+    <span class="pr-tag">📦 ${t('downtimeRawMat')}</span>
+    <span class="pr-time">${fmtDuracionCO(r.mpMs)}</span>
+    <span class="pr-count">${mpDet}</span>
+  </div>`;
+
   html+=`</div>`;
   box.innerHTML=html;
+}
+
+/* ===================== MATERIA PRIMA (reproceso) ===================== */
+/* Estados: pend (reportada, maquina parada) -> proc (en reproceso) -> res (reincorporada).
+   La duracion del paro = resTs - ts (reporte hasta reincorporacion). */
+function openMPModal(){
+  if(supervisor){ return; }
+  const m=$('modalMP');
+  const n=new Date();
+  $('mpStamp').textContent=`${fmtDate(n)} · ${fmtTime(n)}`;
+  $('mpAlert').classList.remove('show'); $('mpAlert').textContent='';
+  $('mpDescIn').value=''; $('mpLoteIn').value=''; $('mpOperIn').value='';
+  m.classList.add('show');
+  setTimeout(()=>$('mpDescIn').focus(),50);
+}
+function closeMPModal(){ $('modalMP').classList.remove('show'); }
+
+function mpEstadoLabel(e){ return e==='res'?t('mpResolved'):(e==='proc'?t('mpProcessing'):t('mpPending')); }
+function mpEstadoPillBg(e){
+  if(e==='res') return 'background:rgba(45,212,167,.15);color:var(--accent)';
+  if(e==='proc') return 'background:rgba(55,138,221,.15);color:#378add';
+  return 'background:rgba(240,180,41,.15);color:var(--warn)';
+}
+
+/* Avanzar estado de un reporte de materia prima (operador o supervisor) */
+function avanzarMP(id, destino){
+  const mp=(state.materiaPrima||[]).find(x=>x.id===id);
+  if(!mp) return;
+  const now=new Date().toISOString();
+  if(destino==='proc' && mp.estado==='pend'){
+    mp.estado='proc'; mp.procTs=now;
+  } else if(destino==='res' && (mp.estado==='proc'||mp.estado==='pend')){
+    mp.estado='res'; mp.resTs=now;
+  } else { return; }
+  if(supervisor){ escribirNube(); } else { save(); }
+  render();
+}
+
+function renderMP(){
+  const list=$('mpList');
+  if(!list) return;
+  const arr=(state.materiaPrima||[]).slice().sort((a,b)=> new Date(b.ts)-new Date(a.ts));
+  if(!arr.length){
+    list.innerHTML=`<div class="empty">${t('mpEmpty')}</div>`;
+    return;
+  }
+  let html='';
+  arr.forEach(mp=>{
+    const f=new Date(mp.ts);
+    const dur = mp.resTs ? (new Date(mp.resTs)-new Date(mp.ts)) : (Date.now()-new Date(mp.ts));
+    const durTxt = fmtDuracionCO(Math.max(0,dur));
+    const durStyle = mp.estado==='res' ? 'color:var(--accent)' : 'color:var(--warn)';
+    /* botones segun estado */
+    let botones='';
+    if(mp.estado==='pend'){
+      botones=`<button class="mini-btn" onclick="avanzarMP('${mp.id}','proc')">${t('mpBtnProc')}</button>
+               <button class="mini-btn" onclick="avanzarMP('${mp.id}','res')">${t('mpBtnRes')}</button>`;
+    } else if(mp.estado==='proc'){
+      botones=`<button class="mini-btn" onclick="avanzarMP('${mp.id}','res')">${t('mpBtnRes')}</button>`;
+    }
+    html+=`<div style="background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin-bottom:8px">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap">
+        <div style="min-width:0">
+          <div style="font-size:13px;font-weight:600">${String(mp.desc||'').replace(/</g,'&lt;')}</div>
+          <div style="font-size:11px;color:var(--muted);margin-top:3px">
+            ${mp.lote?('<b>'+String(mp.lote).replace(/</g,'&lt;')+'</b> · '):''}${fmtDate(f)} ${fmtTime(f)} · ${String(mp.oper||'').replace(/</g,'&lt;')}
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+          <span style="font-family:ui-monospace,Menlo,monospace;font-size:13px;font-weight:700;${durStyle}">⏱ ${durTxt}</span>
+          <span style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.4px;border-radius:12px;padding:3px 9px;${mpEstadoPillBg(mp.estado)}">${mpEstadoLabel(mp.estado)}</span>
+          ${botones}
+        </div>
+      </div>
+    </div>`;
+  });
+  list.innerHTML=html;
 }
 
 /* Abrir modal de change over — solo operador, solo orden cerrada */
@@ -1485,6 +1666,29 @@ const I18N = {
     downtimeCoIn:'from previous order',
     downtimeCoRunning:'change over in progress',
     downtimeIncOpen:'unresolved incident(s)',
+    downtimeBarrels:'Returned barrels (QC)',
+    downtimeBarClosed:'closed return(s)',
+    downtimeBarStillOut:'still out',
+    downtimeBarOpen:'barrel(s) out',
+    downtimeRawMat:'Raw material (reprocess)',
+    downtimeMpDone:'reincorporated',
+    downtimeMpStillOpen:'in reprocess',
+    downtimeMpOpen:'material report(s) open',
+    /* raw material */
+    mpTitle:'Raw material — reprocess',
+    mpReport:'📦 Report material',
+    mpSub:'When the machine stops because material must be sent back for reprocessing (sieving, sorting, etc.), report it here. The stop counts in the downtime log until the material is reincorporated.',
+    mpEmpty:'No raw material reports.',
+    mpModalTitle:'📦 Report raw material for reprocess',
+    mpDesc:'What happened with the material',
+    mpDescPh:'Ex. Powder too coarse, sent back for sieving',
+    mpLote:'Material batch (optional)',
+    mpLotePh:'Ex. MP-2026-088',
+    mpHint:'The stop timer starts now and stops when the material is marked as reincorporated.',
+    mpSaveBtn:'📦 Report material',
+    mpPending:'Reported', mpProcessing:'In reprocess', mpResolved:'Reincorporated',
+    mpBtnProc:'▶ Start reprocess', mpBtnRes:'✓ Reincorporated',
+    alMpDesc:'Describe what happened with the material.',
     /* QC (Quality Control) role */
     qcTag:'🧪 QC',
     qcLabel:'Search any order by code (optional)',
@@ -1677,6 +1881,29 @@ const I18N = {
     downtimeCoIn:'desde la orden anterior',
     downtimeCoRunning:'change over en curso',
     downtimeIncOpen:'incidencia(s) sin resolver',
+    downtimeBarrels:'Barriles devueltos (QC)',
+    downtimeBarClosed:'devolución(es) cerrada(s)',
+    downtimeBarStillOut:'aún fuera',
+    downtimeBarOpen:'barril(es) fuera',
+    downtimeRawMat:'Materia prima (reproceso)',
+    downtimeMpDone:'reincorporada(s)',
+    downtimeMpStillOpen:'en reproceso',
+    downtimeMpOpen:'reporte(s) de material abiertos',
+    /* materia prima */
+    mpTitle:'Materia prima — reproceso',
+    mpReport:'📦 Reportar material',
+    mpSub:'Cuando la máquina se detiene porque el material debe devolverse a reproceso (tamizar, sortear, etc.), repórtelo aquí. El paro cuenta en el registro de paros hasta que el material se reincorpora.',
+    mpEmpty:'Sin reportes de materia prima.',
+    mpModalTitle:'📦 Reportar materia prima a reproceso',
+    mpDesc:'Qué pasó con el material',
+    mpDescPh:'Ej. Polvo muy grueso, devuelto a tamizar',
+    mpLote:'Lote del material (opcional)',
+    mpLotePh:'Ej. MP-2026-088',
+    mpHint:'El cronómetro del paro inicia ahora y se detiene cuando el material se marque como reincorporado.',
+    mpSaveBtn:'📦 Reportar material',
+    mpPending:'Reportada', mpProcessing:'En reproceso', mpResolved:'Reincorporada',
+    mpBtnProc:'▶ Iniciar reproceso', mpBtnRes:'✓ Reincorporada',
+    alMpDesc:'Describa qué pasó con el material.',
     /* Rol QC (Control de Calidad) */
     qcTag:'🧪 QC',
     qcLabel:'Buscar una orden por código (opcional)',
@@ -2057,6 +2284,7 @@ function reopenDay(key){
 /* ---- render ---- */
 function render(){
   renderIncidencias();
+  renderMP();
   renderParos();
   const {min,max}=getRange();
   const meta=parseFloat(state.orden.metaCaps);
@@ -2393,6 +2621,26 @@ if($('coCancel'))      $('coCancel').addEventListener('click', cerrarModalChange
 if($('coConfirm'))     $('coConfirm').addEventListener('click', confirmarChangeOver);
 if($('modalChangeOver')) $('modalChangeOver').addEventListener('click', e=>{
   if(e.target===$('modalChangeOver')) cerrarModalChangeOver();
+});
+
+/* ===== Materia prima: botones ===== */
+if($('btnMP')) $('btnMP').addEventListener('click', openMPModal);
+if($('mpCancel')) $('mpCancel').addEventListener('click', closeMPModal);
+if($('modalMP')) $('modalMP').addEventListener('click', e=>{ if(e.target===$('modalMP')) closeMPModal(); });
+if($('mpSave')) $('mpSave').addEventListener('click', ()=>{
+  const desc=($('mpDescIn').value||'').trim();
+  const oper=($('mpOperIn').value||'').trim().toUpperCase();
+  const al=$('mpAlert');
+  if(!desc){ al.textContent=t('alMpDesc'); al.classList.add('show'); $('mpDescIn').focus(); return; }
+  if(!oper){ al.textContent=t('alIncidentReporter'); al.classList.add('show'); $('mpOperIn').focus(); return; }
+  if(!state.materiaPrima) state.materiaPrima=[];
+  state.materiaPrima.push({
+    id:Date.now()+'-'+Math.random().toString(36).slice(2,7),
+    desc, lote:($('mpLoteIn').value||'').trim(), oper,
+    ts:new Date().toISOString(),
+    estado:'pend', procTs:null, resTs:null
+  });
+  save(); closeMPModal(); render();
 });
 
 /* ===== Modo recolección (operador) ===== */
@@ -3830,9 +4078,21 @@ async function procesarBarril(datos){
   const existente=data.barrilesQR.find(b=>b && b.uid===datos.uid);
   if(existente){
     if(existente.removed){
-      /* estaba retirado: lo reincorporamos */
+      /* estaba retirado: lo reincorporamos y CERRAMOS la devolución abierta
+         guardando reintegroTs y duración (tiempo perdido medible) */
+      const nowTs=Date.now();
+      if(Array.isArray(existente.devoluciones)){
+        const abierta=existente.devoluciones.find(dv=>dv && dv.removedTs && !dv.reintegroTs);
+        if(abierta){
+          abierta.reintegroTs=nowTs;
+          abierta.durationMs=Math.max(0, nowTs - abierta.removedTs);
+        }
+      } else if(existente.removedTs){
+        /* retrocompat: barril devuelto antes de esta versión, creamos el registro cerrado */
+        existente.devoluciones=[{ motivo:existente.motivo||'otro', removedTs:existente.removedTs, reintegroTs:nowTs, durationMs:Math.max(0, nowTs - existente.removedTs) }];
+      }
       existente.removed=false; delete existente.motivo; delete existente.removedTs;
-      existente.ts=Date.now();
+      existente.ts=nowTs;
       const ok=await escribirOrden(codFinal, data);
       if(!ok){ packMostrarMsg(t('packSaveErr'),'err'); beep(false); return; }
       packCache[codFinal]=data;
@@ -4014,7 +4274,12 @@ $('desescanOk').addEventListener('click',async()=>{
   const { cod, uid, data }=_desCtx;
   const b=(data.barrilesQR||[]).find(x=>x && x.uid===uid);
   if(b){
-    b.removed=true; b.motivo=motivoFinal; b.removedTs=Date.now();
+    const nowTs=Date.now();
+    b.removed=true; b.motivo=motivoFinal; b.removedTs=nowTs;
+    /* Historial de devoluciones: cada retiro abre un registro que se cierra al reincorporar.
+       Permite medir el tiempo perdido por barril devuelto (KPI de paros). */
+    if(!Array.isArray(b.devoluciones)) b.devoluciones=[];
+    b.devoluciones.push({ motivo:motivoFinal, removedTs:nowTs, reintegroTs:null, durationMs:null });
   }
   const ok=await escribirOrden(cod, data);
   if(!ok){ packMostrarMsg(t('packSaveErr'),'err'); beep(false); return; }
