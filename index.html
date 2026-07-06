@@ -457,6 +457,17 @@
   .pb-removed-head{flex-basis:100%;width:100%;margin-top:10px;font-size:10px;color:var(--danger);text-transform:uppercase;letter-spacing:.5px;font-weight:700}
   .pb-chip-out{border-color:var(--danger);color:var(--danger);background:rgba(255,107,107,.08);text-decoration:line-through;gap:5px;text-decoration-thickness:1px}
   .pb-chip-out .pb-mot{font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.2px;text-decoration:none;opacity:.85}
+  /* Manifiesto: pendiente de escanear (checklist sin marcar) */
+  .pb-chip-pend{border-style:dashed;border-color:var(--line);color:var(--muted);background:transparent;font-weight:600}
+  /* Reportado por packeting: esperando disposición de QC */
+  .pb-chip-rep{border-color:var(--warn);color:var(--warn);background:rgba(240,180,41,.10);animation:repPulse 1.6s ease-in-out infinite}
+  @keyframes repPulse{0%,100%{box-shadow:0 0 0 0 rgba(240,180,41,.35)}50%{box-shadow:0 0 0 4px rgba(240,180,41,0)}}
+  /* Alerta en tarjeta QC: barriles reportados esperando disposición */
+  .qc-rep-alert{background:rgba(240,180,41,.12);border:1px solid rgba(240,180,41,.4);border-radius:10px;
+    padding:9px 12px;font-size:12px;color:var(--warn);cursor:pointer;display:flex;align-items:center;gap:6px;
+    flex-wrap:wrap;margin:-4px 0 4px;animation:repPulse 1.6s ease-in-out infinite}
+  .qc-rep-alert:hover{background:rgba(240,180,41,.2)}
+  .qc-rep-alert .qc-rep-go{margin-left:auto;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.3px;text-decoration:underline}
   /* Barra de progreso de packeting */
   .pack-prog{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:16px;margin-bottom:14px}
   .pack-prog-head{display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-bottom:10px}
@@ -910,10 +921,24 @@
   </div>
 </div>
 
-<!-- Modal des-escanear label (packeting) -->
+<!-- Modal reporte de packeting: barril re-escaneado -> ¿problema o error? (NO retira) -->
+<div class="modal-bg" id="modalPackReporte">
+  <div class="modal" style="max-width:400px">
+    <h3 data-i18n="packRepTitle">Barrel already checked</h3>
+    <div class="sub" id="packRepSub">—</div>
+    <p style="font-size:12px;color:var(--muted);margin-bottom:14px" data-i18n="packRepDesc">
+      If this barrel has a problem, report it to Quality Control. Only QC can remove it from the count.</p>
+    <div class="actions" style="flex-direction:column;gap:8px">
+      <button class="btn warn" id="packRepProblema" style="width:100%" data-i18n="packRepProblema">⚠️ It has a problem — notify QC</button>
+      <button class="btn" id="packRepError" style="width:100%" data-i18n="packRepError">↩️ Scanned by error (do nothing)</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal disposición QC (retirar barril con motivo) -->
 <div class="modal-bg" id="modalDesescan">
   <div class="modal" style="max-width:400px">
-    <h3 data-i18n="unscanTitle">Label already scanned</h3>
+    <h3 data-i18n="unscanTitle">Barrel disposition (QC)</h3>
     <div class="sub" id="desescanSub">—</div>
     <div class="row">
       <label data-i18n="unscanReasonLbl">Reason for removing it</label>
@@ -1073,6 +1098,10 @@ function initSupabase(){
 function normalizar(d){ d=d||{}; d.orden=d.orden||{producto:'',lote:'',orden:'',min:'',max:'',metaCaps:''};
   d.registros=d.registros||[]; d.dias=d.dias||{}; d.firmas=d.firmas||{}; d.incidencias=d.incidencias||[];
   d.barrilesQR=d.barrilesQR||[];
+  /* Manifiesto: barriles declarados al generar etiquetas. [{bn, uid, ts}] */
+  d.barrilesDeclarados=d.barrilesDeclarados||[];
+  /* Migración: campo reportado (flujo packeting reporta -> QC dispone) */
+  d.barrilesQR.forEach(b=>{ if(b && b.reportado===undefined) b.reportado=null; });
   /* materia prima: reportes de material que requirio reproceso (tamizar, sortear, etc.)
      estados: pend (reportada) -> proc (en reproceso) -> res (reincorporada) */
   d.materiaPrima=d.materiaPrima||[];
@@ -1298,6 +1327,8 @@ function resumenParos(st){
   const barriles = Array.isArray(st.barrilesQR) ? st.barrilesQR : [];
   barriles.forEach(b=>{
     if(!b) return;
+    /* reportado por packeting y aún sin disposición de QC: el paro ya empezó */
+    if(b.reportado && !b.removed){ out.barAbiertos++; }
     if(Array.isArray(b.devoluciones)){
       b.devoluciones.forEach(dv=>{
         if(!dv || !dv.removedTs) return;
@@ -1796,7 +1827,20 @@ const I18N = {
     packLogEmpty:'No barrels scanned yet.', packCamErr:'Could not access the camera. Check permissions.',
     packConnReady:'Ready', packBarrel:'Barrel',
     packProgL:'Packed progress', packProgNone:'No barrel total registered in Encapsulation yet — nothing to compare.',
-    unscanTitle:'Label already scanned', unscanReasonLbl:'Reason for removing it',
+    unscanTitle:'Barrel disposition (QC)', unscanReasonLbl:'Reason for removing it',
+    /* manifiesto / reporte packeting */
+    packPendTitle:'Declared, not received yet',
+    packRepTitleChip:'Reported to QC at',
+    packRepTitle:'Barrel already checked',
+    packRepDesc:'If this barrel has a problem, report it to Quality Control. Only QC can remove it from the count.',
+    packRepProblema:'⚠️ It has a problem — notify QC',
+    packRepError:'↩️ Scanned by error (do nothing)',
+    packReportadoOk:'⚠️ Reported to QC. The barrel still counts until QC decides.',
+    packYaReportado:'This barrel is already reported. Waiting for QC.',
+    packOnlyQcReinc:'Removed by QC. Only QC can reincorporate it.',
+    qcAskDispo:'Barrel active — choose disposition.',
+    qcBarReportados:'reported barrel(s) waiting for QC',
+    qcBarIrEscanear:'Scan →',
     unscanHint:'The barrel stops counting as packed and the reason is recorded.',
     unscanConfirm:'Remove label', unscanSub:(b)=>`Barrel from batch ${b}`,
     reasonDusty:'Dusty', reasonSort:'To sort', reasonError:'Scanned by error', reasonOther:'Other',
@@ -2009,7 +2053,20 @@ const I18N = {
     packLogEmpty:'Aún no se han escaneado barriles.', packCamErr:'No se pudo acceder a la cámara. Revisa los permisos.',
     packConnReady:'Listo', packBarrel:'Barril',
     packProgL:'Avance empacado', packProgNone:'Encapsulación aún no registra barriles — no hay total para comparar.',
-    unscanTitle:'Label ya escaneado', unscanReasonLbl:'Motivo para retirarlo',
+    unscanTitle:'Disposición del barril (QC)', unscanReasonLbl:'Motivo para retirarlo',
+    /* manifiesto / reporte packeting */
+    packPendTitle:'Declarado, aún sin recibir',
+    packRepTitleChip:'Reportado a QC a las',
+    packRepTitle:'Barril ya chequeado',
+    packRepDesc:'Si este barril tiene un problema, repórtelo a Control de Calidad. Solo QC puede retirarlo del conteo.',
+    packRepProblema:'⚠️ Tiene problema — avisar a QC',
+    packRepError:'↩️ Escaneado por error (no hacer nada)',
+    packReportadoOk:'⚠️ Reportado a QC. El barril sigue contando hasta que QC decida.',
+    packYaReportado:'Este barril ya está reportado. Esperando a QC.',
+    packOnlyQcReinc:'Retirado por QC. Solo QC puede reincorporarlo.',
+    qcAskDispo:'Barril activo — elija la disposición.',
+    qcBarReportados:'barril(es) reportado(s) esperando QC',
+    qcBarIrEscanear:'Escanear →',
     unscanHint:'El barril deja de contar como colocado y se registra el motivo.',
     unscanConfirm:'Retirar label', unscanSub:(b)=>`Barril del batch ${b}`,
     reasonDusty:'Polvoso', reasonSort:'Sortear', reasonError:'Escaneo por error', reasonOther:'Otro',
@@ -3559,8 +3616,22 @@ function renderQC(codigos){
       btnAccion = `<button class="btn primary" onclick="location.href='${abrirUrl}&qc-avance=1'">📈 ${t('qcUpdateProd')}</button>`;
     }
 
+    /* ALERTA: barriles reportados por packeting esperando disposición de QC.
+       Se muestra el tiempo del reporte más antiguo pendiente (KPI espera de QC). */
+    const reportados=(d.barrilesQR||[]).filter(b=>b && b.reportado && !b.removed);
+    let repChip='';
+    if(reportados.length){
+      const masViejo=reportados.reduce((mn,b)=> (b.reportado.ts<mn)?b.reportado.ts:mn, reportados[0].reportado.ts);
+      const espera=fmtDuracionCO(Math.max(0, Date.now()-masViejo));
+      repChip=`<div class="qc-rep-alert" onclick="location.href='?rol=qc&clave=${CLAVE_QC}&pack=1'">
+        🛢️ <b>${reportados.length}</b> ${t('qcBarReportados')} · ⏱ ${espera}
+        <span class="qc-rep-go">${t('qcBarIrEscanear')}</span>
+      </div>`;
+    }
+
     html+=`<div class="ord-card${extraCard}">
       ${coBanner}
+      ${repChip}
       <div class="oc-top">
         <div>
           <div class="oc-room-big">${o.orden?String(o.orden).replace(/</g,'&lt;'):'—'}</div>
@@ -3804,21 +3875,36 @@ async function generarLabelsPDF(){
   const cod=_lblOrden.cod || '';
   const cuarto=_lblOrden.cuarto || '';
 
+  /* NUMERACIÓN CONTINUA: continuar desde el último barril declarado de la orden.
+     Así, imprimir en tandas (6 hoy, 6 mañana) nunca repite números ni uids. */
+  if(!Array.isArray(state.barrilesDeclarados)) state.barrilesDeclarados=[];
+  const ultimoBn = state.barrilesDeclarados.reduce((mx,b)=> (b&&b.bn>mx)?b.bn:mx, 0);
+  const nuevos=[];
+
   for(let i=0;i<cantidad;i++){
     const idx=i%PER_PAGE;
     if(i>0 && idx===0) doc.addPage([PAGE_W,PAGE_H]);
     const col=idx%COLS, row=Math.floor(idx/COLS);
     const x=MX+col*(LW+GAP_X), y=MY+row*(LH+GAP_Y);
-    const num=numerar ? i+1 : null;
-    const barrilNo=i+1; /* número de barril, siempre presente (va en el QR) */
+    const barrilNo=ultimoBn + i + 1; /* número de barril continuo (va en el QR) */
+    const num=numerar ? barrilNo : null;
     /* QR LIVIANO: solo lo necesario. uid se deriva de batch + número de barril
-       (confirmado único por barril dentro de su lote). El código de orden (c) va
+       (único gracias a la numeración continua). El código de orden (c) va
        OCULTO en el QR para localizar la orden, pero NO se imprime en la etiqueta. */
     const uid = batch + '#' + barrilNo;
     const payload=JSON.stringify({ p:producto, b:batch, r:cuarto, n:neto, bn:barrilNo, c:cod });
     const qr=await lblQrDataURL(payload);
     dibujarLabel(doc, x, y, LW, LH, { producto, batch, neto, cuarto, num, barrilNo, qr, printNum:numerar });
+    nuevos.push({ bn:barrilNo, uid, ts });
   }
+
+  /* DECLARACIÓN (manifiesto): registrar en la orden qué etiquetas se emitieron.
+     Deduplicado por uid; base del checklist de recepción en packeting. */
+  nuevos.forEach(n=>{
+    if(!state.barrilesDeclarados.some(b=>b && b.uid===n.uid)) state.barrilesDeclarados.push(n);
+  });
+  if(supervisor){ escribirNube(); } else { save(); }
+  render();
 
   const safe=(batch.replace(/[^a-zA-Z0-9_-]/g,'')||'orden');
   doc.save('labels_'+safe+'.pdf');
@@ -4076,46 +4162,64 @@ async function procesarBarril(datos){
 
   /* ¿ya existe este barril (por uid)? */
   const existente=data.barrilesQR.find(b=>b && b.uid===datos.uid);
+  const batchCtx=datos.b||(data.orden&&data.orden.lote)||'—';
+  const setCtx=()=>{
+    packActual={ cod:codFinal, batch:batchCtx, producto:(data.orden&&data.orden.producto)||'', count:contarActivos(data.barrilesQR), total:totalCerrado(data), barriles:(data.barrilesQR||[]).slice(), manifiesto:manifiestoBarriles(data), ultimoBarril:datos.bn||null };
+    actualizarPackActual();
+  };
   if(existente){
     if(existente.removed){
-      /* estaba retirado: lo reincorporamos y CERRAMOS la devolución abierta
-         guardando reintegroTs y duración (tiempo perdido medible) */
+      /* Barril RETIRADO por QC. Solo QC puede reincorporarlo. */
+      if(!qc){
+        setCtx();
+        packMostrarMsg(t('packOnlyQcReinc'),'err'); beep(false);
+        return;
+      }
+      /* QC reincorpora: cerrar la devolución abierta.
+         Duración TOTAL del paro = desde el reporte de packeting (si existió) hasta ahora. */
       const nowTs=Date.now();
       if(Array.isArray(existente.devoluciones)){
         const abierta=existente.devoluciones.find(dv=>dv && dv.removedTs && !dv.reintegroTs);
         if(abierta){
           abierta.reintegroTs=nowTs;
-          abierta.durationMs=Math.max(0, nowTs - abierta.removedTs);
+          const inicio = abierta.reporteTs || abierta.removedTs;
+          abierta.durationMs=Math.max(0, nowTs - inicio);
         }
       } else if(existente.removedTs){
         /* retrocompat: barril devuelto antes de esta versión, creamos el registro cerrado */
-        existente.devoluciones=[{ motivo:existente.motivo||'otro', removedTs:existente.removedTs, reintegroTs:nowTs, durationMs:Math.max(0, nowTs - existente.removedTs) }];
+        existente.devoluciones=[{ motivo:existente.motivo||'otro', reporteTs:null, removedTs:existente.removedTs, reintegroTs:nowTs, durationMs:Math.max(0, nowTs - existente.removedTs), esperaQcMs:null }];
       }
       existente.removed=false; delete existente.motivo; delete existente.removedTs;
+      existente.reportado=null;
       existente.ts=nowTs;
       const ok=await escribirOrden(codFinal, data);
       if(!ok){ packMostrarMsg(t('packSaveErr'),'err'); beep(false); return; }
       packCache[codFinal]=data;
       if(codigo && codFinal===codigo.toUpperCase()){ state.barrilesQR=data.barrilesQR; render(); }
-      const batchR=datos.b||(data.orden&&data.orden.lote)||'—';
-      packActual={ cod:codFinal, batch:batchR, producto:(data.orden&&data.orden.producto)||'', count:contarActivos(data.barrilesQR), total:totalCerrado(data), barriles:(data.barrilesQR||[]).slice(), ultimoBarril:datos.bn||null };
-      actualizarPackActual();
+      setCtx();
       packMostrarMsg(t('packReuse'),'ok'); beep(true);
       return;
     }
-    /* está activo: pedir confirmación ANTES de des-escanear */
-    const batchD=datos.b||(data.orden&&data.orden.lote)||'—';
-    packActual={ cod:codFinal, batch:batchD, producto:(data.orden&&data.orden.producto)||'', count:contarActivos(data.barrilesQR), total:totalCerrado(data), barriles:(data.barrilesQR||[]).slice(), ultimoBarril:datos.bn||null };
-    actualizarPackActual();
-    packMostrarMsg(t('packAskUnscan'),'dup'); beep(false);
 
-    const confirmar = confirm(t('packConfirmUnscan')(datos.bn!=null?datos.bn:null));
-    if(!confirmar){
-      /* el usuario canceló: el barril sigue contando, no se hace nada */
-      packMostrarMsg(t('packReady'),'');
+    /* Barril ACTIVO re-escaneado */
+    if(qc){
+      /* QC tiene autoridad plena: abre directamente el selector de motivo para RETIRARLO.
+         Aplica tanto a barriles reportados por packeting como a los que QC detecta en su ronda. */
+      setCtx();
+      packMostrarMsg(t('qcAskDispo'),'dup'); beep(false);
+      abrirDesescaneo(codFinal, datos.uid, batchCtx, data);
       return;
     }
-    abrirDesescaneo(codFinal, datos.uid, batchD, data);
+
+    /* PACKETING: no puede retirar. Si ya está reportado, avisar. Si no, preguntar problema/error. */
+    if(existente.reportado){
+      setCtx();
+      packMostrarMsg(t('packYaReportado'),'dup'); beep(false);
+      return;
+    }
+    setCtx();
+    packMostrarMsg(t('packAskProblema'),'dup'); beep(false);
+    abrirPackReporte(codFinal, datos.uid, datos.bn!=null?datos.bn:null, data);
     return;
   }
 
@@ -4136,7 +4240,7 @@ async function procesarBarril(datos){
 
   const batch=datos.b||(data.orden&&data.orden.lote)||'—';
   const producto=(data.orden&&data.orden.producto)||'';
-  packActual={ cod:codFinal, batch, producto, count:contarActivos(data.barrilesQR), total:totalCerrado(data), barriles:(data.barrilesQR||[]).slice(), ultimoBarril:datos.bn||null };
+  packActual={ cod:codFinal, batch, producto, count:contarActivos(data.barrilesQR), total:totalCerrado(data), barriles:(data.barrilesQR||[]).slice(), manifiesto:manifiestoBarriles(data), ultimoBarril:datos.bn||null };
   actualizarPackActual();
 
   packMostrarMsg(datos.bn ? t('packAddedN')(datos.bn, batch) : t('packAdded')(batch),'ok'); beep(true);
@@ -4151,6 +4255,57 @@ function totalCerrado(data){
   return Object.values(dias).reduce((s,d)=>s+(d&&d.barriles?Number(d.barriles):0),0);
 }
 
+/* MANIFIESTO de barriles de una orden: la lista completa esperada con su estado.
+   Fuente primaria: barrilesDeclarados (guardados al generar etiquetas).
+   Retrocompat: si la orden no tiene declaración, se deriva del total de barriles
+   de los días con uids determinísticos lote#1..N.
+   Estados: pend (declarado, no escaneado) | rec (recibido) | rep (reportado por packeting)
+          | ret (retirado por QC)
+   Devuelve { items:[{bn, uid, estado, scan}], declarados, recibidos, reportados, retirados, extra:[...] } */
+function manifiestoBarriles(data){
+  data=data||{};
+  const scans=Array.isArray(data.barrilesQR)?data.barrilesQR:[];
+  const porUid={}; scans.forEach(b=>{ if(b && b.uid) porUid[b.uid]=b; });
+
+  let declarados=Array.isArray(data.barrilesDeclarados)?data.barrilesDeclarados.slice():[];
+  if(!declarados.length){
+    /* retrocompat: derivar del total de barriles reportado en los días */
+    const tot=totalCerrado(data);
+    const lote=(data.orden&&data.orden.lote)||'';
+    if(tot>0 && lote){
+      for(let i=1;i<=tot;i++) declarados.push({ bn:i, uid:lote+'#'+i, ts:null });
+    }
+  }
+  declarados.sort((a,b)=>(a.bn||0)-(b.bn||0));
+
+  const items=[]; const uidsDecl={};
+  let recibidos=0, reportados=0, retirados=0;
+  declarados.forEach(d=>{
+    if(!d || !d.uid) return;
+    uidsDecl[d.uid]=true;
+    const s=porUid[d.uid];
+    let estado='pend';
+    if(s){
+      if(s.removed){ estado='ret'; retirados++; }
+      else if(s.reportado){ estado='rep'; reportados++; recibidos++; }
+      else { estado='rec'; recibidos++; }
+    }
+    items.push({ bn:d.bn, uid:d.uid, estado, scan:s||null });
+  });
+
+  /* barriles escaneados que NO están en la declaración (caso borde: etiqueta de otra tanda) */
+  const extra=scans.filter(b=>b && b.uid && !uidsDecl[b.uid]);
+  extra.forEach(s=>{
+    let estado='rec';
+    if(s.removed){ estado='ret'; retirados++; }
+    else if(s.reportado){ estado='rep'; reportados++; recibidos++; }
+    else recibidos++;
+    items.push({ bn:s.bn||null, uid:s.uid, estado, scan:s, esExtra:true });
+  });
+
+  return { items, declarados:declarados.length, recibidos, reportados, retirados, extra };
+}
+
 function actualizarPackActual(){
   if(!packActual) return;
   $('packBatch').textContent=packActual.batch||'—';
@@ -4160,55 +4315,65 @@ function actualizarPackActual(){
   renderPackBarriles();
 }
 
-/* grilla de barriles de la orden actual: activos + des-escaneados (tachados con motivo) */
+/* MANIFIESTO de barriles de la orden actual: checklist de recepción.
+   Estados: pendiente (declarado, aún sin escanear) · ✓ recibido · ⚠️ reportado · ⛔ retirado */
 function renderPackBarriles(){
   const box=$('packBarriles'); if(!box) return;
-  const lista=(packActual&&packActual.barriles)||[];
-  const activos=lista.filter(b=>b && !b.removed);
-  const retirados=lista.filter(b=>b && b.removed);
+  const man=(packActual&&packActual.manifiesto)||null;
 
-  if(!activos.length && !retirados.length){ box.style.display='none'; return; }
+  if(!man || !man.items.length){ box.style.display='none'; return; }
   box.style.display='block';
 
-  /* ordenar por número de barril; los sin número, por hora */
+  $('packBarrilesCount').textContent =
+    man.recibidos.toLocaleString(I18N[lang].locale) + ' / ' + man.declarados.toLocaleString(I18N[lang].locale);
+
   const ordenar=arr=>{
-    const con=arr.filter(b=>b.bn!=null).sort((a,b)=>a.bn-b.bn);
-    const sin=arr.filter(b=>b.bn==null).sort((a,b)=>(a.ts||0)-(b.ts||0));
+    const con=arr.filter(x=>x.bn!=null).sort((a,b)=>a.bn-b.bn);
+    const sin=arr.filter(x=>x.bn==null);
     return con.concat(sin);
   };
-
-  $('packBarrilesCount').textContent=activos.length.toLocaleString(I18N[lang].locale);
 
   const grid=$('packBarrilesGrid');
   let html='';
 
-  /* activos */
-  html += ordenar(activos).map(b=>{
-    const etq = b.bn!=null ? ('#'+b.bn) : '•';
-    return `<span class="pb-chip" title="${fmtTime(new Date(b.ts||Date.now()))}">${etq}</span>`;
+  /* checklist principal: pendientes + recibidos + reportados, en orden de número */
+  const principal=man.items.filter(x=>x.estado!=='ret');
+  html += ordenar(principal).map(x=>{
+    const etq = x.bn!=null ? ('#'+x.bn) : '•';
+    if(x.estado==='pend'){
+      return `<span class="pb-chip pb-chip-pend" title="${t('packPendTitle')}">☐ ${etq}</span>`;
+    }
+    if(x.estado==='rep'){
+      const desde = (x.scan && x.scan.reportado && x.scan.reportado.ts) ? fmtTime(new Date(x.scan.reportado.ts)) : '';
+      return `<span class="pb-chip pb-chip-rep" title="${t('packRepTitleChip')} ${desde}">⚠️ ${etq}</span>`;
+    }
+    const hora = (x.scan && x.scan.ts) ? fmtTime(new Date(x.scan.ts)) : '';
+    return `<span class="pb-chip" title="${hora}">✓ ${etq}</span>`;
   }).join('');
 
-  /* des-escaneados: bloque aparte, tachados, con su motivo */
+  /* retirados por QC: bloque aparte, tachados, con su motivo */
+  const retirados=man.items.filter(x=>x.estado==='ret');
   if(retirados.length){
     html += `<div class="pb-removed-head">${t('packRemovedList')} (${retirados.length})</div>`;
-    html += ordenar(retirados).map(b=>{
-      const etq = b.bn!=null ? ('#'+b.bn) : '•';
-      const mot = b.motivo ? nombreMotivo(b.motivo) : '';
-      const ttl = mot ? mot : t('packRemovedList');
-      return `<span class="pb-chip pb-chip-out" title="${ttl}">${etq}<span class="pb-mot">${mot}</span></span>`;
+    html += ordenar(retirados).map(x=>{
+      const etq = x.bn!=null ? ('#'+x.bn) : '•';
+      const mot = (x.scan && x.scan.motivo) ? nombreMotivo(x.scan.motivo) : '';
+      return `<span class="pb-chip pb-chip-out" title="${mot||t('packRemovedList')}">${etq}<span class="pb-mot">${mot}</span></span>`;
     }).join('');
   }
 
   grid.innerHTML=html;
 }
 
-/* pintar barra de progreso: colocados / total cerrado en encapsulación */
+/* pintar barra de progreso: recibidos / declarados (manifiesto).
+   Fallback: colocados / total de barriles de los días (órdenes sin declaración). */
 function renderPackProgreso(){
   const box=$('packProg'); if(!box) return;
   if(!packActual){ box.style.display='none'; return; }
   box.style.display='block';
-  const col=packActual.count!=null?packActual.count:0;
-  const tot=packActual.total!=null?packActual.total:0;
+  const man=packActual.manifiesto;
+  const col=(man && man.declarados>0) ? man.recibidos : (packActual.count!=null?packActual.count:0);
+  const tot=(man && man.declarados>0) ? man.declarados : (packActual.total!=null?packActual.total:0);
   $('packProgCol').textContent=col.toLocaleString(I18N[lang].locale);
   $('packProgTot').textContent=tot.toLocaleString(I18N[lang].locale);
   const fill=$('packProgFill'), pct=$('packProgPct'), none=$('packProgNone');
@@ -4234,7 +4399,41 @@ function nombreMotivo(m){
   return m||t('reasonOther');
 }
 
-/* ===== Des-escaneo (retirar label con motivo) ===== */
+/* ===== Reporte de packeting (barril con problema -> aviso a QC, SIN retirarlo) ===== */
+let _repCtx=null;   /* { cod, uid, data } */
+const modalPackReporte=$('modalPackReporte');
+
+function abrirPackReporte(cod, uid, bn, data){
+  _repCtx={ cod, uid, data };
+  $('packRepSub').textContent = bn!=null ? ('#'+bn) : uid;
+  modalPackReporte.classList.add('show');
+}
+function cerrarPackReporte(){ modalPackReporte.classList.remove('show'); _repCtx=null; }
+
+$('packRepError').addEventListener('click',()=>{
+  /* escaneo por error: no pasa nada, el barril sigue contando */
+  cerrarPackReporte();
+  packMostrarMsg(t('packReady'),'');
+});
+$('packRepProblema').addEventListener('click',async()=>{
+  if(!_repCtx){ cerrarPackReporte(); return; }
+  const { cod, uid, data }=_repCtx;
+  const b=(data.barrilesQR||[]).find(x=>x && x.uid===uid);
+  if(b && !b.removed && !b.reportado){
+    b.reportado={ ts:Date.now() };
+  }
+  const ok=await escribirOrden(cod, data);
+  if(!ok){ packMostrarMsg(t('packSaveErr'),'err'); beep(false); cerrarPackReporte(); return; }
+  packCache[cod]=data;
+  if(codigo && cod===codigo.toUpperCase()){ state.barrilesQR=data.barrilesQR; render(); }
+  packActual={ cod, batch:packActual?packActual.batch:'—', producto:packActual?packActual.producto:'', count:contarActivos(data.barrilesQR), total:totalCerrado(data), barriles:(data.barrilesQR||[]).slice(), manifiesto:manifiestoBarriles(data), ultimoBarril:(b&&b.bn!=null)?b.bn:null };
+  actualizarPackActual();
+  cerrarPackReporte();
+  packMostrarMsg(t('packReportadoOk'),'ok'); beep(true);
+});
+modalPackReporte.addEventListener('click',e=>{ if(e.target===modalPackReporte) cerrarPackReporte(); });
+
+/* ===== Disposición QC (retirar label con motivo) ===== */
 let _desCtx=null;       /* { cod, uid, data } */
 let _desMotivo=null;    /* motivo seleccionado */
 const modalDesescan=$('modalDesescan');
@@ -4275,18 +4474,23 @@ $('desescanOk').addEventListener('click',async()=>{
   const b=(data.barrilesQR||[]).find(x=>x && x.uid===uid);
   if(b){
     const nowTs=Date.now();
+    /* Si packeting lo había reportado, conservamos ese inicio: el paro real empezó ahí.
+       esperaQcMs = cuánto tardó QC en atender el reporte (KPI de disponibilidad de QC). */
+    const reporteTs = (b.reportado && b.reportado.ts) ? b.reportado.ts : null;
     b.removed=true; b.motivo=motivoFinal; b.removedTs=nowTs;
+    b.reportado=null;
     /* Historial de devoluciones: cada retiro abre un registro que se cierra al reincorporar.
        Permite medir el tiempo perdido por barril devuelto (KPI de paros). */
     if(!Array.isArray(b.devoluciones)) b.devoluciones=[];
-    b.devoluciones.push({ motivo:motivoFinal, removedTs:nowTs, reintegroTs:null, durationMs:null });
+    b.devoluciones.push({ motivo:motivoFinal, reporteTs, removedTs:nowTs, reintegroTs:null, durationMs:null,
+      esperaQcMs: reporteTs ? Math.max(0, nowTs - reporteTs) : null });
   }
   const ok=await escribirOrden(cod, data);
   if(!ok){ packMostrarMsg(t('packSaveErr'),'err'); beep(false); return; }
   packCache[cod]=data;
   if(codigo && cod===codigo.toUpperCase()){ state.barrilesQR=data.barrilesQR; render(); }
 
-  packActual={ cod, batch:packActual?packActual.batch:'—', producto:packActual?packActual.producto:'', count:contarActivos(data.barrilesQR), total:totalCerrado(data), barriles:(data.barrilesQR||[]).slice(), ultimoBarril:(b&&b.bn!=null)?b.bn:null };
+  packActual={ cod, batch:packActual?packActual.batch:'—', producto:packActual?packActual.producto:'', count:contarActivos(data.barrilesQR), total:totalCerrado(data), barriles:(data.barrilesQR||[]).slice(), manifiesto:manifiestoBarriles(data), ultimoBarril:(b&&b.bn!=null)?b.bn:null };
   actualizarPackActual();
 
   modalDesescan.classList.remove('show'); _desCtx=null;
