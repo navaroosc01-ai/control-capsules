@@ -468,6 +468,22 @@
     flex-wrap:wrap;margin:-4px 0 4px;animation:repPulse 1.6s ease-in-out infinite}
   .qc-rep-alert:hover{background:rgba(240,180,41,.2)}
   .qc-rep-alert .qc-rep-go{margin-left:auto;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.3px;text-decoration:underline}
+  /* Panel de barriles reportados en la pantalla del escáner (modo QC) */
+  .qc-rep-panel{background:rgba(240,180,41,.08);border:1px solid rgba(240,180,41,.4);border-radius:var(--radius);
+    padding:14px 16px;margin-bottom:14px}
+  .qc-rep-panel-head{display:flex;justify-content:space-between;align-items:center;gap:8px;
+    font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;color:var(--warn);margin-bottom:10px}
+  .qc-rep-panel-n{background:var(--warn);color:var(--panel);border-radius:20px;padding:2px 10px;
+    font-size:12px;font-weight:800;animation:repPulse 1.6s ease-in-out infinite}
+  .qc-rep-item{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:9px 12px;margin-bottom:6px;
+    background:var(--panel);border:1px solid var(--line);border-radius:10px;font-size:13px;color:var(--ink)}
+  .qc-rep-item:last-child{margin-bottom:0}
+  .qc-rep-item .qr-bn{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    font-weight:800;font-size:15px;color:var(--warn);min-width:44px}
+  .qc-rep-item .qr-info{display:flex;flex-direction:column;gap:1px;min-width:0;flex:1}
+  .qc-rep-item .qr-prod{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .qc-rep-item .qr-batch{font-size:11px;color:var(--muted)}
+  .qc-rep-item .oc-co-timer{font-size:13px;padding:3px 8px}
   /* Barra de progreso de packeting */
   .pack-prog{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:16px;margin-bottom:14px}
   .pack-prog-head{display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-bottom:10px}
@@ -559,6 +575,16 @@
         <button class="btn" id="qcBackFromPack" data-i18n="qcBack" style="display:none">← Back to active orders</button>
         <div class="dot" id="packDot"><i></i><span id="packTxt">—</span></div>
       </div>
+    </div>
+    <!-- Avisos para QC: barriles reportados por packeting pendientes de revisión.
+         Solo visible en modo QC; se refresca automáticamente cada 5 s. -->
+    <div id="qcRepPanel" class="qc-rep-panel" style="display:none">
+      <div class="qc-rep-panel-head">
+        <span data-i18n="qcRepTitle">🛢️ Barrels to review in packeting</span>
+        <span class="qc-rep-panel-n" id="qcRepCount">0</span>
+      </div>
+      <div id="qcRepList"></div>
+      <div class="hint" style="margin:6px 0 0" data-i18n="qcRepHint">Scan each barrel to choose its disposition.</div>
     </div>
     <div class="pack-scan-wrap">
       <div id="packReader"></div>
@@ -1841,6 +1867,8 @@ const I18N = {
     qcAskDispo:'Barrel active — choose disposition.',
     qcBarReportados:'reported barrel(s) waiting for QC',
     qcBarIrEscanear:'Scan →',
+    qcRepTitle:'🛢️ Barrels to review in packeting',
+    qcRepHint:'Scan each barrel to choose its disposition.',
     unscanHint:'The barrel stops counting as packed and the reason is recorded.',
     unscanConfirm:'Remove label', unscanSub:(b)=>`Barrel from batch ${b}`,
     reasonDusty:'Dusty', reasonSort:'To sort', reasonError:'Scanned by error', reasonOther:'Other',
@@ -2067,6 +2095,8 @@ const I18N = {
     qcAskDispo:'Barril activo — elija la disposición.',
     qcBarReportados:'barril(es) reportado(s) esperando QC',
     qcBarIrEscanear:'Escanear →',
+    qcRepTitle:'🛢️ Barriles por revisar en packeting',
+    qcRepHint:'Escanee cada barril para elegir su disposición.',
     unscanHint:'El barril deja de contar como colocado y se registra el motivo.',
     unscanConfirm:'Retirar label', unscanSub:(b)=>`Barril del batch ${b}`,
     reasonDusty:'Polvoso', reasonSort:'Sortear', reasonError:'Escaneo por error', reasonOther:'Otro',
@@ -3501,6 +3531,54 @@ function iniciarMecanico(){
 
 /* ===================== ROL QC ===================== */
 let qcOn=false, qcTimer=null, qcDatos={};
+let qcRepTimer=null;
+
+/* Avisos en el escáner (modo QC): recorrer todas las órdenes y listar los barriles
+   reportados por packeting pendientes de disposición, con producto, batch y número. */
+async function refrescarRepQC(){
+  const panel=$('qcRepPanel'); if(!panel) return;
+  try{
+    const url = REST + '?select=codigo,data';
+    const r = await fetch(url,{ headers: HEADERS });
+    if(!r.ok) return;
+    const arr = await r.json();
+    const pendientes=[];
+    arr.forEach(row=>{
+      const d=row.data||{};
+      const o=d.orden||{};
+      (d.barrilesQR||[]).forEach(b=>{
+        if(b && b.reportado && b.reportado.ts && !b.removed){
+          pendientes.push({
+            bn: b.bn!=null ? b.bn : null,
+            uid: b.uid||'',
+            producto: o.producto||'—',
+            batch: o.lote||'—',
+            cuarto: o.orden||'',
+            ts: b.reportado.ts
+          });
+        }
+      });
+    });
+    if(!pendientes.length){ panel.style.display='none'; return; }
+    /* más antiguos primero: son los que más urgen */
+    pendientes.sort((a,b)=>a.ts-b.ts);
+    $('qcRepCount').textContent=pendientes.length;
+    $('qcRepList').innerHTML = pendientes.map(p=>{
+      const esc=s=>String(s).replace(/</g,'&lt;');
+      const etq = p.bn!=null ? ('#'+p.bn) : '•';
+      const elapsed = Math.max(0, Date.now()-p.ts);
+      return `<div class="qc-rep-item">
+        <span class="qr-bn">🛢️ ${etq}</span>
+        <span class="qr-info">
+          <span class="qr-prod">${esc(p.producto)}</span>
+          <span class="qr-batch">Batch ${esc(p.batch)}${p.cuarto?(' · '+esc(p.cuarto)):''}</span>
+        </span>
+        <span class="oc-co-timer ${claseCronometro(elapsed)}" data-costart="${p.ts}">${fmtDuracionCO(elapsed)}</span>
+      </div>`;
+    }).join('');
+    panel.style.display='block';
+  }catch(e){ /* silencioso: el panel simplemente no se refresca */ }
+}
 
 function setQcConn(cls,txt){ const d=$('qcDot'); if(!d) return; d.className='dot '+cls; $('qcTxt').textContent=txt; }
 
@@ -3674,6 +3752,13 @@ function iniciarQC(){
     $('qcBackFromPack').addEventListener('click',()=>{
       location.href = `?rol=qc&clave=${CLAVE_QC}`;
     });
+  }
+  /* En modo escáner: avisos de barriles reportados por packeting (poll cada 5 s) */
+  if(document.body.classList.contains('qc-pack')){
+    if(qcRepTimer) clearInterval(qcRepTimer);
+    qcRepTimer=setInterval(refrescarRepQC, 5000);
+    refrescarRepQC();
+    iniciarCronometrosCO(); /* cronómetros vivos de espera */
   }
   if(qcTimer) clearInterval(qcTimer);
   qcTimer=setInterval(refrescarQC, 5000);
@@ -4198,6 +4283,7 @@ async function procesarBarril(datos){
       if(codigo && codFinal===codigo.toUpperCase()){ state.barrilesQR=data.barrilesQR; render(); }
       setCtx();
       packMostrarMsg(t('packReuse'),'ok'); beep(true);
+      if(qc) refrescarRepQC(); /* actualizar avisos al instante */
       return;
     }
 
@@ -4495,6 +4581,7 @@ $('desescanOk').addEventListener('click',async()=>{
 
   modalDesescan.classList.remove('show'); _desCtx=null;
   packMostrarMsg(t('packRemoved'),'ok'); beep(true);
+  if(qc) refrescarRepQC(); /* actualizar avisos al instante */
 });
 
 /* beep corto de confirmación (Web Audio, sin archivos) */
