@@ -492,6 +492,13 @@
     50%{opacity:.55;box-shadow:0 0 0 6px rgba(240,180,41,0)}}
   /* el botón entero se resalta cuando hay reportes pendientes */
   #qcGoPack.has-rep{border-color:var(--warn);color:var(--warn)}
+  /* Chip de línea de packeting: siempre visible, tap para cambiar */
+  .pack-linea-chip{display:inline-flex;align-items:center;gap:4px;background:var(--panel2);
+    border:1px solid var(--accent);color:var(--accent);border-radius:20px;padding:5px 12px;
+    font-size:12px;font-weight:800;cursor:pointer;user-select:none}
+  .pack-linea-chip:hover{background:rgba(61,220,151,.12)}
+  /* Botones grandes del selector de línea */
+  .linea-btn{width:100%;padding:16px;font-size:16px;font-weight:700}
   /* Barra de progreso de packeting */
   .pack-prog{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:16px;margin-bottom:14px}
   .pack-prog-head{display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-bottom:10px}
@@ -580,6 +587,7 @@
     <div class="pack-head">
       <h2><span class="ic">📦</span> <span data-i18n="packTitle">Packeting — barrel scanning</span></h2>
       <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+        <span class="pack-linea-chip" id="packLineaChip" style="display:none" title="">📍 —</span>
         <button class="btn" id="qcBackFromPack" data-i18n="qcBack" style="display:none">← Back to active orders</button>
         <div class="dot" id="packDot"><i></i><span id="packTxt">—</span></div>
       </div>
@@ -965,6 +973,19 @@
     <div class="actions" style="flex-direction:column;gap:8px">
       <button class="btn warn" id="packRepProblema" style="width:100%" data-i18n="packRepProblema">⚠️ It has a problem — notify QC</button>
       <button class="btn" id="packRepError" style="width:100%" data-i18n="packRepError">↩️ Scanned by error (do nothing)</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal selección de línea de packeting (queda por defecto en el dispositivo) -->
+<div class="modal-bg" id="modalLinea">
+  <div class="modal" style="max-width:380px">
+    <h3 data-i18n="lineaTitle">📍 Which packeting line is this?</h3>
+    <p style="font-size:12px;color:var(--muted);margin-bottom:14px" data-i18n="lineaDesc">
+      Your reports to QC will include this line so they know where to go. It stays saved on this device — tap the 📍 chip at the top to change it later.</p>
+    <div class="actions" style="flex-direction:column;gap:10px">
+      <button class="btn primary linea-btn" id="lineaBtn1">Línea 1</button>
+      <button class="btn primary linea-btn" id="lineaBtn2">Línea 2</button>
     </div>
   </div>
 </div>
@@ -1877,6 +1898,13 @@ const I18N = {
     qcBarIrEscanear:'Scan →',
     qcRepTitle:'🛢️ Barrels to review in packeting',
     qcRepHint:'Scan each barrel to choose its disposition.',
+    /* linea de packeting */
+    lineaTitle:'📍 Which packeting line is this?',
+    lineaDesc:'Your reports to QC will include this line so they know where to go. It stays saved on this device — tap the 📍 chip at the top to change it later.',
+    lineaNombre:(n)=>`Line ${n}`,
+    lineaSinSel:'Select line',
+    lineaCambiarTitle:'Tap to change the line',
+    lineaOk:(nom)=>`Working on ${nom}. Reports to QC will include it.`,
     unscanHint:'The barrel stops counting as packed and the reason is recorded.',
     unscanConfirm:'Remove label', unscanSub:(b)=>`Barrel from batch ${b}`,
     reasonDusty:'Dusty', reasonSort:'To sort', reasonError:'Scanned by error', reasonOther:'Other',
@@ -2105,6 +2133,13 @@ const I18N = {
     qcBarIrEscanear:'Escanear →',
     qcRepTitle:'🛢️ Barriles por revisar en packeting',
     qcRepHint:'Escanee cada barril para elegir su disposición.',
+    /* linea de packeting */
+    lineaTitle:'📍 ¿En qué línea de packeting está?',
+    lineaDesc:'Sus reportes a QC incluirán esta línea para que sepan a dónde ir. Queda guardada en este dispositivo — toque el chip 📍 arriba para cambiarla.',
+    lineaNombre:(n)=>`Línea ${n}`,
+    lineaSinSel:'Elegir línea',
+    lineaCambiarTitle:'Toque para cambiar la línea',
+    lineaOk:(nom)=>`Trabajando en ${nom}. Los reportes a QC la incluirán.`,
     unscanHint:'El barril deja de contar como colocado y se registra el motivo.',
     unscanConfirm:'Retirar label', unscanSub:(b)=>`Barril del batch ${b}`,
     reasonDusty:'Polvoso', reasonSort:'Sortear', reasonError:'Escaneo por error', reasonOther:'Otro',
@@ -3566,6 +3601,7 @@ async function refrescarRepQC(){
             producto: o.producto||'—',
             batch: o.lote||'—',
             cuarto: o.orden||'',
+            linea: b.reportado.linea||null,
             ts: b.reportado.ts
           });
         }
@@ -3599,7 +3635,7 @@ async function refrescarRepQC(){
         <span class="qr-bn">🛢️ ${etq}</span>
         <span class="qr-info">
           <span class="qr-prod">${esc(p.producto)}</span>
-          <span class="qr-batch">Batch ${esc(p.batch)}${p.cuarto?(' · '+esc(p.cuarto)):''}</span>
+          <span class="qr-batch">Batch ${esc(p.batch)}${p.cuarto?(' · '+esc(p.cuarto)):''}${p.linea?(' · <b style="color:var(--warn)">📍 '+esc(t('lineaNombre')(p.linea))+'</b>'):''}</span>
         </span>
         <span class="oc-co-timer ${claseCronometro(elapsed)}" data-costart="${p.ts}">${fmtDuracionCO(elapsed)}</span>
       </div>`;
@@ -4094,6 +4130,31 @@ function packMostrarMsg(txt, tipo){
   m.textContent=txt; m.className='pack-msg '+(tipo||'');
 }
 
+/* ===== Línea de packeting: se elige una vez y queda por defecto en el dispositivo ===== */
+const PACK_LINEA_KEY='pack_linea';
+let packLinea=null;
+
+function nombreLinea(n){ return t('lineaNombre')(n); }
+
+function cargarLinea(){
+  try{ const v=localStorage.getItem(PACK_LINEA_KEY); if(v==='1'||v==='2') packLinea=parseInt(v,10); }catch(e){}
+}
+function guardarLinea(n){
+  packLinea=n;
+  try{ localStorage.setItem(PACK_LINEA_KEY, String(n)); }catch(e){}
+  actualizarChipLinea();
+  $('modalLinea').classList.remove('show');
+  packMostrarMsg(t('lineaOk')(nombreLinea(n)),'ok');
+}
+function actualizarChipLinea(){
+  const chip=$('packLineaChip'); if(!chip) return;
+  if(qc){ chip.style.display='none'; return; } /* QC no declara línea: va a donde esté el barril */
+  chip.style.display='inline-flex';
+  chip.textContent='📍 '+(packLinea?nombreLinea(packLinea):t('lineaSinSel'));
+  chip.title=t('lineaCambiarTitle');
+}
+function abrirModalLinea(){ $('modalLinea').classList.add('show'); }
+
 function iniciarPacketing(){
   document.body.classList.add('packeting');
   setPackConn('ok', t('packConnReady'));
@@ -4101,6 +4162,16 @@ function iniciarPacketing(){
   renderPackBarriles();
   $('packStart').addEventListener('click', packStart);
   $('packStop').addEventListener('click', packStop);
+  /* Línea de trabajo: solo para el rol packeting (QC exento).
+     Si el dispositivo no tiene línea guardada, pedirla antes de empezar. */
+  if(!qc){
+    cargarLinea();
+    actualizarChipLinea();
+    $('packLineaChip').addEventListener('click', abrirModalLinea);
+    $('lineaBtn1').addEventListener('click', ()=>guardarLinea(1));
+    $('lineaBtn2').addEventListener('click', ()=>guardarLinea(2));
+    if(!packLinea){ abrirModalLinea(); }
+  }
 }
 
 async function packStart(){
@@ -4536,7 +4607,7 @@ $('packRepProblema').addEventListener('click',async()=>{
   const { cod, uid, data }=_repCtx;
   const b=(data.barrilesQR||[]).find(x=>x && x.uid===uid);
   if(b && !b.removed && !b.reportado){
-    b.reportado={ ts:Date.now() };
+    b.reportado={ ts:Date.now(), linea: packLinea||null };
   }
   const ok=await escribirOrden(cod, data);
   if(!ok){ packMostrarMsg(t('packSaveErr'),'err'); beep(false); cerrarPackReporte(); return; }
@@ -4593,12 +4664,13 @@ $('desescanOk').addEventListener('click',async()=>{
     /* Si packeting lo había reportado, conservamos ese inicio: el paro real empezó ahí.
        esperaQcMs = cuánto tardó QC en atender el reporte (KPI de disponibilidad de QC). */
     const reporteTs = (b.reportado && b.reportado.ts) ? b.reportado.ts : null;
+    const reporteLinea = (b.reportado && b.reportado.linea) ? b.reportado.linea : null;
     b.removed=true; b.motivo=motivoFinal; b.removedTs=nowTs;
     b.reportado=null;
     /* Historial de devoluciones: cada retiro abre un registro que se cierra al reincorporar.
        Permite medir el tiempo perdido por barril devuelto (KPI de paros). */
     if(!Array.isArray(b.devoluciones)) b.devoluciones=[];
-    b.devoluciones.push({ motivo:motivoFinal, reporteTs, removedTs:nowTs, reintegroTs:null, durationMs:null,
+    b.devoluciones.push({ motivo:motivoFinal, reporteTs, linea:reporteLinea, removedTs:nowTs, reintegroTs:null, durationMs:null,
       esperaQcMs: reporteTs ? Math.max(0, nowTs - reporteTs) : null });
   }
   const ok=await escribirOrden(cod, data);
