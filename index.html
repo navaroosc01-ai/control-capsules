@@ -522,6 +522,25 @@
   .pl-out{opacity:.6}
   .pl-out .pl-batch{text-decoration:line-through}
   .pl-motivo{font-size:10px;color:var(--warn);font-weight:600;text-transform:uppercase;letter-spacing:.3px}
+  /* ===== Reimprimir etiquetas (solo supervisor): corregir info de labels ya emitidos ===== */
+  .rp-link{width:100%;background:transparent;border:1px dashed var(--line);color:var(--muted);
+    font-size:12px;font-weight:600;padding:9px;border-radius:8px;cursor:pointer;transition:.15s;font-family:inherit}
+  .rp-link:hover{border-color:var(--warn);color:var(--warn);border-style:solid}
+  .rp-mini{padding:4px 10px;font-size:11px;font-weight:700}
+  .reprint-toolbar{display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap}
+  .reprint-count{margin-left:auto;font-size:12px;color:var(--muted)}
+  .reprint-count b{color:var(--accent);font-size:14px;font-variant-numeric:tabular-nums}
+  .reprint-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(52px,1fr));gap:5px;
+    max-height:180px;overflow-y:auto;padding:8px;background:var(--panel2);border:1px solid var(--line);border-radius:8px}
+  .rp-chip{display:flex;align-items:center;justify-content:center;padding:7px 4px;
+    background:var(--panel);border:1px solid var(--line);border-radius:6px;
+    font-size:12px;font-weight:700;font-variant-numeric:tabular-nums;
+    cursor:pointer;user-select:none;color:var(--muted);transition:.1s}
+  .rp-chip:hover{border-color:var(--accent);color:var(--accent)}
+  .rp-chip.sel{background:rgba(61,220,151,.14);border-color:var(--accent);color:var(--accent)}
+  .reprint-warn{background:rgba(240,180,41,.10);border:1px solid rgba(240,180,41,.4);
+    border-radius:8px;padding:11px 13px;font-size:12px;color:var(--warn);margin-bottom:12px;line-height:1.55}
+  .reprint-warn b{color:var(--warn)}
 </style>
 </head>
 <body>
@@ -1039,9 +1058,65 @@
         <span data-i18n="lblNumber">Number the labels (1, 2, 3…)</span>
       </label>
     </div>
+    <!-- Acceso a "Corregir etiquetas emitidas" (solo supervisor).
+         Se muestra/oculta desde abrirLabels() según el rol. -->
+    <div id="lblReprintRow" style="display:none;margin-bottom:12px">
+      <button type="button" class="rp-link" id="lblReprintBtn" data-i18n="reprintOpen">🔄 Correct labels already issued</button>
+    </div>
     <div class="actions">
       <button class="btn" id="lblCancel" data-i18n="cancel">Cancel</button>
       <button class="btn primary" id="lblGen" data-i18n="lblGenerate">Generate PDF</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Reimprimir etiquetas (solo supervisor): corregir la información de labels ya emitidos.
+     - Selecciona uno o varios bn ya declarados.
+     - Los datos (batch, neto) se pueden editar; el PDF sale con los mismos bn.
+     - Si el batch cambia, se migran los uid en el manifiesto y en cualquier escaneo previo,
+       y se deja bitácora (reprints:[]) para auditoría. -->
+<div class="modal-bg" id="modalReprint">
+  <div class="modal" style="max-width:460px">
+    <h3 data-i18n="reprintTitle">🔄 Correct issued labels</h3>
+    <div class="sub" id="reprintInfo">—</div>
+
+    <div class="row">
+      <label data-i18n="reprintSelect">Which barrels to reprint</label>
+      <div class="reprint-toolbar">
+        <button type="button" class="btn rp-mini" id="reprintAll" data-i18n="reprintAll">All</button>
+        <button type="button" class="btn rp-mini" id="reprintNone" data-i18n="reprintNone">None</button>
+        <span class="reprint-count"><b id="reprintCount">0</b> <span data-i18n="reprintSelected">selected</span></span>
+      </div>
+      <div class="reprint-grid" id="reprintGrid"></div>
+      <div class="hint" id="reprintEmpty" data-i18n="reprintEmpty" style="display:none">No issued labels to reprint yet.</div>
+    </div>
+
+    <div class="row">
+      <label data-i18n="reprintFields">New data (goes on the label)</label>
+      <div class="grid g2">
+        <div class="row">
+          <label data-i18n="lblBatchLbl">Batch (Lot Number)</label>
+          <input id="reprintBatch" type="text">
+        </div>
+        <div class="row">
+          <label data-i18n="lblNetLbl">Net weight (kg)</label>
+          <input id="reprintNeto" type="number" step="0.1" inputmode="decimal">
+        </div>
+      </div>
+    </div>
+
+    <div class="row">
+      <label style="display:flex;align-items:center;gap:8px;text-transform:none;letter-spacing:0;cursor:pointer">
+        <input id="reprintNumerar" type="checkbox" checked style="width:16px;height:16px;flex:0 0 auto">
+        <span data-i18n="lblNumber">Number the labels (1, 2, 3…)</span>
+      </label>
+    </div>
+
+    <div class="reprint-warn" id="reprintWarn" style="display:none"></div>
+
+    <div class="actions">
+      <button class="btn" id="reprintCancel" data-i18n="cancel">Cancel</button>
+      <button class="btn primary" id="reprintGen" data-i18n="reprintGen">Reprint</button>
     </div>
   </div>
 </div>
@@ -1871,6 +1946,17 @@ const I18N = {
     lblGenerate:'Generate PDF', lblSheets:(n)=>`${n} ${n===1?'sheet':'sheets'} (6 labels per sheet)`,
     lblNeedBatch:'Enter the batch number (Lot Number).', lblNeedNet:'Enter the net weight (kg).',
     lblNeedQty:'Enter a valid number of labels.',
+    /* Reimpresión / corrección de etiquetas ya emitidas (solo supervisor) */
+    reprintOpen:'🔄 Correct labels already issued',
+    reprintTitle:'🔄 Correct issued labels',
+    reprintSelect:'Which barrels to reprint',
+    reprintAll:'All', reprintNone:'None', reprintSelected:'selected',
+    reprintEmpty:'No issued labels to reprint yet.',
+    reprintFields:'New data (goes on the label)',
+    reprintGen:'Reprint',
+    reprintGenN:(n)=>`Reprint (${n})`,
+    reprintNeedSel:'Select at least one barrel to reprint.',
+    reprintUidWarn:(n)=>`⚠️ You are changing the <b>batch</b> of <b>${n}</b> label${n===1?'':'s'}. Their identity (uid) will change from <b>OLD_batch#N</b> to <b>NEW_batch#N</b>. Any previous scan is migrated to the new uid automatically. <b>Recommended:</b> physically destroy the old labels before applying the new ones.`,
     barrelsQR:'Barrels scanned (QR)',
     packTitle:'Packeting — barrel scanning', packStart:'▶️ Start scanner', packStop:'⏹️ Stop scanner',
     packLastBatch:'Current batch', packBarrels:'barrels', packLog:'Recent scans', packRemovedList:'Removed',
@@ -2106,6 +2192,17 @@ const I18N = {
     lblGenerate:'Generar PDF', lblSheets:(n)=>`${n} ${n===1?'hoja':'hojas'} (6 labels por hoja)`,
     lblNeedBatch:'Ingresa el número de batch (Lot Number).', lblNeedNet:'Ingresa los kilos neto (kg).',
     lblNeedQty:'Ingresa una cantidad válida de labels.',
+    /* Reimpresión / corrección de etiquetas ya emitidas (solo supervisor) */
+    reprintOpen:'🔄 Corregir etiquetas ya emitidas',
+    reprintTitle:'🔄 Corregir etiquetas emitidas',
+    reprintSelect:'Qué barriles reimprimir',
+    reprintAll:'Todos', reprintNone:'Ninguno', reprintSelected:'seleccionados',
+    reprintEmpty:'Aún no hay etiquetas emitidas para reimprimir.',
+    reprintFields:'Nuevos datos (van en la etiqueta)',
+    reprintGen:'Reimprimir',
+    reprintGenN:(n)=>`Reimprimir (${n})`,
+    reprintNeedSel:'Selecciona al menos un barril para reimprimir.',
+    reprintUidWarn:(n)=>`⚠️ Vas a cambiar el <b>batch</b> de <b>${n}</b> etiqueta${n===1?'':'s'}. Su identidad (uid) pasa de <b>BATCH_VIEJO#N</b> a <b>BATCH_NUEVO#N</b>. Los escaneos previos se migran al uid nuevo automáticamente. <b>Recomendado:</b> destruí físicamente las etiquetas viejas antes de pegar las nuevas.`,
     barrelsQR:'Barriles leídos (QR)',
     packTitle:'Packeting — escaneo de barriles', packStart:'▶️ Iniciar escáner', packStop:'⏹️ Detener escáner',
     packLastBatch:'Batch actual', packBarrels:'barriles', packLog:'Escaneos recientes', packRemovedList:'Retirados',
@@ -3972,6 +4069,10 @@ function abrirLabels(){
   $('lblNeto').value  = '25';
   $('lblCant').value  = '6';
   $('lblNumerar').checked = true;
+  /* El acceso a "Corregir emitidas" solo se ofrece a supervisor.
+     Además solo tiene sentido si ya hay barriles declarados en la orden. */
+  const declHay = Array.isArray(state.barrilesDeclarados) && state.barrilesDeclarados.some(d=>d && d.bn!=null);
+  $('lblReprintRow').style.display = (supervisor && declHay) ? 'block' : 'none';
   actualizarHojasLbl();
   $('modalLabels').classList.add('show');
 }
@@ -4122,6 +4223,196 @@ $('lblCant').addEventListener('input', actualizarHojasLbl);
 $('lblCancel').addEventListener('click', cerrarLabels);
 $('lblGen').addEventListener('click', generarLabelsPDF);
 $('modalLabels').addEventListener('click', e=>{ if(e.target.id==='modalLabels') cerrarLabels(); });
+
+/* ===================== REIMPRIMIR — corregir etiquetas ya emitidas =====================
+   Solo supervisor. Regenera un PDF con los bn seleccionados usando los datos actuales.
+   Si el batch cambia respecto al declarado original, se actualiza el uid en el manifiesto
+   (barrilesDeclarados) y en cualquier escaneo previo (barrilesQR), dejando bitácora
+   en decl.reprints[] y en sc.reprints[] para trazabilidad completa. */
+
+let _rpOrden = null;      /* snapshot de la orden al abrir */
+let _rpSel   = new Set(); /* bn seleccionados */
+
+function abrirReprint(){
+  if(!supervisor){ return; }
+  cerrarLabels();
+
+  const o = state.orden || {};
+  _rpOrden = { producto:o.producto||'', batch:o.lote||'', cuarto:o.orden||'', cod:codigo||'' };
+  $('reprintInfo').textContent =
+    (_rpOrden.producto || t('noProduct')) + (_rpOrden.cuarto ? '  ·  Room ' + _rpOrden.cuarto : '');
+
+  $('reprintBatch').value  = _rpOrden.batch || '';
+  $('reprintNeto').value   = '25';
+  $('reprintNumerar').checked = true;
+  _rpSel.clear();
+
+  renderReprintGrid();
+  actualizarReprintUI();
+  $('modalReprint').classList.add('show');
+}
+
+function cerrarReprint(){
+  $('modalReprint').classList.remove('show');
+  _rpOrden = null;
+  _rpSel.clear();
+}
+
+function renderReprintGrid(){
+  const decl = Array.isArray(state.barrilesDeclarados) ? state.barrilesDeclarados.slice() : [];
+  decl.sort((a,b)=>(a.bn||0)-(b.bn||0));
+  const grid  = $('reprintGrid');
+  const empty = $('reprintEmpty');
+
+  const validos = decl.filter(d=>d && d.bn!=null);
+  if(!validos.length){
+    grid.innerHTML = '';
+    empty.style.display = 'block';
+    return;
+  }
+  empty.style.display = 'none';
+
+  grid.innerHTML = validos.map(d => {
+    const sel = _rpSel.has(d.bn) ? ' sel' : '';
+    return `<span class="rp-chip${sel}" data-bn="${d.bn}">#${d.bn}</span>`;
+  }).join('');
+
+  grid.querySelectorAll('.rp-chip').forEach(chip => {
+    chip.addEventListener('click', ()=>{
+      const bn = parseInt(chip.getAttribute('data-bn'), 10);
+      if(_rpSel.has(bn)) _rpSel.delete(bn); else _rpSel.add(bn);
+      chip.classList.toggle('sel');
+      actualizarReprintUI();
+    });
+  });
+}
+
+function actualizarReprintUI(){
+  const n = _rpSel.size;
+  $('reprintCount').textContent = n;
+  $('reprintGen').textContent = n ? t('reprintGenN')(n) : t('reprintGen');
+  $('reprintGen').disabled = (n === 0);
+
+  /* aviso si el batch nuevo difiere del uid original de alguno de los seleccionados */
+  const newBatch = ($('reprintBatch').value || '').trim();
+  const decl = Array.isArray(state.barrilesDeclarados) ? state.barrilesDeclarados : [];
+  let uidChanges = 0;
+  if(newBatch){
+    _rpSel.forEach(bn => {
+      const d = decl.find(x => x && x.bn === bn);
+      if(d && d.uid){
+        const oldBatch = String(d.uid).split('#')[0];
+        if(oldBatch !== newBatch) uidChanges++;
+      }
+    });
+  }
+  const warn = $('reprintWarn');
+  if(uidChanges > 0){
+    warn.style.display = 'block';
+    warn.innerHTML = t('reprintUidWarn')(uidChanges);
+  } else {
+    warn.style.display = 'none';
+  }
+}
+
+async function reimprimirLabelsPDF(){
+  if(!_rpOrden){ return; }
+  const producto = _rpOrden.producto || '';
+  const batch    = $('reprintBatch').value.trim();
+  const neto     = $('reprintNeto').value.trim();
+  const cuarto   = _rpOrden.cuarto || '';
+  const cod      = _rpOrden.cod || '';
+  const numerar  = $('reprintNumerar').checked;
+
+  if(!batch){ alert(t('lblNeedBatch')); return; }
+  if(!neto){  alert(t('lblNeedNet'));   return; }
+  if(_rpSel.size === 0){ alert(t('reprintNeedSel')); return; }
+
+  const bnList = Array.from(_rpSel).sort((a,b)=>a-b);
+
+  const { jsPDF } = window.jspdf;
+  const PAGE_W=215.9, PAGE_H=279.4;
+  const COLS=2, ROWS=3, PER_PAGE=COLS*ROWS;
+  const MX=12, MY=14, GAP_X=6, GAP_Y=4;
+  const LW=(PAGE_W-2*MX-GAP_X)/COLS;
+  const LH=(PAGE_H-2*MY-(ROWS-1)*GAP_Y)/ROWS;
+
+  const doc = new jsPDF({unit:'mm',format:[PAGE_W,PAGE_H]});
+  const ts  = Date.now();
+
+  for(let i=0; i<bnList.length; i++){
+    const barrilNo = bnList[i];
+    const idx = i % PER_PAGE;
+    if(i>0 && idx===0) doc.addPage([PAGE_W,PAGE_H]);
+    const col = idx % COLS, row = Math.floor(idx/COLS);
+    const x = MX + col*(LW+GAP_X), y = MY + row*(LH+GAP_Y);
+    const num = numerar ? barrilNo : null;
+    const payload = JSON.stringify({ c:cod, b:batch, bn:barrilNo });
+    const qr = await lblQrDataURL(payload);
+    dibujarLabel(doc, x, y, LW, LH, { producto, batch, neto, cuarto, num, barrilNo, qr, printNum:numerar });
+  }
+
+  /* MIGRACIÓN de estado para los bn seleccionados.
+     - Siempre anotamos la reimpresión en decl.reprints[] (audit).
+     - Si el batch cambió, actualizamos el uid del declarado y de los escaneos previos. */
+  if(!Array.isArray(state.barrilesDeclarados)) state.barrilesDeclarados = [];
+  if(!Array.isArray(state.barrilesQR))         state.barrilesQR = [];
+
+  bnList.forEach(bn => {
+    const decl = state.barrilesDeclarados.find(d => d && d.bn === bn);
+    if(!decl) return;
+    const oldUid = decl.uid || '';
+    const newUid = batch + '#' + bn;
+    const batchCambia = (oldUid && oldUid !== newUid);
+
+    decl.reprints = Array.isArray(decl.reprints) ? decl.reprints : [];
+    decl.reprints.push({
+      ts,
+      by: 'supervisor',
+      oldUid:   batchCambia ? oldUid : null,
+      oldBatch: batchCambia ? String(oldUid).split('#')[0] : null,
+      newBatch: batch
+    });
+
+    if(batchCambia){
+      decl.uid = newUid;
+      /* migrar escaneos previos con el uid viejo (packeting los preserva por trazabilidad) */
+      state.barrilesQR.forEach(sc => {
+        if(sc && sc.uid === oldUid){
+          sc.uid = newUid;
+          sc.reprints = Array.isArray(sc.reprints) ? sc.reprints : [];
+          sc.reprints.push({ ts, oldUid });
+        }
+      });
+    }
+  });
+
+  /* supervisor → nube directa (save() saltearía la escritura para roles no operador) */
+  escribirNube();
+  render();
+
+  const safe = (batch.replace(/[^a-zA-Z0-9_-]/g,'') || 'orden');
+  doc.save('reimpresion_' + safe + '.pdf');
+  cerrarReprint();
+}
+
+/* wiring del modal de reimpresión */
+$('lblReprintBtn').addEventListener('click', abrirReprint);
+$('reprintCancel').addEventListener('click', cerrarReprint);
+$('modalReprint').addEventListener('click', e=>{ if(e.target.id==='modalReprint') cerrarReprint(); });
+$('reprintGen').addEventListener('click', reimprimirLabelsPDF);
+$('reprintBatch').addEventListener('input', actualizarReprintUI);
+$('reprintAll').addEventListener('click', ()=>{
+  const decl = Array.isArray(state.barrilesDeclarados) ? state.barrilesDeclarados : [];
+  decl.forEach(d => { if(d && d.bn!=null) _rpSel.add(d.bn); });
+  renderReprintGrid();
+  actualizarReprintUI();
+});
+$('reprintNone').addEventListener('click', ()=>{
+  _rpSel.clear();
+  renderReprintGrid();
+  actualizarReprintUI();
+});
 
 /* ===================== PACKETING: escaneo de barriles ===================== */
 let packQR=null, packBusy=false, packActual=null;
