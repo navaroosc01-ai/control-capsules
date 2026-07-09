@@ -4039,11 +4039,15 @@ async function generarLabelsPDF(){
     const x=MX+col*(LW+GAP_X), y=MY+row*(LH+GAP_Y);
     const barrilNo=ultimoBn + i + 1; /* número de barril continuo (va en el QR) */
     const num=numerar ? barrilNo : null;
-    /* QR LIVIANO: solo lo necesario. uid se deriva de batch + número de barril
-       (único gracias a la numeración continua). El código de orden (c) va
-       OCULTO en el QR para localizar la orden, pero NO se imprime en la etiqueta. */
+    /* QR MÍNIMO (baja densidad para lectura confiable en celulares débiles).
+       Solo llevamos lo que el escáner realmente usa:
+         c  = código de orden -> ruta rápida de lookup con packCache
+         b  = batch/lote      -> arma el uid (batch#bn) y sirve de fallback si c falla
+         bn = número de barril
+       Producto, cuarto y neto NO van en el QR: se leen de la orden en la nube al escanear.
+       parsearQRBarril() ya acepta este formato liviano y también las etiquetas viejas. */
     const uid = batch + '#' + barrilNo;
-    const payload=JSON.stringify({ p:producto, b:batch, r:cuarto, n:neto, bn:barrilNo, c:cod });
+    const payload=JSON.stringify({ c:cod, b:batch, bn:barrilNo });
     const qr=await lblQrDataURL(payload);
     dibujarLabel(doc, x, y, LW, LH, { producto, batch, neto, cuarto, num, barrilNo, qr, printNum:numerar });
     nuevos.push({ bn:barrilNo, uid, ts });
