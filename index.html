@@ -324,6 +324,17 @@
   .paro-row.zero .pr-time{color:var(--muted)}
   .paro-row.co .pr-time{color:var(--warn)}
 
+  /* ===== Sección Packeting (aparece en QC dashboard y tablero supervisor) ===== */
+  .pk-section{margin-top:22px}
+  .pk-section-title{font-size:13px;font-weight:800;text-transform:uppercase;letter-spacing:.8px;
+    color:var(--muted);margin:0 0 10px;padding-left:2px;display:flex;align-items:center;gap:8px}
+  .pk-section-title::after{content:'';flex:1;height:1px;background:var(--line);margin-left:6px}
+  .ord-card.pk{border-left:3px solid var(--accent)}
+  .pk-line-chip{display:inline-block;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;
+    color:var(--accent);background:rgba(87,166,255,.14);padding:3px 9px;border-radius:12px;margin-left:6px}
+  .pk-range-chip{display:inline-block;font-size:11px;color:var(--muted);background:var(--panel2);
+    border:1px solid var(--line);padding:3px 8px;border-radius:10px;margin-left:6px;
+    font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
   /* ===== Rol QC: dashboard de ordenes activas + escaner ===== */
   #qcBoard{display:none}
   body.qc #qcBoard{display:block}
@@ -585,6 +596,10 @@
     </div>
     <div id="tabGrid" class="tab-grid"></div>
     <div id="tabEmpty" class="tab-empty" data-i18n="tabEmpty">Type one or more order codes and press "Show" to see their live progress.</div>
+    <div id="tabPkSection" class="pk-section" style="display:none">
+      <h4 class="pk-section-title" data-i18n="pkSection">📦 Packeting</h4>
+      <div id="tabPkGrid" class="tab-grid"></div>
+    </div>
   </div>
 
   <!-- ===== Tablero del Manager Mecánico (?rol=mecanico) ===== -->
@@ -676,6 +691,10 @@
     </div>
     <div id="qcGrid" class="tab-grid"></div>
     <div id="qcEmpty" class="tab-empty" data-i18n="qcEmpty">No active orders right now.</div>
+    <div id="qcPkSection" class="pk-section" style="display:none">
+      <h4 class="pk-section-title" data-i18n="pkSection">📦 Packeting</h4>
+      <div id="qcPkGrid" class="tab-grid"></div>
+    </div>
   </div>
 
   <!-- Barra superior QC dentro de una orden: boton para volver al dashboard -->
@@ -1124,6 +1143,71 @@
   </div>
 </div>
 
+<!-- Modal Packeting: iniciar orden en la línea (se dispara al escanear un QR sin orden activa) -->
+<div class="modal-bg" id="modalPackStart">
+  <div class="modal" style="max-width:480px">
+    <h3 data-i18n="pkStartTitle">📦 Start packeting order on this line?</h3>
+    <div class="sub" id="pkStartDesc">—</div>
+    <div class="alert" id="pkStartAlert"></div>
+    <div class="row">
+      <label data-i18n="pkTargetLbl">Total bottles to produce</label>
+      <input id="pkTarget" type="number" step="1" min="1" inputmode="numeric">
+    </div>
+    <div class="grid g2">
+      <div class="row">
+        <label data-i18n="pkPesoMinLbl">Min weight per bottle (g)</label>
+        <input id="pkPesoMin" type="number" step="0.1" inputmode="decimal">
+      </div>
+      <div class="row">
+        <label data-i18n="pkPesoMaxLbl">Max weight per bottle (g)</label>
+        <input id="pkPesoMax" type="number" step="0.1" inputmode="decimal">
+      </div>
+    </div>
+    <div class="row">
+      <label data-i18n="pkPesoFirstLbl">Weight of the first bottle (g)</label>
+      <input id="pkPesoFirst" type="number" step="0.1" inputmode="decimal">
+    </div>
+    <div class="actions">
+      <button class="btn" id="pkStartCancel" data-i18n="pkStartCancel">Not now</button>
+      <button class="btn primary" id="pkStartConfirm" data-i18n="pkStartConfirm">Start order</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Packeting: nueva muestra de peso -->
+<div class="modal-bg" id="modalPackSample">
+  <div class="modal" style="max-width:380px">
+    <h3 data-i18n="pkSampleTitle">⚖️ New packeting sample</h3>
+    <div class="sub" id="pkSampleInfo">—</div>
+    <div class="alert" id="pkSampleAlert"></div>
+    <div class="row">
+      <label data-i18n="pkSampleLbl">Bottle weight (g)</label>
+      <input id="pkSampleVal" type="number" step="0.1" inputmode="decimal">
+    </div>
+    <div class="actions">
+      <button class="btn" id="pkSampleCancel" data-i18n="cancel">Cancel</button>
+      <button class="btn primary" id="pkSampleSave" data-i18n="save">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Packeting: actualizar avance (total de botes producidos) -->
+<div class="modal-bg" id="modalPackAdvance">
+  <div class="modal" style="max-width:380px">
+    <h3 data-i18n="pkAdvTitle">📈 Update bottles produced</h3>
+    <div class="sub" id="pkAdvInfo">—</div>
+    <div class="alert" id="pkAdvAlert"></div>
+    <div class="row">
+      <label data-i18n="pkAdvLbl">Total bottles so far</label>
+      <input id="pkAdvVal" type="number" step="1" min="0" inputmode="numeric">
+    </div>
+    <div class="actions">
+      <button class="btn" id="pkAdvCancel" data-i18n="cancel">Cancel</button>
+      <button class="btn primary" id="pkAdvSave" data-i18n="save">Save</button>
+    </div>
+  </div>
+</div>
+
 <!-- Modal Change over: capturar los datos de la nueva orden a iniciar en el mismo cuarto -->
 <div class="modal-bg" id="modalChangeOver">
   <div class="modal" style="max-width:520px">
@@ -1254,6 +1338,19 @@ function normalizar(d){ d=d||{}; d.orden=d.orden||{producto:'',lote:'',orden:'',
     if(inc.atiende===undefined) inc.atiende=null;
     if(inc.procTs===undefined) inc.procTs=null;
   });
+  /* packeting: sub-estado que trackea la produccion de botes en una linea.
+     Estructura: { linea, target, pesoMin, pesoMax, startTs, registros:[{ts,peso,primera}], dias:{"YYYY-MM-DD":{avance,avanceTs,closed?,prod?}} }
+     null = no se ha iniciado orden de packeting para esta orden de encapsulado. */
+  if(d.packeting===undefined) d.packeting=null;
+  if(d.packeting){
+    d.packeting.registros = d.packeting.registros || [];
+    d.packeting.dias      = d.packeting.dias || {};
+    if(d.packeting.target===undefined)  d.packeting.target=null;
+    if(d.packeting.pesoMin===undefined) d.packeting.pesoMin=null;
+    if(d.packeting.pesoMax===undefined) d.packeting.pesoMax=null;
+    if(d.packeting.startTs===undefined) d.packeting.startTs=null;
+    if(d.packeting.linea===undefined)   d.packeting.linea=null;
+  }
   return d; }
 
 /* Estados de incidencia */
@@ -1298,6 +1395,9 @@ async function codigosEnProceso(){
     /* Change over activo: orden nueva con startTs y sin endTs */
     const coActivo = dd.changeOverFrom && dd.changeOverFrom.startTs && !dd.changeOverFrom.endTs;
     if(coActivo){ out.push(cod); return; }
+    /* Packeting activo: aunque el encapsulado esté cerrado, la orden sigue viva mientras
+       haya orden de packeting en curso (para que QC y supervisor la vean). */
+    if(dd.packeting && dd.packeting.linea){ out.push(cod); return; }
     if(estatusOrden(dd, true)===tEN('inProcess')) out.push(cod);
   });
   return out;
@@ -1994,6 +2094,36 @@ const I18N = {
     lineaSinSel:'Select line',
     lineaCambiarTitle:'Tap to change the line',
     lineaOk:(nom)=>`Working on ${nom}. Reports to QC will include it.`,
+    /* packeting production tracking (bottles per line) */
+    pkStartTitle:'📦 Start packeting order on this line?',
+    pkStartDesc:(cod,lote,prod,linea)=>`Order ${cod} · Batch ${lote} · ${prod||'—'} — starting on ${linea}.`,
+    pkTargetLbl:'Total bottles to produce',
+    pkPesoMinLbl:'Min weight per bottle (g)',
+    pkPesoMaxLbl:'Max weight per bottle (g)',
+    pkPesoFirstLbl:'Weight of the first bottle (g)',
+    pkStartCancel:'Not now',
+    pkStartConfirm:'Start order',
+    pkStartOk:'✓ Packeting order started',
+    pkAlreadyStarted:(l)=>`Packeting order already active on line ${l}.`,
+    pkOtherLine:(l)=>`Packeting already running on line ${l} for this order.`,
+    pkNeedTarget:'Enter total bottles.',
+    pkNeedRange:'Enter both min and max weight (min ≤ max).',
+    pkNeedFirst:'Enter the weight of the first bottle.',
+    pkOutOfRange:(mn,mx)=>`Weight is outside the range ${mn}–${mx} g. Confirm to continue?`,
+    pkSection:'📦 Packeting',
+    pkLineChip:(n)=>`Line ${n}`,
+    pkProgress:'Bottles produced',
+    pkUnit:'bottles',
+    pkNewSample:'➕ New sample',
+    pkUpdateAdv:'📈 Update bottles',
+    pkFirstSample:'➕ First sample',
+    pkSampleTitle:'⚖️ New packeting sample',
+    pkSampleLbl:'Bottle weight (g)',
+    pkAdvTitle:'📈 Update bottles produced',
+    pkAdvLbl:'Total bottles so far',
+    pkRangeChip:(mn,mx)=>`${mn}–${mx} g`,
+    pkNoActiveOrder:'No active packeting order.',
+    pkAvanceHoy:'Today (bottles)',
     unscanHint:'The barrel stops counting as packed and the reason is recorded.',
     unscanConfirm:'Remove label', unscanSub:(b)=>`Barrel from batch ${b}`,
     reasonDusty:'Dusty', reasonSort:'To sort', reasonError:'Scanned by error', reasonOther:'Other',
@@ -2240,6 +2370,36 @@ const I18N = {
     lineaSinSel:'Elegir línea',
     lineaCambiarTitle:'Toque para cambiar la línea',
     lineaOk:(nom)=>`Trabajando en ${nom}. Los reportes a QC la incluirán.`,
+    /* packeting production tracking (botes por línea) */
+    pkStartTitle:'📦 ¿Iniciar orden de packeting en esta línea?',
+    pkStartDesc:(cod,lote,prod,linea)=>`Orden ${cod} · Batch ${lote} · ${prod||'—'} — iniciando en ${linea}.`,
+    pkTargetLbl:'Botes totales a producir',
+    pkPesoMinLbl:'Peso mínimo por bote (g)',
+    pkPesoMaxLbl:'Peso máximo por bote (g)',
+    pkPesoFirstLbl:'Peso del primer bote (g)',
+    pkStartCancel:'Ahora no',
+    pkStartConfirm:'Iniciar orden',
+    pkStartOk:'✓ Orden de packeting iniciada',
+    pkAlreadyStarted:(l)=>`Ya hay orden de packeting activa en la línea ${l}.`,
+    pkOtherLine:(l)=>`El packeting de esta orden ya corre en la línea ${l}.`,
+    pkNeedTarget:'Ingresa la cantidad total de botes.',
+    pkNeedRange:'Ingresa peso mínimo y máximo (mín ≤ máx).',
+    pkNeedFirst:'Ingresa el peso del primer bote.',
+    pkOutOfRange:(mn,mx)=>`El peso está fuera del rango ${mn}–${mx} g. ¿Confirmar de todos modos?`,
+    pkSection:'📦 Packeting',
+    pkLineChip:(n)=>`Línea ${n}`,
+    pkProgress:'Botes producidos',
+    pkUnit:'botes',
+    pkNewSample:'➕ Nueva muestra',
+    pkUpdateAdv:'📈 Actualizar botes',
+    pkFirstSample:'➕ Primera muestra',
+    pkSampleTitle:'⚖️ Nueva muestra de packeting',
+    pkSampleLbl:'Peso del bote (g)',
+    pkAdvTitle:'📈 Actualizar botes producidos',
+    pkAdvLbl:'Total de botes hasta ahora',
+    pkRangeChip:(mn,mx)=>`${mn}–${mx} g`,
+    pkNoActiveOrder:'Sin orden de packeting activa.',
+    pkAvanceHoy:'Hoy (botes)',
     unscanHint:'El barril deja de contar como colocado y se registra el motivo.',
     unscanConfirm:'Retirar label', unscanSub:(b)=>`Barril del batch ${b}`,
     reasonDusty:'Polvoso', reasonSort:'Sortear', reasonError:'Escaneo por error', reasonOther:'Otro',
@@ -3420,6 +3580,60 @@ async function refrescarTablero(){
     </div>`;
   });
   grid.innerHTML=html;
+  renderTablePacketing(tabEfectivos, tabDatos);
+}
+
+/* Sección Packeting del tablero supervisor: cards read-only con barra de avance del día acumulado */
+function renderTablePacketing(codigos, datos){
+  const sec = $('tabPkSection'), grid = $('tabPkGrid');
+  const loc = I18N[lang].locale;
+  const activas = (codigos||[]).filter(c=> datos && datos[c] && datos[c].packeting);
+  if(!activas.length){ sec.style.display='none'; grid.innerHTML=''; return; }
+  sec.style.display='block';
+  let html = '';
+  activas.forEach(cod=>{
+    const d = datos[cod];
+    const p = d.packeting;
+    const o = d.orden || {};
+    const hoyK = dayKey(new Date());
+    const dHoy = p.dias && p.dias[hoyK];
+    const producidosTotal = pkBotesAcumulados(p);
+    const target = p.target||0;
+    /* Barra de avance del día acumulado (mismo criterio visual que encapsulado) */
+    let prog = '';
+    if(target>0){
+      const pctReal = producidosTotal/target*100, pct = Math.min(100,pctReal);
+      const color = pctReal<=30?'var(--danger)':(pctReal<=70?'var(--warn)':'var(--accent)');
+      prog = `<div>
+        <div class="oc-prog-top"><span>${t('pkProgress')}</span><b>${pct.toFixed(1)}%</b></div>
+        <div class="bar"><span style="width:${pct}%;background:${color}"></span></div>
+        <div class="oc-prog-top" style="margin-top:5px;margin-bottom:0">
+          <span style="color:var(--muted)">${producidosTotal.toLocaleString(loc)} / ${target.toLocaleString(loc)} ${t('pkUnit')}</span></div>
+      </div>`;
+    } else {
+      prog = `<div class="oc-meta">${t('accumLabel')} <b>${producidosTotal.toLocaleString(loc)}</b> ${t('pkUnit')}</div>`;
+    }
+    /* Avance del día actual (packeting) */
+    let hoyTxt = '—';
+    if(dHoy && dHoy.avance!=null){
+      const hh = dHoy.avanceTs?` · ${fmtTime(new Date(dHoy.avanceTs))}`:'';
+      hoyTxt = `<b>${Number(dHoy.avance).toLocaleString(loc)}</b> ${t('pkUnit')}${hh}`;
+    }
+    html += `<div class="ord-card pk">
+      <div class="oc-top">
+        <div>
+          <div class="oc-room-big">${(o.orden?String(o.orden).replace(/</g,'&lt;'):'—')}
+            <span class="pk-line-chip">${t('pkLineChip')(p.linea||'—')}</span></div>
+          <div class="oc-prod">${o.producto?String(o.producto).replace(/</g,'&lt;'):'—'}
+            <span class="pk-range-chip">${t('pkRangeChip')(p.pesoMin,p.pesoMax)}</span></div>
+          <div class="oc-code">${cod}</div>
+        </div>
+      </div>
+      ${prog}
+      <div class="oc-avance">${t('pkAvanceHoy')} ${hoyTxt}</div>
+    </div>`;
+  });
+  grid.innerHTML = html;
 }
 
 /* Cronometros en vivo del tablero: actualiza cada segundo SOLO los timers de change over.
@@ -3887,6 +4101,60 @@ function renderQC(codigos){
     </div>`;
   });
   grid.innerHTML=html;
+  renderQcPacketing(codigos);
+}
+
+/* Sección Packeting del dashboard QC: tarjetas por orden con packeting activo */
+function renderQcPacketing(codigos){
+  const sec = $('qcPkSection'), grid = $('qcPkGrid');
+  const loc = I18N[lang].locale;
+  const activas = (codigos||[]).filter(c=> qcDatos[c] && qcDatos[c].packeting);
+  if(!activas.length){ sec.style.display='none'; grid.innerHTML=''; return; }
+  sec.style.display='block';
+  let html = '';
+  activas.forEach(cod=>{
+    const d = qcDatos[cod];
+    const p = d.packeting;
+    const o = d.orden || {};
+    const hoyK = dayKey(new Date());
+    const dHoy = p.dias && p.dias[hoyK];
+    const producidosTotal = pkBotesAcumulados(p);
+    const target = p.target||0;
+    /* Barra: producidos / target */
+    let prog = '';
+    if(target>0){
+      const pctReal = producidosTotal/target*100, pct = Math.min(100,pctReal);
+      const color = pctReal<=30?'var(--danger)':(pctReal<=70?'var(--warn)':'var(--accent)');
+      prog = `<div>
+        <div class="oc-prog-top"><span>${t('pkProgress')}</span><b>${pct.toFixed(1)}%</b></div>
+        <div class="bar"><span style="width:${pct}%;background:${color}"></span></div>
+        <div class="oc-prog-top" style="margin-top:5px;margin-bottom:0">
+          <span style="color:var(--muted)">${producidosTotal.toLocaleString(loc)} / ${target.toLocaleString(loc)} ${t('pkUnit')}</span></div>
+      </div>`;
+    }
+    /* Botones QC: Nueva muestra + Actualizar avance */
+    const abrirUrl = `?rol=qc&clave=${CLAVE_QC}&orden=${encodeURIComponent(cod)}`;
+    const btnMuestra = `<button class="btn" onclick="location.href='${abrirUrl}&pack-muestra=1'">${t('pkNewSample')}</button>`;
+    const btnAvance  = `<button class="btn primary" onclick="location.href='${abrirUrl}&pack-avance=1'">${t('pkUpdateAdv')}</button>`;
+    const hoyTxt = (dHoy && dHoy.avance!=null)
+      ? `<b>${Number(dHoy.avance).toLocaleString(loc)}</b> ${t('pkUnit')}`
+      : `<span style="color:var(--muted)">—</span>`;
+    html += `<div class="ord-card pk">
+      <div class="oc-top">
+        <div>
+          <div class="oc-room-big">${(o.orden?String(o.orden).replace(/</g,'&lt;'):'—')}
+            <span class="pk-line-chip">${t('pkLineChip')(p.linea||'—')}</span></div>
+          <div class="oc-prod">${o.producto?String(o.producto).replace(/</g,'&lt;'):'—'}
+            <span class="pk-range-chip">${t('pkRangeChip')(p.pesoMin,p.pesoMax)}</span></div>
+          <div class="oc-code">${cod}</div>
+        </div>
+      </div>
+      ${prog}
+      <div class="oc-avance">${t('pkAvanceHoy')} ${hoyTxt}</div>
+      <div class="qc-actions">${btnMuestra}${btnAvance}</div>
+    </div>`;
+  });
+  grid.innerHTML = html;
 }
 
 function iniciarQC(){
@@ -3951,10 +4219,22 @@ function ejecutarAccionQC(){
   qcAccionRapida = true;
   document.body.classList.add('qc-quick');
   /* Decidir automaticamente qué modal abrir segun el estado REAL del dia y las muestras.
-     Los flags de URL (qc-first, qc-avance) sirven de pista pero el estado gana. */
+     Los flags de URL (qc-first, qc-avance, pack-muestra, pack-avance) sirven de pista. */
   const p=new URLSearchParams(location.search);
   const flagFirst = (p.get('qc-first')==='1');
   const flagAvance = (p.get('qc-avance')==='1');
+  const flagPkMuestra = (p.get('pack-muestra')==='1');
+  const flagPkAvance  = (p.get('pack-avance')==='1');
+
+  /* Acciones de packeting (independientes del estado del día de encapsulado) */
+  if(flagPkMuestra || flagPkAvance){
+    const codActual = (codigo||'').toUpperCase();
+    setTimeout(()=>{
+      if(flagPkMuestra) abrirModalPackSample(codActual);
+      else abrirModalPackAdvance(codActual);
+    }, 300);
+    return;
+  }
 
   const hoyKey = dayKey(new Date());
   const dHoy = state.dias[hoyKey];
@@ -4729,7 +5009,221 @@ async function procesarBarril(datos){
   actualizarPackActual();
 
   packMostrarMsg(datos.bn ? t('packAddedN')(datos.bn, batch) : t('packAdded')(batch),'ok'); beep(true);
+
+  /* Hook packeting production: si no hay orden de packeting activa para esta orden
+     y el usuario tiene linea seleccionada y NO es QC, ofrecer iniciar orden en la linea. */
+  const lineaNum = typeof packLinea!=='undefined' ? packLinea : (window.packLinea||null);
+  if(!qc && lineaNum && !data.packeting){
+    setTimeout(()=>abrirModalPackStart(codFinal, data, batch, producto, lineaNum), 250);
+  } else if(!qc && lineaNum && data.packeting && data.packeting.linea && data.packeting.linea!==lineaNum){
+    /* orden de packeting ya activa en OTRA linea: avisar (no bloquea el escaneo) */
+    packMostrarMsg(t('pkOtherLine')(data.packeting.linea),'dup');
+  }
 }
+
+/* ============================================================
+   PACKETING PRODUCTION: iniciar orden en una línea, tomar muestras
+   de peso por bote, y actualizar avance de botes producidos.
+   ============================================================ */
+
+/* Contexto en memoria mientras un modal de packeting está abierto */
+let _pkCtx = null; /* { codFinal, data } */
+
+/* Persistir cambios a data.packeting en la nube.
+   Como esto lo dispara packeting (rol packeting o QC), usamos escribirOrden. */
+async function guardarPacketingCloud(codFinal, data){
+  const ok = await escribirOrden(codFinal, data);
+  if(ok){ packCache[codFinal]=data; }
+  return ok;
+}
+
+/* Abrir modal "Iniciar orden de packeting" (disparado desde el escaneo). */
+function abrirModalPackStart(codFinal, data, batch, producto, lineaNum){
+  _pkCtx = { codFinal, data };
+  const cod = codFinal || '—';
+  const lineaTxt = t('lineaNombre')(lineaNum);
+  $('pkStartDesc').textContent = t('pkStartDesc')(cod, batch||'—', producto||'—', lineaTxt);
+  $('pkTarget').value = '';
+  $('pkPesoMin').value = '';
+  $('pkPesoMax').value = '';
+  $('pkPesoFirst').value = '';
+  $('pkStartAlert').classList.remove('show'); $('pkStartAlert').textContent = '';
+  $('modalPackStart').classList.add('show');
+  setTimeout(()=>$('pkTarget').focus(),50);
+}
+
+/* Cerrar el modal iniciar orden (sin guardar) */
+function cerrarModalPackStart(){ $('modalPackStart').classList.remove('show'); _pkCtx=null; }
+
+/* Confirmar creacion de la orden de packeting */
+async function confirmarPackStart(){
+  if(!_pkCtx) return;
+  const { codFinal, data } = _pkCtx;
+  const al = $('pkStartAlert');
+  const target = parseFloat($('pkTarget').value);
+  const pesoMin = parseFloat($('pkPesoMin').value);
+  const pesoMax = parseFloat($('pkPesoMax').value);
+  const pesoFirst = parseFloat($('pkPesoFirst').value);
+  if(!(target>0)){ al.textContent=t('pkNeedTarget'); al.classList.add('show'); return; }
+  if(!(pesoMin>0) || !(pesoMax>0) || pesoMin>pesoMax){ al.textContent=t('pkNeedRange'); al.classList.add('show'); return; }
+  if(!(pesoFirst>0)){ al.textContent=t('pkNeedFirst'); al.classList.add('show'); return; }
+  const lineaNum = typeof packLinea!=='undefined' ? packLinea : (window.packLinea||null);
+  const nowIso = new Date().toISOString();
+  const nowTs  = Date.now();
+  const hoyK   = dayKey(new Date());
+  data.packeting = {
+    linea: lineaNum,
+    target: target,
+    pesoMin: pesoMin,
+    pesoMax: pesoMax,
+    startTs: nowTs,
+    registros: [{ ts: nowIso, peso: pesoFirst, primera: true }],
+    dias: {}
+  };
+  data.packeting.dias[hoyK] = { closed:false, avance:0, avanceTs:nowIso };
+  const ok = await guardarPacketingCloud(codFinal, data);
+  if(!ok){ al.textContent = t('packSaveErr'); al.classList.add('show'); return; }
+  cerrarModalPackStart();
+  packMostrarMsg(t('pkStartOk'),'ok'); beep(true);
+  if(qcOn) refrescarQC();
+  if(tableroOn) refrescarTablero();
+}
+
+/* Abrir modal "Nueva muestra de packeting" (QC toma otra muestra de peso).
+   Prioriza state cuando el usuario ya está dentro de la orden (QC via URL);
+   si no, hace fetch desde la nube. */
+async function abrirModalPackSample(codFinal){
+  let data, useState = false;
+  const codActual = codFinal && codFinal.toUpperCase();
+  if(codigo && codActual===codigo.toUpperCase() && state && state.packeting){
+    data = state; useState = true;
+  } else {
+    data = await cargarOrdenParaPacketing(codActual);
+  }
+  if(!data || !data.packeting){ alert(t('pkNoActiveOrder')); return; }
+  _pkCtx = { codFinal:codActual, data, useState };
+  const p = data.packeting;
+  $('pkSampleInfo').textContent = `${codActual} · ${t('lineaNombre')(p.linea||'—')} · ${t('pkRangeChip')(p.pesoMin, p.pesoMax)}`;
+  $('pkSampleVal').value = '';
+  $('pkSampleAlert').classList.remove('show'); $('pkSampleAlert').textContent = '';
+  $('modalPackSample').classList.add('show');
+  setTimeout(()=>$('pkSampleVal').focus(),50);
+}
+function cerrarModalPackSample(){ $('modalPackSample').classList.remove('show'); _pkCtx=null; }
+
+async function guardarPackSample(){
+  if(!_pkCtx) return;
+  const { codFinal, data, useState } = _pkCtx;
+  const al = $('pkSampleAlert');
+  const peso = parseFloat($('pkSampleVal').value);
+  if(!(peso>0)){ al.textContent=t('pkNeedFirst'); al.classList.add('show'); return; }
+  const p = data.packeting;
+  if(peso < p.pesoMin || peso > p.pesoMax){
+    if(!confirm(t('pkOutOfRange')(p.pesoMin, p.pesoMax))) return;
+  }
+  const primera = !(p.registros && p.registros.length);
+  p.registros.push({ ts:new Date().toISOString(), peso, primera:primera||undefined });
+  /* asegurar dia de hoy abierto */
+  const hoyK = dayKey(new Date());
+  if(!p.dias[hoyK]) p.dias[hoyK] = { closed:false, avance:0, avanceTs:new Date().toISOString() };
+  let ok = false;
+  if(useState){
+    /* QC dentro de la orden: state es la fuente de verdad, guardar con pushNow para evitar race con el debounce */
+    if(saveTimer){ clearTimeout(saveTimer); saveTimer=null; }
+    try { await pushNow(); ok=true; } catch(e){ ok=false; }
+  } else {
+    ok = await guardarPacketingCloud(codFinal, data);
+  }
+  if(!ok){ al.textContent=t('packSaveErr'); al.classList.add('show'); return; }
+  cerrarModalPackSample();
+  if(qcAccionRapida){ volverDashboardQC(); return; }
+  if(qcOn) refrescarQC();
+  if(tableroOn) refrescarTablero();
+}
+
+/* Abrir modal "Actualizar avance" (total de botes producidos hasta ahora) */
+async function abrirModalPackAdvance(codFinal){
+  let data, useState = false;
+  const codActual = codFinal && codFinal.toUpperCase();
+  if(codigo && codActual===codigo.toUpperCase() && state && state.packeting){
+    data = state; useState = true;
+  } else {
+    data = await cargarOrdenParaPacketing(codActual);
+  }
+  if(!data || !data.packeting){ alert(t('pkNoActiveOrder')); return; }
+  _pkCtx = { codFinal:codActual, data, useState };
+  const p = data.packeting;
+  const hoyK = dayKey(new Date());
+  const dHoy = p.dias[hoyK]||{};
+  $('pkAdvInfo').textContent = `${codActual} · ${t('lineaNombre')(p.linea||'—')} · ${t('pkProgress')}: ${dHoy.avance||0} / ${p.target||'—'} ${t('pkUnit')}`;
+  $('pkAdvVal').value = dHoy.avance!=null ? dHoy.avance : '';
+  $('pkAdvAlert').classList.remove('show'); $('pkAdvAlert').textContent = '';
+  $('modalPackAdvance').classList.add('show');
+  setTimeout(()=>$('pkAdvVal').focus(),50);
+}
+function cerrarModalPackAdvance(){ $('modalPackAdvance').classList.remove('show'); _pkCtx=null; }
+
+async function guardarPackAdvance(){
+  if(!_pkCtx) return;
+  const { codFinal, data, useState } = _pkCtx;
+  const al = $('pkAdvAlert');
+  const av = parseFloat($('pkAdvVal').value);
+  if(!(av>=0)){ al.textContent=t('alEnterCaps'); al.classList.add('show'); return; }
+  const p = data.packeting;
+  const hoyK = dayKey(new Date());
+  if(!p.dias[hoyK]) p.dias[hoyK] = { closed:false, avance:0, avanceTs:null };
+  p.dias[hoyK].avance = av;
+  p.dias[hoyK].avanceTs = new Date().toISOString();
+  let ok = false;
+  if(useState){
+    if(saveTimer){ clearTimeout(saveTimer); saveTimer=null; }
+    try { await pushNow(); ok=true; } catch(e){ ok=false; }
+  } else {
+    ok = await guardarPacketingCloud(codFinal, data);
+  }
+  if(!ok){ al.textContent=t('packSaveErr'); al.classList.add('show'); return; }
+  cerrarModalPackAdvance();
+  if(qcAccionRapida){ volverDashboardQC(); return; }
+  if(qcOn) refrescarQC();
+  if(tableroOn) refrescarTablero();
+}
+
+/* Cargar una orden desde la nube (o cache) para operaciones de packeting */
+async function cargarOrdenParaPacketing(codFinal){
+  if(packCache && packCache[codFinal]) return packCache[codFinal];
+  try{
+    const m = await leerVarias([codFinal]);
+    if(m[codFinal]){
+      const data = normalizar(m[codFinal]);
+      packCache[codFinal] = data;
+      return data;
+    }
+  }catch(e){}
+  return null;
+}
+
+/* Total acumulado de botes producidos en todos los dias */
+function pkBotesAcumulados(pk){
+  if(!pk || !pk.dias) return 0;
+  return Object.values(pk.dias).reduce((s,d)=> s + (d && d.avance ? Number(d.avance) : 0), 0);
+}
+
+/* Wiring de los botones de los modales de packeting production */
+$('pkStartCancel').addEventListener('click', cerrarModalPackStart);
+$('pkStartConfirm').addEventListener('click', confirmarPackStart);
+$('modalPackStart').addEventListener('click', e=>{ if(e.target.id==='modalPackStart') cerrarModalPackStart(); });
+$('pkSampleCancel').addEventListener('click', ()=>{
+  cerrarModalPackSample();
+  if(qcAccionRapida){ volverDashboardQC(); }
+});
+$('pkSampleSave').addEventListener('click', guardarPackSample);
+$('modalPackSample').addEventListener('click', e=>{ if(e.target.id==='modalPackSample'){ cerrarModalPackSample(); if(qcAccionRapida) volverDashboardQC(); }});
+$('pkAdvCancel').addEventListener('click', ()=>{
+  cerrarModalPackAdvance();
+  if(qcAccionRapida){ volverDashboardQC(); }
+});
+$('pkAdvSave').addEventListener('click', guardarPackAdvance);
+$('modalPackAdvance').addEventListener('click', e=>{ if(e.target.id==='modalPackAdvance'){ cerrarModalPackAdvance(); if(qcAccionRapida) volverDashboardQC(); }});
 
 /* contar solo barriles activos (no retirados) */
 function contarActivos(arr){ return (arr||[]).filter(b=>b && !b.removed).length; }
