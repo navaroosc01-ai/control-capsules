@@ -1151,21 +1151,21 @@
     <div class="alert" id="pkStartAlert"></div>
     <div class="row">
       <label data-i18n="pkTargetLbl">Total bottles to produce</label>
-      <input id="pkTarget" type="number" step="1" min="1" inputmode="numeric">
+      <input id="pkTarget" type="text" inputmode="numeric" pattern="[0-9]*" autocomplete="off">
     </div>
     <div class="grid g2">
       <div class="row">
         <label data-i18n="pkPesoMinLbl">Min weight per bottle (g)</label>
-        <input id="pkPesoMin" type="number" step="0.1" inputmode="decimal">
+        <input id="pkPesoMin" type="text" inputmode="decimal" autocomplete="off">
       </div>
       <div class="row">
         <label data-i18n="pkPesoMaxLbl">Max weight per bottle (g)</label>
-        <input id="pkPesoMax" type="number" step="0.1" inputmode="decimal">
+        <input id="pkPesoMax" type="text" inputmode="decimal" autocomplete="off">
       </div>
     </div>
     <div class="row">
       <label data-i18n="pkPesoFirstLbl">Weight of the first bottle (g)</label>
-      <input id="pkPesoFirst" type="number" step="0.1" inputmode="decimal">
+      <input id="pkPesoFirst" type="text" inputmode="decimal" autocomplete="off">
     </div>
     <div class="actions">
       <button class="btn" id="pkStartCancel" data-i18n="pkStartCancel">Not now</button>
@@ -1182,7 +1182,7 @@
     <div class="alert" id="pkSampleAlert"></div>
     <div class="row">
       <label data-i18n="pkSampleLbl">Bottle weight (g)</label>
-      <input id="pkSampleVal" type="number" step="0.1" inputmode="decimal">
+      <input id="pkSampleVal" type="text" inputmode="decimal" autocomplete="off">
     </div>
     <div class="actions">
       <button class="btn" id="pkSampleCancel" data-i18n="cancel">Cancel</button>
@@ -1199,7 +1199,7 @@
     <div class="alert" id="pkAdvAlert"></div>
     <div class="row">
       <label data-i18n="pkAdvLbl">Total bottles so far</label>
-      <input id="pkAdvVal" type="number" step="1" min="0" inputmode="numeric">
+      <input id="pkAdvVal" type="text" inputmode="numeric" pattern="[0-9]*" autocomplete="off">
     </div>
     <div class="actions">
       <button class="btn" id="pkAdvCancel" data-i18n="cancel">Cancel</button>
