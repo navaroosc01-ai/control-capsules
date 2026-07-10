@@ -4132,10 +4132,21 @@ function renderQcPacketing(codigos){
           <span style="color:var(--muted)">${producidosTotal.toLocaleString(loc)} / ${target.toLocaleString(loc)} ${t('pkUnit')}</span></div>
       </div>`;
     }
-    /* Botones QC: Nueva muestra + Actualizar avance */
+    /* Botones QC: si no hay muestra HOY, solo "Primera muestra" (abre el dia).
+       Si ya hay muestra hoy, ambos botones (nueva muestra + actualizar avance). */
+    const hayMuestraHoy = (p.registros||[]).some(r=>{
+      if(!r || !r.ts) return false;
+      try { return dayKey(new Date(r.ts))===hoyK; } catch(e){ return false; }
+    });
     const abrirUrl = `?rol=qc&clave=${CLAVE_QC}&orden=${encodeURIComponent(cod)}`;
-    const btnMuestra = `<button class="btn" onclick="location.href='${abrirUrl}&pack-muestra=1'">${t('pkNewSample')}</button>`;
-    const btnAvance  = `<button class="btn primary" onclick="location.href='${abrirUrl}&pack-avance=1'">${t('pkUpdateAdv')}</button>`;
+    let btnAcciones;
+    if(!hayMuestraHoy){
+      btnAcciones = `<button class="btn primary" onclick="location.href='${abrirUrl}&pack-muestra=1'">${t('pkFirstSample')}</button>`;
+    } else {
+      const btnMuestra = `<button class="btn" onclick="location.href='${abrirUrl}&pack-muestra=1'">${t('pkNewSample')}</button>`;
+      const btnAvance  = `<button class="btn primary" onclick="location.href='${abrirUrl}&pack-avance=1'">${t('pkUpdateAdv')}</button>`;
+      btnAcciones = btnMuestra + btnAvance;
+    }
     const hoyTxt = (dHoy && dHoy.avance!=null)
       ? `<b>${Number(dHoy.avance).toLocaleString(loc)}</b> ${t('pkUnit')}`
       : `<span style="color:var(--muted)">—</span>`;
@@ -4151,7 +4162,7 @@ function renderQcPacketing(codigos){
       </div>
       ${prog}
       <div class="oc-avance">${t('pkAvanceHoy')} ${hoyTxt}</div>
-      <div class="qc-actions">${btnMuestra}${btnAvance}</div>
+      <div class="qc-actions">${btnAcciones}</div>
     </div>`;
   });
   grid.innerHTML = html;
@@ -5113,10 +5124,15 @@ function cerrarModalPackSample(){ $('modalPackSample').classList.remove('show');
 
 async function guardarPackSample(){
   if(!_pkCtx) return;
-  const { codFinal, data, useState } = _pkCtx;
+  const { codFinal, useState } = _pkCtx;
   const al = $('pkSampleAlert');
   const peso = parseFloat($('pkSampleVal').value);
   if(!(peso>0)){ al.textContent=t('pkNeedFirst'); al.classList.add('show'); return; }
+  /* IMPORTANTE: releer la referencia de state al momento de guardar. Si sondear() reemplazo
+     state mientras el modal estaba abierto, la referencia capturada en _pkCtx.data seria vieja
+     y el cambio se perderia al llamar pushNow() (que escribe el state actual). */
+  const data = useState ? state : _pkCtx.data;
+  if(!data || !data.packeting){ al.textContent=t('pkNoActiveOrder'); al.classList.add('show'); return; }
   const p = data.packeting;
   if(peso < p.pesoMin || peso > p.pesoMax){
     if(!confirm(t('pkOutOfRange')(p.pesoMin, p.pesoMax))) return;
@@ -5165,10 +5181,14 @@ function cerrarModalPackAdvance(){ $('modalPackAdvance').classList.remove('show'
 
 async function guardarPackAdvance(){
   if(!_pkCtx) return;
-  const { codFinal, data, useState } = _pkCtx;
+  const { codFinal, useState } = _pkCtx;
   const al = $('pkAdvAlert');
   const av = parseFloat($('pkAdvVal').value);
   if(!(av>=0)){ al.textContent=t('alEnterCaps'); al.classList.add('show'); return; }
+  /* IMPORTANTE: releer state al momento de guardar (no la referencia capturada en _pkCtx),
+     porque sondear() puede haber reemplazado state mientras el modal estaba abierto. */
+  const data = useState ? state : _pkCtx.data;
+  if(!data || !data.packeting){ al.textContent=t('pkNoActiveOrder'); al.classList.add('show'); return; }
   const p = data.packeting;
   const hoyK = dayKey(new Date());
   if(!p.dias[hoyK]) p.dias[hoyK] = { closed:false, avance:0, avanceTs:null };
