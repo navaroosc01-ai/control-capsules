@@ -183,7 +183,7 @@
   body.supervisor .parcial-row .px,
   body.supervisor tbody .btn.danger{display:none !important}
   /* El supervisor VE los datos de la orden pero no puede editarlos */
-  body.supervisor input:not(#fCodigo):not(#tabCodigos):not(#incEditFecha):not(#incEditHora):not(#lblBatch):not(#lblNeto):not(#lblCant):not(#lblNumerar):not(#reprintBatch):not(#reprintNeto):not(#reprintNumerar){pointer-events:none;opacity:.85;background:var(--panel)}
+  body.supervisor input:not(#fCodigo):not(#tabCodigos):not(#incEditFecha):not(#incEditHora):not(#lblBatch):not(#lblNeto):not(#lblCant):not(#lblNumerar):not(#reprintBatch):not(#reprintNeto):not(#reprintNumerar):not(#pkFinishVal){pointer-events:none;opacity:.85;background:var(--panel)}
   body.supervisor #incEditFecha,
   body.supervisor #incEditHora{pointer-events:auto;opacity:1;background:var(--panel2)}
   body.supervisor #fCodigo{pointer-events:auto;opacity:1}
@@ -192,7 +192,8 @@
   body.supervisor #lblNeto,
   body.supervisor #lblCant,
   body.supervisor #reprintBatch,
-  body.supervisor #reprintNeto{pointer-events:auto;opacity:1;background:var(--panel2)}
+  body.supervisor #reprintNeto,
+  body.supervisor #pkFinishVal{pointer-events:auto;opacity:1;background:var(--panel2)}
   body.supervisor #lblNumerar,
   body.supervisor #reprintNumerar{pointer-events:auto;opacity:1}
   /* Imprimir, CSV y Limpiar: solo visibles para el supervisor (y NO en el tablero) */
@@ -324,6 +325,21 @@
   .paro-row.zero .pr-time{color:var(--muted)}
   .paro-row.co .pr-time{color:var(--warn)}
 
+  /* ===== Sección Packeting supervisor (link principal, NO tablero) ===== */
+  #supPkPanel{display:none;background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);
+    padding:16px 18px;margin-bottom:16px}
+  body.supervisor:not(.tablero) #supPkPanel{display:block}
+  body.supervisor.tablero #supPkPanel{display:none}
+  #supPkPanel h3{font-size:14px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);
+    margin:0 0 12px;display:flex;align-items:center;gap:8px}
+  #supPkPanel .tab-grid{margin-top:0}
+  .sup-pk-empty{color:var(--muted);font-size:13px;padding:8px 0}
+  /* Banner "orden de packeting finalizada" en vista de orden supervisor */
+  #supPkFinBanner{display:none;background:rgba(45,212,167,.08);border:1px solid rgba(45,212,167,.35);
+    border-radius:var(--radius);padding:12px 16px;margin-bottom:14px;
+    align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+  #supPkFinBanner.show{display:flex}
+  #supPkFinBanner .banner-txt{font-size:13px;color:var(--ink);flex:1;min-width:200px}
   /* ===== Sección Packeting (aparece en QC dashboard y tablero supervisor) ===== */
   .pk-section{margin-top:22px}
   .pk-section-title{font-size:13px;font-weight:800;text-transform:uppercase;letter-spacing:.8px;
@@ -724,6 +740,19 @@
   </div>
 
   <div class="sup-banner" id="supBanner" data-i18n="supBanner">👁️ Supervisor mode active — read-only view. Changes are disabled.</div>
+
+  <!-- Panel supervisor: líneas de packeting activas (solo visible en rol supervisor SIN tablero) -->
+  <div id="supPkPanel">
+    <h3><span data-i18n="supPkSection">📦 Active packeting lines</span></h3>
+    <div id="supPkGrid" class="tab-grid"></div>
+    <div id="supPkEmpty" class="sup-pk-empty" data-i18n="supPkEmpty">No active packeting orders right now.</div>
+  </div>
+
+  <!-- Banner "orden de packeting finalizada" con botón Reabrir (aparece al cargar una orden finalizada) -->
+  <div id="supPkFinBanner">
+    <div class="banner-txt" id="supPkFinBannerTxt">—</div>
+    <button class="btn primary" id="supPkReopenBtnEl" data-i18n="supPkReopenBtn">🔓 Reopen order</button>
+  </div>
 
   <!-- Datos de la orden -->
   <div class="card">
@@ -1208,6 +1237,37 @@
   </div>
 </div>
 
+<!-- Modal Packeting: finalizar orden (solo supervisor desde el tablero) -->
+<div class="modal-bg" id="modalPackFinish">
+  <div class="modal" style="max-width:440px">
+    <h3 data-i18n="pkFinishTitle">🏁 Finalize packeting order?</h3>
+    <div class="sub" id="pkFinishInfo">—</div>
+    <div class="alert" id="pkFinishAlert"></div>
+    <div class="row">
+      <label data-i18n="pkFinishFinalLbl">Final bottle count</label>
+      <input id="pkFinishVal" type="text" inputmode="numeric" pattern="[0-9]*" autocomplete="off">
+      <div class="hint" data-i18n="pkFinishHint">Once finalized, no more samples or advance updates can be added. This action cannot be undone from the app.</div>
+    </div>
+    <div class="actions">
+      <button class="btn" id="pkFinishCancel" data-i18n="cancel">Cancel</button>
+      <button class="btn primary" id="pkFinishSave" data-i18n="pkFinishConfirm">Confirm finalize</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Packeting: reabrir orden (solo supervisor cuando carga una orden finalizada) -->
+<div class="modal-bg" id="modalPackReopen">
+  <div class="modal" style="max-width:440px">
+    <h3 data-i18n="supPkReopenTitle">🔓 Reopen packeting order</h3>
+    <div class="sub" id="supPkReopenInfo">—</div>
+    <div class="alert" id="supPkReopenAlert"></div>
+    <div class="actions">
+      <button class="btn" id="supPkReopenCancel" data-i18n="cancel">Cancel</button>
+      <button class="btn primary" id="supPkReopenSave" data-i18n="supPkReopenConfirm">Confirm reopen</button>
+    </div>
+  </div>
+</div>
+
 <!-- Modal Change over: capturar los datos de la nueva orden a iniciar en el mismo cuarto -->
 <div class="modal-bg" id="modalChangeOver">
   <div class="modal" style="max-width:520px">
@@ -1350,6 +1410,12 @@ function normalizar(d){ d=d||{}; d.orden=d.orden||{producto:'',lote:'',orden:'',
     if(d.packeting.pesoMax===undefined) d.packeting.pesoMax=null;
     if(d.packeting.startTs===undefined) d.packeting.startTs=null;
     if(d.packeting.linea===undefined)   d.packeting.linea=null;
+    /* Finalización de la orden de packeting (por supervisor).
+       finished=true => la orden queda cerrada: sin nuevas muestras, sin actualizar avance,
+       sin volver a preguntar "iniciar orden" al escanear barriles. */
+    if(d.packeting.finished===undefined)      d.packeting.finished=false;
+    if(d.packeting.finishedTs===undefined)    d.packeting.finishedTs=null;
+    if(d.packeting.finishedBotes===undefined) d.packeting.finishedBotes=null;
   }
   return d; }
 
@@ -1397,7 +1463,7 @@ async function codigosEnProceso(){
     if(coActivo){ out.push(cod); return; }
     /* Packeting activo: aunque el encapsulado esté cerrado, la orden sigue viva mientras
        haya orden de packeting en curso (para que QC y supervisor la vean). */
-    if(dd.packeting && dd.packeting.linea){ out.push(cod); return; }
+    if(dd.packeting && dd.packeting.linea && !dd.packeting.finished){ out.push(cod); return; }
     if(estatusOrden(dd, true)===tEN('inProcess')) out.push(cod);
   });
   return out;
@@ -2124,6 +2190,25 @@ const I18N = {
     pkRangeChip:(mn,mx)=>`${mn}–${mx} g`,
     pkNoActiveOrder:'No active packeting order.',
     pkAvanceHoy:'Today (bottles)',
+    pkFinishBtn:'🏁 Finalize order',
+    pkFinishTitle:'🏁 Finalize packeting order?',
+    pkFinishDesc:(cod,linea,prod,target)=>`${cod} · ${linea} · ${prod} / ${target} bottles produced.`,
+    pkFinishFinalLbl:'Final bottle count',
+    pkFinishHint:'Once finalized, no more samples or advance updates can be added. This action cannot be undone from the app.',
+    pkFinishConfirm:'Confirm finalize',
+    pkFinishOk:'✓ Order finalized',
+    pkFinishedTag:(date)=>`Finalized · ${date}`,
+    /* Supervisor section (main link without tablero) */
+    supPkSection:'📦 Active packeting lines',
+    supPkEmpty:'No active packeting orders right now.',
+    supPkClose:'🏁 Close order',
+    /* Reopen from supervisor order view */
+    supPkReopenTitle:'🔓 Reopen packeting order',
+    supPkReopenDesc:(date,bottles)=>`Finalized on ${date} with ${bottles} bottles. Reopening allows new samples and advance updates again.`,
+    supPkReopenBtn:'🔓 Reopen order',
+    supPkReopenConfirm:'Confirm reopen',
+    supPkReopenOk:'✓ Order reopened',
+    supPkFinishedBanner:(date,bottles)=>`Packeting order finalized on ${date} with ${bottles} bottles.`,
     unscanHint:'The barrel stops counting as packed and the reason is recorded.',
     unscanConfirm:'Remove label', unscanSub:(b)=>`Barrel from batch ${b}`,
     reasonDusty:'Dusty', reasonSort:'To sort', reasonError:'Scanned by error', reasonOther:'Other',
@@ -2400,6 +2485,25 @@ const I18N = {
     pkRangeChip:(mn,mx)=>`${mn}–${mx} g`,
     pkNoActiveOrder:'Sin orden de packeting activa.',
     pkAvanceHoy:'Hoy (botes)',
+    pkFinishBtn:'🏁 Finalizar orden',
+    pkFinishTitle:'🏁 ¿Finalizar orden de packeting?',
+    pkFinishDesc:(cod,linea,prod,target)=>`${cod} · ${linea} · ${prod} / ${target} botes producidos.`,
+    pkFinishFinalLbl:'Total final de botes',
+    pkFinishHint:'Al finalizar la orden ya no se podrán tomar muestras ni actualizar avance. Esta acción no se puede deshacer desde la app.',
+    pkFinishConfirm:'Confirmar finalización',
+    pkFinishOk:'✓ Orden finalizada',
+    pkFinishedTag:(fecha)=>`Finalizada · ${fecha}`,
+    /* Sección supervisor (link sin tablero) */
+    supPkSection:'📦 Líneas de packeting activas',
+    supPkEmpty:'No hay órdenes de packeting activas en este momento.',
+    supPkClose:'🏁 Cerrar orden',
+    /* Reabrir orden desde la vista de orden del supervisor */
+    supPkReopenTitle:'🔓 Reabrir orden de packeting',
+    supPkReopenDesc:(fecha,botes)=>`Finalizada el ${fecha} con ${botes} botes. Al reabrir se podrán tomar muestras y actualizar avance nuevamente.`,
+    supPkReopenBtn:'🔓 Reabrir orden',
+    supPkReopenConfirm:'Confirmar reapertura',
+    supPkReopenOk:'✓ Orden reabierta',
+    supPkFinishedBanner:(fecha,botes)=>`Orden de packeting finalizada el ${fecha} con ${botes} botes.`,
     unscanHint:'El barril deja de contar como colocado y se registra el motivo.',
     unscanConfirm:'Retirar label', unscanSub:(b)=>`Barril del batch ${b}`,
     reasonDusty:'Polvoso', reasonSort:'Sortear', reasonError:'Escaneo por error', reasonOther:'Otro',
@@ -2817,6 +2921,8 @@ function render(){
     html+='</div>';
   });
   box.innerHTML=html;
+  /* Refrescar el banner de "packeting finalizada" para supervisor */
+  if(typeof actualizarSupPkFinBanner==='function') actualizarSupPkFinBanner();
 }
 function delRec(i){ if(confirm(t('confDelSample'))){ state.registros.splice(i,1); save(); render(); } }
 function toggleDia(k){ diasExpandidos[k]=!diasExpandidos[k]; render(); }
@@ -3587,7 +3693,7 @@ async function refrescarTablero(){
 function renderTablePacketing(codigos, datos){
   const sec = $('tabPkSection'), grid = $('tabPkGrid');
   const loc = I18N[lang].locale;
-  const activas = (codigos||[]).filter(c=> datos && datos[c] && datos[c].packeting);
+  const activas = (codigos||[]).filter(c=> datos && datos[c] && datos[c].packeting && !datos[c].packeting.finished);
   if(!activas.length){ sec.style.display='none'; grid.innerHTML=''; return; }
   sec.style.display='block';
   let html = '';
@@ -4108,7 +4214,7 @@ function renderQC(codigos){
 function renderQcPacketing(codigos){
   const sec = $('qcPkSection'), grid = $('qcPkGrid');
   const loc = I18N[lang].locale;
-  const activas = (codigos||[]).filter(c=> qcDatos[c] && qcDatos[c].packeting);
+  const activas = (codigos||[]).filter(c=> qcDatos[c] && qcDatos[c].packeting && !qcDatos[c].packeting.finished);
   if(!activas.length){ sec.style.display='none'; grid.innerHTML=''; return; }
   sec.style.display='block';
   let html = '';
@@ -5026,8 +5132,8 @@ async function procesarBarril(datos){
   const lineaNum = typeof packLinea!=='undefined' ? packLinea : (window.packLinea||null);
   if(!qc && lineaNum && !data.packeting){
     setTimeout(()=>abrirModalPackStart(codFinal, data, batch, producto, lineaNum), 250);
-  } else if(!qc && lineaNum && data.packeting && data.packeting.linea && data.packeting.linea!==lineaNum){
-    /* orden de packeting ya activa en OTRA linea: avisar (no bloquea el escaneo) */
+  } else if(!qc && lineaNum && data.packeting && !data.packeting.finished && data.packeting.linea && data.packeting.linea!==lineaNum){
+    /* orden de packeting ya activa en OTRA linea (y no finalizada): avisar sin bloquear */
     packMostrarMsg(t('pkOtherLine')(data.packeting.linea),'dup');
   }
 }
@@ -5244,6 +5350,182 @@ $('pkAdvCancel').addEventListener('click', ()=>{
 });
 $('pkAdvSave').addEventListener('click', guardarPackAdvance);
 $('modalPackAdvance').addEventListener('click', e=>{ if(e.target.id==='modalPackAdvance'){ cerrarModalPackAdvance(); if(qcAccionRapida) volverDashboardQC(); }});
+
+/* ============================================================
+   PACKETING — Supervisor: panel de líneas activas + finalizar + reabrir
+   Aparece SOLO en ?rol=sup (link principal, NO tablero).
+   ============================================================ */
+
+/* Cache y timer del panel supervisor */
+let supPkDatos = {}, supPkTimer = null, supPkOn = false;
+
+/* Formatear fecha corta para el banner y descripciones */
+function fmtFechaCorta(iso){
+  if(!iso) return '—';
+  try { const d=new Date(iso); return fmtDate(d)+' '+fmtTime(d); } catch(e){ return '—'; }
+}
+
+/* Poll: leer ordenes con packeting activo y renderizar el panel. */
+async function refrescarSupPk(){
+  if(!supPkOn) return;
+  const panel = $('supPkPanel'), grid = $('supPkGrid'), empty = $('supPkEmpty');
+  if(!panel) return;
+  try{
+    /* codigosEnProceso ya filtra packeting finalizado, así que basta con esos */
+    const codigos = await codigosEnProceso();
+    supPkDatos = {};
+    for(const cod of codigos){
+      try{
+        const url = REST + '?codigo=eq.' + encodeURIComponent(cod) + '&select=data';
+        const r = await fetch(url,{ headers: HEADERS });
+        if(r.ok){
+          const arr = await r.json();
+          if(arr && arr[0]) supPkDatos[cod] = normalizar(arr[0].data);
+        }
+      }catch(e){}
+    }
+    /* solo órdenes con packeting activo (no finalizado) */
+    const activas = codigos.filter(c => supPkDatos[c] && supPkDatos[c].packeting && !supPkDatos[c].packeting.finished);
+    if(!activas.length){ grid.innerHTML=''; empty.style.display='block'; return; }
+    empty.style.display='none';
+    const loc = I18N[lang].locale;
+    let html = '';
+    activas.forEach(cod=>{
+      const d = supPkDatos[cod];
+      const p = d.packeting;
+      const o = d.orden || {};
+      const producidosTotal = pkBotesAcumulados(p);
+      const target = p.target||0;
+      let prog = '';
+      if(target>0){
+        const pctReal = producidosTotal/target*100, pct = Math.min(100,pctReal);
+        const color = pctReal<=30?'var(--danger)':(pctReal<=70?'var(--warn)':'var(--accent)');
+        prog = `<div>
+          <div class="oc-prog-top"><span>${t('pkProgress')}</span><b>${pct.toFixed(1)}%</b></div>
+          <div class="bar"><span style="width:${pct}%;background:${color}"></span></div>
+          <div class="oc-prog-top" style="margin-top:5px;margin-bottom:0">
+            <span style="color:var(--muted)">${producidosTotal.toLocaleString(loc)} / ${target.toLocaleString(loc)} ${t('pkUnit')}</span></div>
+        </div>`;
+      }
+      const codSafe = String(cod).replace(/'/g,'&#39;');
+      html += `<div class="ord-card pk">
+        <div class="oc-top">
+          <div>
+            <div class="oc-room-big">${(o.orden?String(o.orden).replace(/</g,'&lt;'):'—')}
+              <span class="pk-line-chip">${t('pkLineChip')(p.linea||'—')}</span></div>
+            <div class="oc-prod">${o.producto?String(o.producto).replace(/</g,'&lt;'):'—'}
+              <span class="pk-range-chip">${t('pkRangeChip')(p.pesoMin,p.pesoMax)}</span></div>
+            <div class="oc-code">${cod}</div>
+          </div>
+        </div>
+        ${prog}
+        <div class="qc-actions"><button class="btn primary" onclick="abrirModalPackFinish('${codSafe}')">${t('supPkClose')}</button></div>
+      </div>`;
+    });
+    grid.innerHTML = html;
+  }catch(e){ /* silencioso, reintenta */ }
+}
+
+function iniciarSupPk(){
+  if(supPkTimer) clearInterval(supPkTimer);
+  supPkOn = true;
+  supPkTimer = setInterval(refrescarSupPk, 5000);
+  refrescarSupPk();
+}
+
+/* Abrir modal Finalizar orden desde el panel supervisor.
+   Toma el data desde supPkDatos (ya cargado por el poll). */
+function abrirModalPackFinish(cod){
+  const data = supPkDatos[cod];
+  if(!data || !data.packeting){ alert(t('pkNoActiveOrder')); return; }
+  _pkCtx = { codFinal: cod, data, useState: false };
+  const p = data.packeting;
+  const total = pkBotesAcumulados(p);
+  const loc = I18N[lang].locale;
+  $('pkFinishInfo').textContent = t('pkFinishDesc')(cod, t('lineaNombre')(p.linea||'—'), total.toLocaleString(loc), (p.target||0).toLocaleString(loc));
+  $('pkFinishVal').value = String(total);
+  $('pkFinishAlert').classList.remove('show'); $('pkFinishAlert').textContent = '';
+  $('modalPackFinish').classList.add('show');
+  setTimeout(()=>$('pkFinishVal').focus(),50);
+}
+function cerrarModalPackFinish(){ $('modalPackFinish').classList.remove('show'); _pkCtx=null; }
+
+async function guardarPackFinish(){
+  if(!_pkCtx) return;
+  const { codFinal, data } = _pkCtx;
+  const al = $('pkFinishAlert');
+  const final = parseFloat($('pkFinishVal').value);
+  if(!(final>=0)){ al.textContent = t('alEnterCaps'); al.classList.add('show'); return; }
+  const p = data.packeting;
+  p.finished = true;
+  p.finishedTs = new Date().toISOString();
+  p.finishedBotes = final;
+  /* cerrar el dia de hoy si esta abierto (para que quede consistente el conteo) */
+  const hoyK = dayKey(new Date());
+  if(p.dias[hoyK] && !p.dias[hoyK].closed){
+    p.dias[hoyK].closed = true;
+    if(p.dias[hoyK].avance==null) p.dias[hoyK].avance = 0;
+    p.dias[hoyK].prod = p.dias[hoyK].avance;
+  }
+  const ok = await escribirOrden(codFinal, data);
+  if(!ok){ al.textContent = t('packSaveErr'); al.classList.add('show'); return; }
+  cerrarModalPackFinish();
+  if(supPkOn) refrescarSupPk();
+  if(tableroOn) refrescarTablero();
+  if(qcOn) refrescarQC();
+}
+
+/* ---- Reabrir orden: banner + modal ----
+   El banner aparece cuando supervisor abre una orden que tiene packeting.finished=true.
+   Se llama desde render() para que se sincronice con el ciclo de la vista de orden. */
+function actualizarSupPkFinBanner(){
+  const banner = $('supPkFinBanner'); if(!banner) return;
+  const txt = $('supPkFinBannerTxt');
+  const ok = supervisor && state && state.packeting && state.packeting.finished;
+  if(ok){
+    banner.classList.add('show');
+    txt.textContent = t('supPkFinishedBanner')(fmtFechaCorta(state.packeting.finishedTs), (state.packeting.finishedBotes!=null?state.packeting.finishedBotes:'—'));
+  } else {
+    banner.classList.remove('show');
+  }
+}
+
+function abrirModalPackReopen(){
+  if(!supervisor || !state || !state.packeting || !state.packeting.finished) return;
+  const p = state.packeting;
+  $('supPkReopenInfo').textContent = t('supPkReopenDesc')(fmtFechaCorta(p.finishedTs), (p.finishedBotes!=null?p.finishedBotes:'—'));
+  $('supPkReopenAlert').classList.remove('show'); $('supPkReopenAlert').textContent = '';
+  $('modalPackReopen').classList.add('show');
+}
+function cerrarModalPackReopen(){ $('modalPackReopen').classList.remove('show'); }
+
+async function guardarPackReopen(){
+  if(!supervisor || !state || !state.packeting || !state.packeting.finished) return;
+  const al = $('supPkReopenAlert');
+  state.packeting.finished = false;
+  state.packeting.finishedTs = null;
+  state.packeting.finishedBotes = null;
+  /* reabrir el dia de hoy: si estaba cerrado por la finalizacion, dejar abierto para nuevas muestras/avance */
+  const hoyK = dayKey(new Date());
+  if(state.packeting.dias[hoyK]){
+    state.packeting.dias[hoyK].closed = false;
+    delete state.packeting.dias[hoyK].prod;
+  }
+  let ok = false;
+  try { await escribirNube(); ok=true; } catch(e){ ok=false; }
+  if(!ok){ al.textContent = t('packSaveErr'); al.classList.add('show'); return; }
+  cerrarModalPackReopen();
+  actualizarSupPkFinBanner();
+  render();
+}
+
+$('pkFinishCancel').addEventListener('click', cerrarModalPackFinish);
+$('pkFinishSave').addEventListener('click', guardarPackFinish);
+$('modalPackFinish').addEventListener('click', e=>{ if(e.target.id==='modalPackFinish') cerrarModalPackFinish(); });
+$('supPkReopenCancel').addEventListener('click', cerrarModalPackReopen);
+$('supPkReopenSave').addEventListener('click', guardarPackReopen);
+$('modalPackReopen').addEventListener('click', e=>{ if(e.target.id==='modalPackReopen') cerrarModalPackReopen(); });
+$('supPkReopenBtnEl').addEventListener('click', abrirModalPackReopen);
 
 /* contar solo barriles activos (no retirados) */
 function contarActivos(arr){ return (arr||[]).filter(b=>b && !b.removed).length; }
@@ -5541,6 +5823,11 @@ if(initInfo.qc){
   iniciarTablero();
 } else if(initInfo.cod){
   abrirOrden(initInfo.cod);
+  /* Si además es supervisor (link principal), arrancar tambien el panel de packeting */
+  if(supervisor){ iniciarSupPk(); }
+} else if(supervisor){
+  /* Supervisor sin orden cargada: solo mostrar panel de packeting activo */
+  iniciarSupPk();
 }
 </script>
 </body>
