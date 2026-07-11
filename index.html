@@ -359,6 +359,9 @@
   .pk-mani-chip.absent{background:transparent;color:var(--muted);border-color:var(--line);
     text-decoration:line-through;opacity:.6}
   .pk-mani-chip.absent:hover{opacity:.9;background:rgba(88,101,112,.1)}
+  /* Chip de barril reportado por packeting: pendiente disposición de QC */
+  .pk-mani-chip.reported{background:rgba(240,180,41,.14);color:var(--warn);border-color:rgba(240,180,41,.5);cursor:default}
+  .pk-mani-chip.reported:hover{background:rgba(240,180,41,.14)}
   .pk-mani-chip .cb-mark{font-weight:800;font-size:11px}
   .pk-mani-summary{font-size:12px;color:var(--muted);margin-bottom:6px}
   .pk-mani-summary b{color:var(--ink)}
@@ -2271,7 +2274,7 @@ const I18N = {
     pkFirstSampleRequired:'First sample must be taken from packeting before updating production.',
     pkAlreadyPresent:(bn)=>`Barrel ${bn} already marked present.`,
     pkMarkedPresent:(bn)=>`✓ Barrel ${bn} marked present.`,
-    pkScanHint:'Scan any barrel QR only to start a new packeting order. Barrels are assumed present unless you uncheck them.',
+    pkScanHint:'Scan a barrel QR to start a new packeting order or to report a problematic barrel to QC. Barrels are assumed present unless you uncheck them.',
     pkAlreadyActive:(cod)=>`✓ ${cod} is already active on this line. Use the panel below.`,
     unscanHint:'The barrel stops counting as packed and the reason is recorded.',
     unscanConfirm:'Remove label', unscanSub:(b)=>`Barrel from batch ${b}`,
@@ -2577,7 +2580,7 @@ const I18N = {
     pkFirstSampleRequired:'Debes tomar la primera muestra desde packeting antes de actualizar producción.',
     pkAlreadyPresent:(bn)=>`Barril ${bn} ya está marcado presente.`,
     pkMarkedPresent:(bn)=>`✓ Barril ${bn} marcado presente.`,
-    pkScanHint:'Escanea el QR de cualquier barril SOLO para iniciar una orden nueva. Los barriles se asumen presentes hasta que los desmarques.',
+    pkScanHint:'Escanea el QR de un barril para iniciar una orden nueva o para reportar un barril problemático a QC. Los barriles se asumen presentes hasta que los desmarques.',
     pkAlreadyActive:(cod)=>`✓ ${cod} ya está activa en esta línea. Usa el panel de abajo.`,
     unscanHint:'El barril deja de contar como colocado y se registra el motivo.',
     unscanConfirm:'Retirar label', unscanSub:(b)=>`Barril del batch ${b}`,
@@ -5177,25 +5180,6 @@ async function procesarBarril(datos){
     return;
   }
 
-  /* Modo OPERADOR packeting: si ya hay orden de packeting activa en esta línea para esta orden,
-     el escáner NO agrega barril (los barriles se manejan por checkbox en el panel). Solo avisa. */
-  const lineaNumTemp = typeof packLinea!=='undefined' ? packLinea : (window.packLinea||null);
-  if(!qc && lineaNumTemp && data.packeting && !data.packeting.finished && data.packeting.linea===lineaNumTemp){
-    packMostrarMsg(t('pkAlreadyActive')(codFinal),'dup'); beep(false);
-    /* si el barril estaba marcado ausente, quitarlo (el escaneo confirma presencia física) */
-    if(Array.isArray(data.packeting.barrilesAusentes)){
-      const idxAus = data.packeting.barrilesAusentes.indexOf(datos.uid);
-      if(idxAus >= 0){
-        data.packeting.barrilesAusentes.splice(idxAus, 1);
-        await escribirOrden(codFinal, data);
-        packCache[codFinal]=data;
-        if(pkActivasOn) refrescarPkActivas();
-        packMostrarMsg(t('pkMarkedPresent')(datos.bn!=null?datos.bn:''),'ok'); beep(true);
-      }
-    }
-    return;
-  }
-
   /* agregar el barril */
   data.barrilesQR.push({ uid:datos.uid, ts:Date.now(), num:datos.i||null, bn:datos.bn||null });
 
@@ -5227,11 +5211,20 @@ async function procesarBarril(datos){
   /* Refrescar panel de órdenes activas en esta línea (checkboxes, contadores) */
   if(pkActivasOn) refrescarPkActivas();
 
-  /* Hook packeting production: si no hay orden de packeting activa para esta orden
-     y el usuario tiene linea seleccionada y NO es QC, ofrecer iniciar orden en la linea. */
+  /* Hook packeting production: 3 casos según el estado de packeting.
+     - No hay packeting: prompt iniciar orden en la línea (flujo original)
+     - Packeting activa en OTRA línea: warning
+     - Packeting activa en ESTA línea: el escaneo es un intento de REPORTE a QC → abrir modal
+       de reporte (con opción "fue error de escaneo" para descartar sin registrar problema) */
   const lineaNum = typeof packLinea!=='undefined' ? packLinea : (window.packLinea||null);
   if(!qc && lineaNum && !data.packeting){
     setTimeout(()=>abrirModalPackStart(codFinal, data, batch, producto, lineaNum), 250);
+  } else if(!qc && lineaNum && data.packeting && !data.packeting.finished && data.packeting.linea===lineaNum){
+    /* Orden activa en esta línea: escanear = intento de reporte. Abrir modal de reporte. */
+    setTimeout(()=>{
+      packMostrarMsg(t('packAskProblema'),'dup');
+      abrirPackReporte(codFinal, datos.uid, datos.bn!=null?datos.bn:null, data);
+    }, 200);
   } else if(!qc && lineaNum && data.packeting && !data.packeting.finished && data.packeting.linea && data.packeting.linea!==lineaNum){
     /* orden de packeting ya activa en OTRA linea (y no finalizada): avisar sin bloquear */
     packMostrarMsg(t('pkOtherLine')(data.packeting.linea),'dup');
@@ -5711,9 +5704,15 @@ function renderPkActivas(codigos, cache){
         <div class="pk-mani-grid">${
           items.map(x=>{
             const isAbs = ausentes.has(x.uid);
+            const isRep = x.estado==='rep'; /* reportado, esperando QC */
             const etq = x.bn!=null ? ('#'+x.bn) : '•';
             const uidSafe = String(x.uid||'').replace(/'/g,'&#39;').replace(/"/g,'&quot;');
             const codSafe = String(cod).replace(/'/g,'&#39;');
+            /* prioridad visual: reportado > ausente > presente */
+            if(isRep){
+              return `<span class="pk-mani-chip reported" title="${t('packRepTitleChip')||'Reportado a QC'}">
+                <span class="cb-mark">⚠️</span>${etq}</span>`;
+            }
             const title = isAbs ? t('pkBarrilTitleAbsent') : t('pkBarrilTitlePresent');
             const mark = isAbs ? '☐' : '✓';
             return `<span class="pk-mani-chip${isAbs?' absent':''}" title="${title}"
@@ -5982,6 +5981,8 @@ $('packRepProblema').addEventListener('click',async()=>{
   actualizarPackActual();
   cerrarPackReporte();
   packMostrarMsg(t('packReportadoOk'),'ok'); beep(true);
+  /* Refrescar el panel de órdenes activas para que el chip del barril refleje el estado reportado */
+  if(pkActivasOn) refrescarPkActivas();
 });
 modalPackReporte.addEventListener('click',e=>{ if(e.target===modalPackReporte) cerrarPackReporte(); });
 
