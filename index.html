@@ -325,15 +325,6 @@
   .paro-row.zero .pr-time{color:var(--muted)}
   .paro-row.co .pr-time{color:var(--warn)}
 
-  /* ===== Sección Packeting supervisor (link principal, NO tablero) ===== */
-  #supPkPanel{display:none;background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);
-    padding:16px 18px;margin-bottom:16px}
-  body.supervisor:not(.tablero) #supPkPanel{display:block}
-  body.supervisor.tablero #supPkPanel{display:none}
-  #supPkPanel h3{font-size:14px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);
-    margin:0 0 12px;display:flex;align-items:center;gap:8px}
-  #supPkPanel .tab-grid{margin-top:0}
-  .sup-pk-empty{color:var(--muted);font-size:13px;padding:8px 0}
   /* Banner "orden de packeting finalizada" en vista de orden supervisor */
   #supPkFinBanner{display:none;background:rgba(45,212,167,.08);border:1px solid rgba(45,212,167,.35);
     border-radius:var(--radius);padding:12px 16px;margin-bottom:14px;
@@ -790,13 +781,6 @@
   </div>
 
   <div class="sup-banner" id="supBanner" data-i18n="supBanner">👁️ Supervisor mode active — read-only view. Changes are disabled.</div>
-
-  <!-- Panel supervisor: líneas de packeting activas (solo visible en rol supervisor SIN tablero) -->
-  <div id="supPkPanel">
-    <h3><span data-i18n="supPkSection">📦 Active packeting lines</span></h3>
-    <div id="supPkGrid" class="tab-grid"></div>
-    <div id="supPkEmpty" class="sup-pk-empty" data-i18n="supPkEmpty">No active packeting orders right now.</div>
-  </div>
 
   <!-- Banner "orden de packeting finalizada" con botón Reabrir (aparece al cargar una orden finalizada) -->
   <div id="supPkFinBanner">
@@ -6095,11 +6079,6 @@ if(initInfo.qc){
   iniciarTablero();
 } else if(initInfo.cod){
   abrirOrden(initInfo.cod);
-  /* Si además es supervisor (link principal), arrancar tambien el panel de packeting */
-  if(supervisor){ iniciarSupPk(); }
-} else if(supervisor){
-  /* Supervisor sin orden cargada: solo mostrar panel de packeting activo */
-  iniciarSupPk();
 }
 </script>
 </body>
