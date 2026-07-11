@@ -486,6 +486,18 @@
   #packReader:empty{display:none}
   #packReader video{width:100%!important;border-radius:10px;display:block}
   .pack-scan-wrap .btn{width:100%;padding:14px;font-size:15px}
+
+  /* ===== Vista packeting OPERADOR (no QC): escáner compacto solo para arrancar orden ===== */
+  body.packeting:not(.qc) .pack-scan-wrap{max-width:340px;margin:0 auto 14px;padding:10px}
+  body.packeting:not(.qc) #packReader{max-height:220px}
+  body.packeting:not(.qc) #packReader video{max-height:220px;object-fit:cover}
+  body.packeting:not(.qc) .pack-scan-wrap .btn{padding:10px;font-size:13px}
+  body.packeting:not(.qc) #packCurrent,
+  body.packeting:not(.qc) #packProg,
+  body.packeting:not(.qc) #packBarriles{display:none !important}
+  body.packeting:not(.qc) .pack-scan-hint{display:block;font-size:12px;color:var(--muted);
+    text-align:center;margin-top:8px;line-height:1.4}
+  .pack-scan-hint{display:none}
   .pack-current{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:18px;margin-bottom:14px;text-align:center}
   .pack-current-l{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;font-weight:600;margin-bottom:4px}
   .pack-current-v{font-size:22px;font-weight:800;color:var(--ink);line-height:1.2;word-break:break-word}
@@ -684,6 +696,7 @@
       <div id="packReader"></div>
       <button class="btn primary" id="packStart" data-i18n="packStart">▶️ Start scanner</button>
       <button class="btn danger" id="packStop" style="display:none" data-i18n="packStop">⏹️ Stop scanner</button>
+      <div class="pack-scan-hint" data-i18n="pkScanHint">Scan any barrel QR only to start a new packeting order. Barrels are assumed present unless you uncheck them.</div>
     </div>
     <div class="pack-current" id="packCurrent">
       <div class="pack-current-l" data-i18n="packLastBatch">Current batch</div>
@@ -2258,6 +2271,8 @@ const I18N = {
     pkFirstSampleRequired:'First sample must be taken from packeting before updating production.',
     pkAlreadyPresent:(bn)=>`Barrel ${bn} already marked present.`,
     pkMarkedPresent:(bn)=>`✓ Barrel ${bn} marked present.`,
+    pkScanHint:'Scan any barrel QR only to start a new packeting order. Barrels are assumed present unless you uncheck them.',
+    pkAlreadyActive:(cod)=>`✓ ${cod} is already active on this line. Use the panel below.`,
     unscanHint:'The barrel stops counting as packed and the reason is recorded.',
     unscanConfirm:'Remove label', unscanSub:(b)=>`Barrel from batch ${b}`,
     reasonDusty:'Dusty', reasonSort:'To sort', reasonError:'Scanned by error', reasonOther:'Other',
@@ -2562,6 +2577,8 @@ const I18N = {
     pkFirstSampleRequired:'Debes tomar la primera muestra desde packeting antes de actualizar producción.',
     pkAlreadyPresent:(bn)=>`Barril ${bn} ya está marcado presente.`,
     pkMarkedPresent:(bn)=>`✓ Barril ${bn} marcado presente.`,
+    pkScanHint:'Escanea el QR de cualquier barril SOLO para iniciar una orden nueva. Los barriles se asumen presentes hasta que los desmarques.',
+    pkAlreadyActive:(cod)=>`✓ ${cod} ya está activa en esta línea. Usa el panel de abajo.`,
     unscanHint:'El barril deja de contar como colocado y se registra el motivo.',
     unscanConfirm:'Retirar label', unscanSub:(b)=>`Barril del batch ${b}`,
     reasonDusty:'Polvoso', reasonSort:'Sortear', reasonError:'Escaneo por error', reasonOther:'Otro',
@@ -5157,6 +5174,25 @@ async function procesarBarril(datos){
     setCtx();
     packMostrarMsg(t('packAskProblema'),'dup'); beep(false);
     abrirPackReporte(codFinal, datos.uid, datos.bn!=null?datos.bn:null, data);
+    return;
+  }
+
+  /* Modo OPERADOR packeting: si ya hay orden de packeting activa en esta línea para esta orden,
+     el escáner NO agrega barril (los barriles se manejan por checkbox en el panel). Solo avisa. */
+  const lineaNumTemp = typeof packLinea!=='undefined' ? packLinea : (window.packLinea||null);
+  if(!qc && lineaNumTemp && data.packeting && !data.packeting.finished && data.packeting.linea===lineaNumTemp){
+    packMostrarMsg(t('pkAlreadyActive')(codFinal),'dup'); beep(false);
+    /* si el barril estaba marcado ausente, quitarlo (el escaneo confirma presencia física) */
+    if(Array.isArray(data.packeting.barrilesAusentes)){
+      const idxAus = data.packeting.barrilesAusentes.indexOf(datos.uid);
+      if(idxAus >= 0){
+        data.packeting.barrilesAusentes.splice(idxAus, 1);
+        await escribirOrden(codFinal, data);
+        packCache[codFinal]=data;
+        if(pkActivasOn) refrescarPkActivas();
+        packMostrarMsg(t('pkMarkedPresent')(datos.bn!=null?datos.bn:''),'ok'); beep(true);
+      }
+    }
     return;
   }
 
