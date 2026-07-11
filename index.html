@@ -340,6 +340,31 @@
     align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
   #supPkFinBanner.show{display:flex}
   #supPkFinBanner .banner-txt{font-size:13px;color:var(--ink);flex:1;min-width:200px}
+
+  /* ===== Panel de órdenes activas en la vista packeting ===== */
+  #pkActivasPanel{margin-top:16px}
+  #pkActivasPanel h3{font-size:13px;font-weight:800;text-transform:uppercase;letter-spacing:.8px;
+    color:var(--muted);margin:0 0 10px;display:flex;align-items:center;gap:8px}
+  #pkActivasPanel h3::after{content:'';flex:1;height:1px;background:var(--line);margin-left:6px}
+  #pkActivasGrid .ord-card{border-left:3px solid var(--accent);margin-bottom:12px}
+  #pkActivasGrid .ord-card:last-child{margin-bottom:0}
+  #pkActivasEmpty{color:var(--muted);font-size:13px;padding:8px 0;text-align:center}
+  /* Chips de barriles con estado present/absent (clickeables) */
+  .pk-mani-grid{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0 12px}
+  .pk-mani-chip{display:inline-flex;align-items:center;gap:6px;font-size:12px;padding:5px 10px;
+    border-radius:8px;background:rgba(45,212,167,.14);color:var(--accent);border:1px solid rgba(45,212,167,.4);
+    cursor:pointer;user-select:none;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    transition:all .15s}
+  .pk-mani-chip:hover{background:rgba(45,212,167,.22)}
+  .pk-mani-chip.absent{background:transparent;color:var(--muted);border-color:var(--line);
+    text-decoration:line-through;opacity:.6}
+  .pk-mani-chip.absent:hover{opacity:.9;background:rgba(88,101,112,.1)}
+  .pk-mani-chip .cb-mark{font-weight:800;font-size:11px}
+  .pk-mani-summary{font-size:12px;color:var(--muted);margin-bottom:6px}
+  .pk-mani-summary b{color:var(--ink)}
+  /* Botones de acción de la tarjeta activa */
+  .pk-card-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+  .pk-card-actions .btn{flex:1;min-width:130px}
   /* ===== Sección Packeting (aparece en QC dashboard y tablero supervisor) ===== */
   .pk-section{margin-top:22px}
   .pk-section-title{font-size:13px;font-weight:800;text-transform:uppercase;letter-spacing:.8px;
@@ -686,6 +711,15 @@
         <span class="pack-barriles-n"><b id="packBarrilesCount">0</b></span>
       </div>
       <div class="pack-barriles-grid" id="packBarrilesGrid"></div>
+    </div>
+
+    <!-- Panel de órdenes activas en la línea seleccionada:
+         una tarjeta por orden con checklist toggle de barriles y botones
+         "Actualizar producción" + "Cerrar orden". -->
+    <div id="pkActivasPanel">
+      <h3><span data-i18n="pkActivasSection">📦 Active orders on your line</span></h3>
+      <div id="pkActivasGrid"></div>
+      <div id="pkActivasEmpty" data-i18n="pkActivasEmpty">No active orders on this line. Scan a QR to start one.</div>
     </div>
   </div>
 
@@ -1416,6 +1450,12 @@ function normalizar(d){ d=d||{}; d.orden=d.orden||{producto:'',lote:'',orden:'',
     if(d.packeting.finished===undefined)      d.packeting.finished=false;
     if(d.packeting.finishedTs===undefined)    d.packeting.finishedTs=null;
     if(d.packeting.finishedBotes===undefined) d.packeting.finishedBotes=null;
+    /* barrilesAusentes: uids de barriles declarados que packeting marca como no-presentes.
+       Todos los declarados se asumen presentes por default; el operador desmarca solo los faltantes.
+       Al cerrar la orden, barrilesProcesados = declarados - ausentes. */
+    if(!Array.isArray(d.packeting.barrilesAusentes)) d.packeting.barrilesAusentes = [];
+    /* barrilesProcesados: valor congelado al cerrar la orden (declarados - ausentes al momento de cerrar) */
+    if(d.packeting.barrilesProcesados===undefined) d.packeting.barrilesProcesados=null;
   }
   return d; }
 
@@ -2209,6 +2249,15 @@ const I18N = {
     supPkReopenConfirm:'Confirm reopen',
     supPkReopenOk:'✓ Order reopened',
     supPkFinishedBanner:(date,bottles)=>`Packeting order finalized on ${date} with ${bottles} bottles.`,
+    /* Active orders panel in packeting view */
+    pkActivasSection:'📦 Active orders on your line',
+    pkActivasEmpty:'No active orders on this line. Scan a QR to start one.',
+    pkBarrilesPresentes:'Barrels present',
+    pkBarrilTitlePresent:'Present. Tap to mark absent.',
+    pkBarrilTitleAbsent:'Absent. Tap to mark present.',
+    pkFirstSampleRequired:'First sample must be taken from packeting before updating production.',
+    pkAlreadyPresent:(bn)=>`Barrel ${bn} already marked present.`,
+    pkMarkedPresent:(bn)=>`✓ Barrel ${bn} marked present.`,
     unscanHint:'The barrel stops counting as packed and the reason is recorded.',
     unscanConfirm:'Remove label', unscanSub:(b)=>`Barrel from batch ${b}`,
     reasonDusty:'Dusty', reasonSort:'To sort', reasonError:'Scanned by error', reasonOther:'Other',
@@ -2504,6 +2553,15 @@ const I18N = {
     supPkReopenConfirm:'Confirmar reapertura',
     supPkReopenOk:'✓ Orden reabierta',
     supPkFinishedBanner:(fecha,botes)=>`Orden de packeting finalizada el ${fecha} con ${botes} botes.`,
+    /* Panel de líneas activas en la vista packeting */
+    pkActivasSection:'📦 Órdenes activas en tu línea',
+    pkActivasEmpty:'No hay órdenes activas en esta línea. Escanea un QR para iniciar una.',
+    pkBarrilesPresentes:'Barriles presentes',
+    pkBarrilTitlePresent:'Presente. Toca para marcar como no presente.',
+    pkBarrilTitleAbsent:'No presente. Toca para marcar presente.',
+    pkFirstSampleRequired:'Debes tomar la primera muestra desde packeting antes de actualizar producción.',
+    pkAlreadyPresent:(bn)=>`Barril ${bn} ya está marcado presente.`,
+    pkMarkedPresent:(bn)=>`✓ Barril ${bn} marcado presente.`,
     unscanHint:'El barril deja de contar como colocado y se registra el motivo.',
     unscanConfirm:'Retirar label', unscanSub:(b)=>`Barril del batch ${b}`,
     reasonDusty:'Polvoso', reasonSort:'Sortear', reasonError:'Escaneo por error', reasonOther:'Otro',
@@ -4214,7 +4272,12 @@ function renderQC(codigos){
 function renderQcPacketing(codigos){
   const sec = $('qcPkSection'), grid = $('qcPkGrid');
   const loc = I18N[lang].locale;
-  const activas = (codigos||[]).filter(c=> qcDatos[c] && qcDatos[c].packeting && !qcDatos[c].packeting.finished);
+  const activas = (codigos||[]).filter(c=>{
+    const dd = qcDatos[c];
+    /* Solo órdenes con packeting activo (no finalizado) Y con primera muestra ya tomada
+       (packeting es responsable de la primera muestra; QC solo actualiza producción). */
+    return dd && dd.packeting && !dd.packeting.finished && (dd.packeting.registros||[]).length>0;
+  });
   if(!activas.length){ sec.style.display='none'; grid.innerHTML=''; return; }
   sec.style.display='block';
   let html = '';
@@ -4238,21 +4301,9 @@ function renderQcPacketing(codigos){
           <span style="color:var(--muted)">${producidosTotal.toLocaleString(loc)} / ${target.toLocaleString(loc)} ${t('pkUnit')}</span></div>
       </div>`;
     }
-    /* Botones QC: si no hay muestra HOY, solo "Primera muestra" (abre el dia).
-       Si ya hay muestra hoy, ambos botones (nueva muestra + actualizar avance). */
-    const hayMuestraHoy = (p.registros||[]).some(r=>{
-      if(!r || !r.ts) return false;
-      try { return dayKey(new Date(r.ts))===hoyK; } catch(e){ return false; }
-    });
+    /* QC solo actualiza producción. La primera muestra y las adicionales son de packeting. */
     const abrirUrl = `?rol=qc&clave=${CLAVE_QC}&orden=${encodeURIComponent(cod)}`;
-    let btnAcciones;
-    if(!hayMuestraHoy){
-      btnAcciones = `<button class="btn primary" onclick="location.href='${abrirUrl}&pack-muestra=1'">${t('pkFirstSample')}</button>`;
-    } else {
-      const btnMuestra = `<button class="btn" onclick="location.href='${abrirUrl}&pack-muestra=1'">${t('pkNewSample')}</button>`;
-      const btnAvance  = `<button class="btn primary" onclick="location.href='${abrirUrl}&pack-avance=1'">${t('pkUpdateAdv')}</button>`;
-      btnAcciones = btnMuestra + btnAvance;
-    }
+    const btnAcciones = `<button class="btn primary" onclick="location.href='${abrirUrl}&pack-avance=1'">${t('pkUpdateAdv')}</button>`;
     const hoyTxt = (dHoy && dHoy.avance!=null)
       ? `<b>${Number(dHoy.avance).toLocaleString(loc)}</b> ${t('pkUnit')}`
       : `<span style="color:var(--muted)">—</span>`;
@@ -4840,6 +4891,8 @@ function guardarLinea(n){
   actualizarChipLinea();
   $('modalLinea').classList.remove('show');
   packMostrarMsg(t('lineaOk')(nombreLinea(n)),'ok');
+  /* al cambiar de línea, refrescar el panel de órdenes activas para mostrar las de esta línea */
+  if(pkActivasOn) refrescarPkActivas();
 }
 function actualizarChipLinea(){
   const chip=$('packLineaChip'); if(!chip) return;
@@ -4866,6 +4919,8 @@ function iniciarPacketing(){
     $('lineaBtn1').addEventListener('click', ()=>guardarLinea(1));
     $('lineaBtn2').addEventListener('click', ()=>guardarLinea(2));
     if(!packLinea){ abrirModalLinea(); }
+    /* Arrancar panel de órdenes activas en esta línea */
+    iniciarPkActivas();
   }
 }
 
@@ -5108,6 +5163,12 @@ async function procesarBarril(datos){
   /* agregar el barril */
   data.barrilesQR.push({ uid:datos.uid, ts:Date.now(), num:datos.i||null, bn:datos.bn||null });
 
+  /* si el barril estaba marcado como ausente por packeting, quitarlo (marca presente automático) */
+  if(data.packeting && Array.isArray(data.packeting.barrilesAusentes)){
+    const idxAus = data.packeting.barrilesAusentes.indexOf(datos.uid);
+    if(idxAus >= 0){ data.packeting.barrilesAusentes.splice(idxAus, 1); }
+  }
+
   /* guardar en la nube (independiente de si la orden está abierta o cerrada) */
   const ok=await escribirOrden(codFinal, data);
   if(!ok){ packMostrarMsg(t('packSaveErr'),'err'); beep(false); return; }
@@ -5126,6 +5187,9 @@ async function procesarBarril(datos){
   actualizarPackActual();
 
   packMostrarMsg(datos.bn ? t('packAddedN')(datos.bn, batch) : t('packAdded')(batch),'ok'); beep(true);
+
+  /* Refrescar panel de órdenes activas en esta línea (checkboxes, contadores) */
+  if(pkActivasOn) refrescarPkActivas();
 
   /* Hook packeting production: si no hay orden de packeting activa para esta orden
      y el usuario tiene linea seleccionada y NO es QC, ofrecer iniciar orden en la linea. */
@@ -5310,6 +5374,7 @@ async function guardarPackAdvance(){
   if(!ok){ al.textContent=t('packSaveErr'); al.classList.add('show'); return; }
   cerrarModalPackAdvance();
   if(qcAccionRapida){ volverDashboardQC(); return; }
+  if(pkActivasOn) refrescarPkActivas();
   if(qcOn) refrescarQC();
   if(tableroOn) refrescarTablero();
 }
@@ -5460,6 +5525,11 @@ async function guardarPackFinish(){
   p.finished = true;
   p.finishedTs = new Date().toISOString();
   p.finishedBotes = final;
+  /* barriles procesados = declarados - ausentes (congela el conteo al momento del cierre) */
+  const man = manifiestoBarriles(data);
+  const items = (man && man.items) ? man.items.filter(x=>x.estado!=='ret') : [];
+  const ausentes = new Set(p.barrilesAusentes||[]);
+  p.barrilesProcesados = items.filter(x=>!ausentes.has(x.uid)).length;
   /* cerrar el dia de hoy si esta abierto (para que quede consistente el conteo) */
   const hoyK = dayKey(new Date());
   if(p.dias[hoyK] && !p.dias[hoyK].closed){
@@ -5471,6 +5541,7 @@ async function guardarPackFinish(){
   if(!ok){ al.textContent = t('packSaveErr'); al.classList.add('show'); return; }
   cerrarModalPackFinish();
   if(supPkOn) refrescarSupPk();
+  if(pkActivasOn) refrescarPkActivas();
   if(tableroOn) refrescarTablero();
   if(qcOn) refrescarQC();
 }
@@ -5526,6 +5597,170 @@ $('supPkReopenCancel').addEventListener('click', cerrarModalPackReopen);
 $('supPkReopenSave').addEventListener('click', guardarPackReopen);
 $('modalPackReopen').addEventListener('click', e=>{ if(e.target.id==='modalPackReopen') cerrarModalPackReopen(); });
 $('supPkReopenBtnEl').addEventListener('click', abrirModalPackReopen);
+
+/* ============================================================
+   PACKETING — Vista operador: panel de órdenes ACTIVAS en su línea.
+   Aparece en ?rol=packeting con una línea seleccionada. Cada tarjeta muestra:
+   - Producto, batch, código, progreso
+   - Checklist de barriles declarados (todos presentes por default; toggle para desmarcar)
+   - Botones: "📈 Actualizar producción" y "🏁 Cerrar orden"
+   ============================================================ */
+let pkActivasCache = {}, pkActivasTimer = null, pkActivasOn = false;
+
+async function refrescarPkActivas(){
+  if(!pkActivasOn) return;
+  const grid = $('pkActivasGrid'), empty = $('pkActivasEmpty');
+  if(!grid) return;
+  const lineaNum = typeof packLinea!=='undefined' ? packLinea : null;
+  if(!lineaNum){ /* sin línea seleccionada, panel vacío */
+    grid.innerHTML=''; empty.style.display='block';
+    empty.textContent = t('pkActivasEmpty');
+    return;
+  }
+  try{
+    const codigos = await codigosEnProceso();
+    pkActivasCache = {};
+    for(const cod of codigos){
+      try{
+        const url = REST + '?codigo=eq.' + encodeURIComponent(cod) + '&select=data';
+        const r = await fetch(url,{ headers: HEADERS });
+        if(r.ok){
+          const arr = await r.json();
+          if(arr && arr[0]) pkActivasCache[cod] = normalizar(arr[0].data);
+        }
+      }catch(e){}
+    }
+    /* filtro: solo órdenes con packeting activo en ESTA línea, no finalizadas */
+    const activas = codigos.filter(c => {
+      const d = pkActivasCache[c];
+      return d && d.packeting && !d.packeting.finished && d.packeting.linea===lineaNum;
+    });
+    if(!activas.length){ grid.innerHTML=''; empty.style.display='block'; empty.textContent = t('pkActivasEmpty'); return; }
+    empty.style.display='none';
+    renderPkActivas(activas, pkActivasCache);
+  }catch(e){ /* silencioso, reintenta */ }
+}
+
+function renderPkActivas(codigos, cache){
+  const grid = $('pkActivasGrid'); if(!grid) return;
+  const loc = I18N[lang].locale;
+  let html = '';
+  codigos.forEach(cod=>{
+    const d = cache[cod];
+    const p = d.packeting;
+    const o = d.orden || {};
+    const producidosTotal = pkBotesAcumulados(p);
+    const target = p.target||0;
+    /* Barra de progreso de botes */
+    let prog = '';
+    if(target>0){
+      const pctReal = producidosTotal/target*100, pct = Math.min(100,pctReal);
+      const color = pctReal<=30?'var(--danger)':(pctReal<=70?'var(--warn)':'var(--accent)');
+      prog = `<div>
+        <div class="oc-prog-top"><span>${t('pkProgress')}</span><b>${pct.toFixed(1)}%</b></div>
+        <div class="bar"><span style="width:${pct}%;background:${color}"></span></div>
+        <div class="oc-prog-top" style="margin-top:5px;margin-bottom:0">
+          <span style="color:var(--muted)">${producidosTotal.toLocaleString(loc)} / ${target.toLocaleString(loc)} ${t('pkUnit')}</span></div>
+      </div>`;
+    }
+    /* Manifest de barriles con checkboxes toggle */
+    const man = manifiestoBarriles(d);
+    const ausentes = new Set(p.barrilesAusentes||[]);
+    let manHtml = '';
+    if(man && man.items && man.items.length){
+      const items = man.items.filter(x=>x.estado!=='ret'); /* excluir retirados por QC */
+      items.sort((a,b)=>(a.bn||0)-(b.bn||0));
+      const presentes = items.filter(x=>!ausentes.has(x.uid)).length;
+      manHtml = `<div class="pk-mani-summary">${t('pkBarrilesPresentes')}: <b>${presentes}</b> / ${items.length}</div>
+        <div class="pk-mani-grid">${
+          items.map(x=>{
+            const isAbs = ausentes.has(x.uid);
+            const etq = x.bn!=null ? ('#'+x.bn) : '•';
+            const uidSafe = String(x.uid||'').replace(/'/g,'&#39;').replace(/"/g,'&quot;');
+            const codSafe = String(cod).replace(/'/g,'&#39;');
+            const title = isAbs ? t('pkBarrilTitleAbsent') : t('pkBarrilTitlePresent');
+            const mark = isAbs ? '☐' : '✓';
+            return `<span class="pk-mani-chip${isAbs?' absent':''}" title="${title}"
+              onclick="pkToggleBarril('${codSafe}','${uidSafe}')">
+              <span class="cb-mark">${mark}</span>${etq}</span>`;
+          }).join('')
+        }</div>`;
+    }
+    /* Botones de acción */
+    const codSafe = String(cod).replace(/'/g,'&#39;');
+    const hayPrimera = (p.registros||[]).length>0;
+    const btnAdv = hayPrimera
+      ? `<button class="btn" onclick="abrirModalPackAdvancePk('${codSafe}')">${t('pkUpdateAdv')}</button>`
+      : `<button class="btn" disabled title="${t('pkFirstSampleRequired')}">${t('pkUpdateAdv')}</button>`;
+    const btnClose = `<button class="btn primary" onclick="abrirModalPackFinishPk('${codSafe}')">${t('pkFinishBtn')}</button>`;
+    html += `<div class="ord-card">
+      <div class="oc-top">
+        <div>
+          <div class="oc-room-big">${(o.orden?String(o.orden).replace(/</g,'&lt;'):'—')}
+            <span class="pk-line-chip">${t('pkLineChip')(p.linea||'—')}</span></div>
+          <div class="oc-prod">${o.producto?String(o.producto).replace(/</g,'&lt;'):'—'}
+            <span class="pk-range-chip">${t('pkRangeChip')(p.pesoMin,p.pesoMax)}</span></div>
+          <div class="oc-code">${cod}</div>
+        </div>
+      </div>
+      ${prog}
+      ${manHtml}
+      <div class="pk-card-actions">${btnAdv}${btnClose}</div>
+    </div>`;
+  });
+  grid.innerHTML = html;
+}
+
+/* Toggle presencia de un barril: guarda inmediato en la nube. */
+async function pkToggleBarril(cod, uid){
+  const data = pkActivasCache[cod];
+  if(!data || !data.packeting) return;
+  const p = data.packeting;
+  p.barrilesAusentes = Array.isArray(p.barrilesAusentes) ? p.barrilesAusentes : [];
+  const idx = p.barrilesAusentes.indexOf(uid);
+  if(idx >= 0){ p.barrilesAusentes.splice(idx, 1); } /* estaba ausente → volver presente */
+  else       { p.barrilesAusentes.push(uid); }        /* estaba presente → marcar ausente */
+  const ok = await escribirOrden(cod, data);
+  if(!ok){ packMostrarMsg(t('packSaveErr'),'err'); return; }
+  refrescarPkActivas();
+}
+
+/* Wrappers de los modales de update y finish para llamar desde el panel packeting.
+   packeting no está "dentro" de la orden, por eso useState=false y usamos escribirOrden. */
+function abrirModalPackAdvancePk(cod){
+  const data = pkActivasCache[cod];
+  if(!data || !data.packeting){ alert(t('pkNoActiveOrder')); return; }
+  _pkCtx = { codFinal: cod, data, useState: false };
+  const p = data.packeting;
+  const hoyK = dayKey(new Date());
+  const dHoy = p.dias[hoyK]||{};
+  $('pkAdvInfo').textContent = `${cod} · ${t('lineaNombre')(p.linea||'—')} · ${t('pkProgress')}: ${dHoy.avance||0} / ${p.target||'—'} ${t('pkUnit')}`;
+  $('pkAdvVal').value = dHoy.avance!=null ? String(dHoy.avance) : '';
+  $('pkAdvAlert').classList.remove('show'); $('pkAdvAlert').textContent = '';
+  $('modalPackAdvance').classList.add('show');
+  setTimeout(()=>$('pkAdvVal').focus(),50);
+}
+
+function abrirModalPackFinishPk(cod){
+  const data = pkActivasCache[cod];
+  if(!data || !data.packeting){ alert(t('pkNoActiveOrder')); return; }
+  _pkCtx = { codFinal: cod, data, useState: false };
+  const p = data.packeting;
+  const total = pkBotesAcumulados(p);
+  const loc = I18N[lang].locale;
+  $('pkFinishInfo').textContent = t('pkFinishDesc')(cod, t('lineaNombre')(p.linea||'—'), total.toLocaleString(loc), (p.target||0).toLocaleString(loc));
+  $('pkFinishVal').value = String(total);
+  $('pkFinishAlert').classList.remove('show'); $('pkFinishAlert').textContent = '';
+  $('modalPackFinish').classList.add('show');
+  setTimeout(()=>$('pkFinishVal').focus(),50);
+}
+
+function iniciarPkActivas(){
+  if(pkActivasTimer) clearInterval(pkActivasTimer);
+  pkActivasOn = true;
+  pkActivasTimer = setInterval(refrescarPkActivas, 5000);
+  refrescarPkActivas();
+}
 
 /* contar solo barriles activos (no retirados) */
 function contarActivos(arr){ return (arr||[]).filter(b=>b && !b.removed).length; }
