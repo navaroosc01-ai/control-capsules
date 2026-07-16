@@ -367,6 +367,11 @@
   .ord-card.pk{border-left:3px solid var(--accent)}
   .pk-line-chip{display:inline-block;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;
     color:var(--accent);background:rgba(87,166,255,.14);padding:3px 9px;border-radius:12px;margin-left:6px}
+  /* Etiqueta "Room" (viene de encapsulación) y flecha de flujo cuarto → línea en tarjetas de packeting */
+  .pk-room-label{display:inline-block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;
+    color:var(--muted);vertical-align:middle;margin-right:6px;padding:2px 7px;border:1px solid var(--line);
+    border-radius:8px;background:var(--panel2)}
+  .pk-room-arrow{display:inline-block;color:var(--muted);font-weight:400;font-size:16px;margin:0 4px 0 8px;vertical-align:middle}
   .pk-range-chip{display:inline-block;font-size:11px;color:var(--muted);background:var(--panel2);
     border:1px solid var(--line);padding:3px 8px;border-radius:10px;margin-left:6px;
     font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
@@ -2112,6 +2117,9 @@ const I18N = {
     dayReportSub:'Final production of the day for all open orders.',
     repColRoom:'Room', repColOrder:'Order', repColProduct:'Product', repColToday:'Today', repColTotal:'Accum.', repColStatus:'Status',
     repNoData:'No data for the orders on the list.', repTotalDay:'Total produced today:', repPrint:'🖨️ Print',
+    repCapsSectionTitle:'💊 Encapsulation', repPkSectionTitle:'📦 Packeting',
+    repPkColLine:'Line', repPkColOrder:'Order', repPkColProduct:'Product', repPkColToday:'Today', repPkColTotal:'Accum.', repPkColStatus:'Status',
+    repPkTotalDay:'Total bottles today:', repPkFinishedTag:'FINISHED', repPkActiveTag:'ACTIVE',
     dayClosedTag:'(day closed)', prodProgressLabel:'Production progress',
     accumLabel:'Accum. production:', noTargetSet:'(no target set)', batchLabel:'Batch:', roomLabel:'Room:',
     sampleCount:'sample(s)', advance:'Progress:', capsLabel:'Caps:', barrelsLabel:'Barrels:', partialLabel:'Partial:',
@@ -2218,6 +2226,7 @@ const I18N = {
     pkOutOfRange:(mn,mx)=>`Weight is outside the range ${mn}–${mx} g. Confirm to continue?`,
     pkSection:'📦 Packeting',
     pkLineChip:(n)=>`Line ${n}`,
+    pkRoomLabel:'Room',
     pkProgress:'Bottles produced',
     pkUnit:'bottles',
     pkNewSample:'➕ New sample',
@@ -2419,6 +2428,9 @@ const I18N = {
     dayReportSub:'Producción final del día de todas las órdenes abiertas.',
     repColRoom:'Room', repColOrder:'Orden', repColProduct:'Producto', repColToday:'Hoy', repColTotal:'Acum.', repColStatus:'Estado',
     repNoData:'Sin datos para las órdenes de la lista.', repTotalDay:'Total producido hoy:', repPrint:'🖨️ Imprimir',
+    repCapsSectionTitle:'💊 Encapsulación', repPkSectionTitle:'📦 Packeting',
+    repPkColLine:'Línea', repPkColOrder:'Orden', repPkColProduct:'Producto', repPkColToday:'Hoy', repPkColTotal:'Acum.', repPkColStatus:'Estado',
+    repPkTotalDay:'Total botes hoy:', repPkFinishedTag:'FINALIZADO', repPkActiveTag:'ACTIVO',
     dayClosedTag:'(día cerrado)', prodProgressLabel:'Avance de producción',
     accumLabel:'Producción acum.:', noTargetSet:'(sin objetivo definido)', batchLabel:'Batch:', roomLabel:'Room:',
     sampleCount:'muestra(s)', advance:'Avance:', capsLabel:'Cáps:', barrelsLabel:'Barriles:', partialLabel:'Parcial:',
@@ -2524,6 +2536,7 @@ const I18N = {
     pkOutOfRange:(mn,mx)=>`El peso está fuera del rango ${mn}–${mx} g. ¿Confirmar de todos modos?`,
     pkSection:'📦 Packeting',
     pkLineChip:(n)=>`Línea ${n}`,
+    pkRoomLabel:'Room',
     pkProgress:'Botes producidos',
     pkUnit:'botes',
     pkNewSample:'➕ Nueva muestra',
@@ -3818,8 +3831,8 @@ function renderTablePacketing(codigos, datos){
     html += `<div class="ord-card pk">
       <div class="oc-top">
         <div>
-          <div class="oc-room-big">${(o.orden?String(o.orden).replace(/</g,'&lt;'):'—')}
-            <span class="pk-line-chip">${t('pkLineChip')(p.linea||'—')}</span></div>
+          <div class="oc-room-big"><span class="pk-room-label">${t('pkRoomLabel')}</span>${(o.orden?String(o.orden).replace(/</g,'&lt;'):'—')}
+            <span class="pk-room-arrow">→</span><span class="pk-line-chip">${t('pkLineChip')(p.linea||'—')}</span></div>
           <div class="oc-prod">${o.producto?String(o.producto).replace(/</g,'&lt;'):'—'}
             <span class="pk-range-chip">${t('pkRangeChip')(p.pesoMin,p.pesoMax)}</span></div>
           <div class="oc-code">${cod}</div>
@@ -3859,6 +3872,8 @@ const modalReporte=$('modalReporte');
 function abrirReporteDia(){
   const loc=I18N[lang].locale;
   const hoyKey=dayKey(new Date());
+
+  /* ===== ENCAPSULACION ===== */
   const filas=[];
   let totalHoy=0;
   (tabEfectivos.length?tabEfectivos:tabCodigos).forEach(cod=>{
@@ -3877,36 +3892,101 @@ function abrirReporteDia(){
       estCls: est===t('inProcess')?'proc':'sin'});
   });
 
+  /* ===== PACKETING =====
+     Se incluye toda orden con packeting configurado (con línea) que:
+       - No esté finalizado (activo), o
+       - Haya tenido producción hoy (aunque se haya finalizado hoy mismo).
+     El status refleja si la orden de packeting está ACTIVA o FINALIZADA. */
+  const filasPk=[];
+  let totalPkHoy=0;
+  (tabEfectivos.length?tabEfectivos:tabCodigos).forEach(cod=>{
+    const d=tabDatos[cod];
+    if(!d || !d.packeting || !d.packeting.linea) return;
+    const p=d.packeting;
+    const o=d.orden||{};
+    const dh = p.dias && p.dias[hoyKey];
+    let hoy=0;
+    if(dh && dh.avance!=null) hoy=Number(dh.avance);
+    /* si está finalizado y no tuvo producción hoy, omitir */
+    if(p.finished && !hoy) return;
+    const total=pkBotesAcumulados(p);
+    totalPkHoy+=hoy;
+    const pkEstTxt = p.finished ? t('repPkFinishedTag') : t('repPkActiveTag');
+    const pkEstCls = p.finished ? 'cerr' : 'proc';
+    filasPk.push({linea:p.linea, room:o.orden||'—', cod, prod:o.producto||'—', hoy, total, est:pkEstTxt, estCls:pkEstCls});
+  });
+
   $('repSub').textContent = `${t('dayReportSub')} · ${fmtDate(new Date())}`;
   const body=$('repBody');
-  if(!filas.length){
+  if(!filas.length && !filasPk.length){
     body.innerHTML=`<div class="tab-empty" style="margin-top:14px">${t('repNoData')}</div>`;
   } else {
-    /* ordenar por Room */
-    filas.sort((a,b)=>String(a.room).localeCompare(String(b.room),undefined,{numeric:true}));
-    let rows='';
-    filas.forEach(f=>{
-      rows+=`<tr>
-        <td style="font-weight:700">${String(f.room).replace(/</g,'&lt;')}</td>
-        <td style="color:var(--muted)">${f.cod}</td>
-        <td>${String(f.prod).replace(/</g,'&lt;')}</td>
-        <td style="text-align:right;font-weight:700">${f.hoy.toLocaleString(loc)}</td>
-        <td style="text-align:right">${f.total.toLocaleString(loc)}</td>
-        <td style="text-align:center"><span class="est-pill ${f.estCls}" style="font-size:10px">${f.est}</span></td>
-      </tr>`;
-    });
+    /* --- Sección Encapsulación --- */
+    let secCaps='';
+    if(filas.length){
+      filas.sort((a,b)=>String(a.room).localeCompare(String(b.room),undefined,{numeric:true}));
+      let rows='';
+      filas.forEach(f=>{
+        rows+=`<tr>
+          <td style="font-weight:700">${String(f.room).replace(/</g,'&lt;')}</td>
+          <td style="color:var(--muted)">${f.cod}</td>
+          <td>${String(f.prod).replace(/</g,'&lt;')}</td>
+          <td style="text-align:right;font-weight:700">${f.hoy.toLocaleString(loc)}</td>
+          <td style="text-align:right">${f.total.toLocaleString(loc)}</td>
+          <td style="text-align:center"><span class="est-pill ${f.estCls}" style="font-size:10px">${f.est}</span></td>
+        </tr>`;
+      });
+      secCaps=`
+        <h4 style="margin:14px 0 6px 0;font-size:13px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px">${t('repCapsSectionTitle')}</h4>
+        <div style="overflow-x:auto">
+          <table class="rep-table">
+            <thead><tr>
+              <th>${t('repColRoom')}</th><th>${t('repColOrder')}</th><th>${t('repColProduct')}</th>
+              <th style="text-align:right">${t('repColToday')}</th><th style="text-align:right">${t('repColTotal')}</th>
+              <th style="text-align:center">${t('repColStatus')}</th>
+            </tr></thead>
+            <tbody>${rows}</tbody>
+          </table>
+        </div>
+        <div class="rep-total"><span>${t('repTotalDay')}</span> <b>${totalHoy.toLocaleString(loc)}</b> ${t('capsUnit')}</div>`;
+    }
+
+    /* --- Sección Packeting --- */
+    let secPk='';
+    if(filasPk.length){
+      filasPk.sort((a,b)=>{
+        const la=Number(a.linea)||0, lb=Number(b.linea)||0;
+        if(la!==lb) return la-lb;
+        return String(a.room).localeCompare(String(b.room),undefined,{numeric:true});
+      });
+      let rowsPk='';
+      filasPk.forEach(f=>{
+        rowsPk+=`<tr>
+          <td style="font-weight:700">${t('lineaNombre')(f.linea)}</td>
+          <td>${String(f.room).replace(/</g,'&lt;')} <span style="color:var(--muted);font-size:11px">${f.cod}</span></td>
+          <td>${String(f.prod).replace(/</g,'&lt;')}</td>
+          <td style="text-align:right;font-weight:700">${f.hoy.toLocaleString(loc)}</td>
+          <td style="text-align:right">${f.total.toLocaleString(loc)}</td>
+          <td style="text-align:center"><span class="est-pill ${f.estCls}" style="font-size:10px">${f.est}</span></td>
+        </tr>`;
+      });
+      secPk=`
+        <h4 style="margin:18px 0 6px 0;font-size:13px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px">${t('repPkSectionTitle')}</h4>
+        <div style="overflow-x:auto">
+          <table class="rep-table">
+            <thead><tr>
+              <th>${t('repPkColLine')}</th><th>${t('repPkColOrder')}</th><th>${t('repPkColProduct')}</th>
+              <th style="text-align:right">${t('repPkColToday')}</th><th style="text-align:right">${t('repPkColTotal')}</th>
+              <th style="text-align:center">${t('repPkColStatus')}</th>
+            </tr></thead>
+            <tbody>${rowsPk}</tbody>
+          </table>
+        </div>
+        <div class="rep-total"><span>${t('repPkTotalDay')}</span> <b>${totalPkHoy.toLocaleString(loc)}</b> ${t('pkUnit')}</div>`;
+    }
+
     body.innerHTML=`
-      <div style="overflow-x:auto;margin-top:10px">
-        <table class="rep-table">
-          <thead><tr>
-            <th>${t('repColRoom')}</th><th>${t('repColOrder')}</th><th>${t('repColProduct')}</th>
-            <th style="text-align:right">${t('repColToday')}</th><th style="text-align:right">${t('repColTotal')}</th>
-            <th style="text-align:center">${t('repColStatus')}</th>
-          </tr></thead>
-          <tbody>${rows}</tbody>
-        </table>
-      </div>
-      <div class="rep-total"><span>${t('repTotalDay')}</span> <b>${totalHoy.toLocaleString(loc)}</b> ${t('capsUnit')}</div>
+      <div style="margin-top:6px">${secCaps}${secPk}</div>
       <div class="actions" style="margin-top:14px">
         <button class="btn" onclick="window.print()">${t('repPrint')}</button>
       </div>`;
@@ -4348,8 +4428,8 @@ function renderQcPacketing(codigos){
     html += `<div class="ord-card pk">
       <div class="oc-top">
         <div>
-          <div class="oc-room-big">${(o.orden?String(o.orden).replace(/</g,'&lt;'):'—')}
-            <span class="pk-line-chip">${t('pkLineChip')(p.linea||'—')}</span></div>
+          <div class="oc-room-big"><span class="pk-room-label">${t('pkRoomLabel')}</span>${(o.orden?String(o.orden).replace(/</g,'&lt;'):'—')}
+            <span class="pk-room-arrow">→</span><span class="pk-line-chip">${t('pkLineChip')(p.linea||'—')}</span></div>
           <div class="oc-prod">${o.producto?String(o.producto).replace(/</g,'&lt;'):'—'}
             <span class="pk-range-chip">${t('pkRangeChip')(p.pesoMin,p.pesoMax)}</span></div>
           <div class="oc-code">${cod}</div>
@@ -5523,8 +5603,8 @@ async function refrescarSupPk(){
       html += `<div class="ord-card pk">
         <div class="oc-top">
           <div>
-            <div class="oc-room-big">${(o.orden?String(o.orden).replace(/</g,'&lt;'):'—')}
-              <span class="pk-line-chip">${t('pkLineChip')(p.linea||'—')}</span></div>
+            <div class="oc-room-big"><span class="pk-room-label">${t('pkRoomLabel')}</span>${(o.orden?String(o.orden).replace(/</g,'&lt;'):'—')}
+              <span class="pk-room-arrow">→</span><span class="pk-line-chip">${t('pkLineChip')(p.linea||'—')}</span></div>
             <div class="oc-prod">${o.producto?String(o.producto).replace(/</g,'&lt;'):'—'}
               <span class="pk-range-chip">${t('pkRangeChip')(p.pesoMin,p.pesoMax)}</span></div>
             <div class="oc-code">${cod}</div>
@@ -5749,8 +5829,8 @@ function renderPkActivas(codigos, cache){
     html += `<div class="ord-card">
       <div class="oc-top">
         <div>
-          <div class="oc-room-big">${(o.orden?String(o.orden).replace(/</g,'&lt;'):'—')}
-            <span class="pk-line-chip">${t('pkLineChip')(p.linea||'—')}</span></div>
+          <div class="oc-room-big"><span class="pk-room-label">${t('pkRoomLabel')}</span>${(o.orden?String(o.orden).replace(/</g,'&lt;'):'—')}
+            <span class="pk-room-arrow">→</span><span class="pk-line-chip">${t('pkLineChip')(p.linea||'—')}</span></div>
           <div class="oc-prod">${o.producto?String(o.producto).replace(/</g,'&lt;'):'—'}
             <span class="pk-range-chip">${t('pkRangeChip')(p.pesoMin,p.pesoMax)}</span></div>
           <div class="oc-code">${cod}</div>
