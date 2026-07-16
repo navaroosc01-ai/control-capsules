@@ -3881,15 +3881,18 @@ function abrirReporteDia(){
     if(!d) return;
     const o=d.orden||{}, dias=d.dias||{};
     const est=estatusOrden(d);
-    /* solo órdenes abiertas (no cerradas) */
-    if(est===t('closedOrder')) return;
     /* producción de hoy: avance del día de hoy (o su cierre si ya se cerró el día) */
     let hoy=0; const dh=dias[hoyKey];
     if(dh){ if(dh.closed && dh.prod!=null) hoy=Number(dh.prod); else if(dh.avance!=null) hoy=Number(dh.avance); }
+    /* Incluir: órdenes abiertas siempre; órdenes cerradas solo si tuvieron producción hoy
+       (para reflejar producción de órdenes cerradas durante el día en el reporte). */
+    if(est===t('closedOrder') && !hoy) return;
     const total=prodAcumulada(dias, true);
     totalHoy+=hoy;
-    filas.push({room:o.orden||'—', cod, prod:o.producto||'—', hoy, total, est,
-      estCls: est===t('inProcess')?'proc':'sin'});
+    let estCls='sin';
+    if(est===t('inProcess')) estCls='proc';
+    else if(est===t('closedOrder')) estCls='cerr';
+    filas.push({room:o.orden||'—', cod, prod:o.producto||'—', hoy, total, est, estCls});
   });
 
   /* ===== PACKETING =====
