@@ -3869,15 +3869,69 @@ function iniciarCronometrosCO(){
 
 /* ===== Reporte de producción del día (todas las órdenes abiertas) ===== */
 const modalReporte=$('modalReporte');
-function abrirReporteDia(){
+
+/* Trae desde la nube TODAS las órdenes que tienen algo que reportar hoy:
+   - órdenes con encapsulado en proceso o change over activo (aunque hoy=0)
+   - órdenes con packeting activo (aunque hoy=0)
+   - órdenes cerradas que tuvieron producción hoy (encapsulado o packeting)
+   Se usa para el reporte diario para no depender de tabEfectivos, ya que las órdenes
+   totalmente cerradas hoy ya no aparecen en codigosEnProceso() y por tanto no están
+   en el tablero, pero SÍ deben aparecer en el reporte del día. */
+async function cargarOrdenesReporteDia(hoyKey){
+  if(!CONFIGURED) return {};
+  const url = REST + '?select=codigo,data';
+  const r = await fetch(url,{ headers: HEADERS });
+  if(!r.ok) throw new Error('HTTP '+r.status);
+  const arr = await r.json();
+  const out = {};
+  arr.forEach(row=>{
+    const cod=(row.codigo||'').toUpperCase();
+    if(!cod) return;
+    const dd = normalizar(row.data||{});
+    /* Producción de hoy en encapsulado */
+    const dhCaps = dd.dias && dd.dias[hoyKey];
+    let hoyCaps = 0;
+    if(dhCaps){
+      if(dhCaps.closed && dhCaps.prod!=null) hoyCaps=Number(dhCaps.prod);
+      else if(dhCaps.avance!=null) hoyCaps=Number(dhCaps.avance);
+    }
+    /* Producción de hoy en packeting */
+    const dhPk = dd.packeting && dd.packeting.dias && dd.packeting.dias[hoyKey];
+    const hoyPk = dhPk && dhPk.avance!=null ? Number(dhPk.avance) : 0;
+    /* Estados de actividad */
+    const coActivo = dd.changeOverFrom && dd.changeOverFrom.startTs && !dd.changeOverFrom.endTs;
+    const encAbierto = estatusOrden(dd, true) === tEN('inProcess');
+    const pkActivo = dd.packeting && dd.packeting.linea && !dd.packeting.finished;
+    if(coActivo || encAbierto || pkActivo || hoyCaps > 0 || hoyPk > 0){
+      out[cod] = dd;
+    }
+  });
+  return out;
+}
+
+async function abrirReporteDia(){
   const loc=I18N[lang].locale;
   const hoyKey=dayKey(new Date());
+
+  /* Abrir el modal de inmediato con un estado de "cargando" para dar feedback rápido */
+  $('repSub').textContent = `${t('dayReportSub')} · ${fmtDate(new Date())}`;
+  $('repBody').innerHTML = `<div class="tab-empty" style="margin-top:14px">${t('updating')}…</div>`;
+  modalReporte.classList.add('show');
+
+  /* Cargar directamente desde la nube (fuente fresca de verdad). */
+  let ordenes = {};
+  try { ordenes = await cargarOrdenesReporteDia(hoyKey); }
+  catch(e){
+    $('repBody').innerHTML = `<div class="tab-empty" style="margin-top:14px">${t('updateErr')}</div>`;
+    return;
+  }
+  const codigos = Object.keys(ordenes);
 
   /* ===== ENCAPSULACION ===== */
   const filas=[];
   let totalHoy=0;
-  (tabEfectivos.length?tabEfectivos:tabCodigos).forEach(cod=>{
-    const d=tabDatos[cod];
+  codigos.forEach(cod=>{
+    const d=ordenes[cod];
     if(!d) return;
     const o=d.orden||{}, dias=d.dias||{};
     const est=estatusOrden(d);
@@ -3902,8 +3956,8 @@ function abrirReporteDia(){
      El status refleja si la orden de packeting está ACTIVA o FINALIZADA. */
   const filasPk=[];
   let totalPkHoy=0;
-  (tabEfectivos.length?tabEfectivos:tabCodigos).forEach(cod=>{
-    const d=tabDatos[cod];
+  codigos.forEach(cod=>{
+    const d=ordenes[cod];
     if(!d || !d.packeting || !d.packeting.linea) return;
     const p=d.packeting;
     const o=d.orden||{};
@@ -3919,7 +3973,6 @@ function abrirReporteDia(){
     filasPk.push({linea:p.linea, room:o.orden||'—', cod, prod:o.producto||'—', hoy, total, est:pkEstTxt, estCls:pkEstCls});
   });
 
-  $('repSub').textContent = `${t('dayReportSub')} · ${fmtDate(new Date())}`;
   const body=$('repBody');
   if(!filas.length && !filasPk.length){
     body.innerHTML=`<div class="tab-empty" style="margin-top:14px">${t('repNoData')}</div>`;
