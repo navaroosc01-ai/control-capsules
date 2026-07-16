@@ -3293,6 +3293,18 @@ function estatusOrden(st, forzarEN){
   return todosCerrados ? tf('closedOrder') : tf('inProcess');
 }
 
+/* ¿El encapsulado de esta orden está en proceso? Se usa para decidir si la orden aparece
+   en el grid principal del tablero del supervisor y del dashboard QC (cuartos de encapsulación).
+   El packeting activo NO cuenta aquí: cuando el encapsulado está cerrado pero el packeting sigue,
+   la orden solo debe verse en la sección de Packeting, no en el grid de encapsulación. */
+function encapsuladoEnProceso(dd){
+  if(!dd) return false;
+  /* Change over activo del encapsulado: aún no se ha tomado la primera muestra en el cuarto */
+  const coActivo = dd.changeOverFrom && dd.changeOverFrom.startTs && !dd.changeOverFrom.endTs;
+  if(coActivo) return true;
+  return estatusOrden(dd, true) === tEN('inProcess');
+}
+
 /* Imprimir el parte de UN día (solo totales, sin lista de muestras) */
 function imprimirDia(key){
   const o=state.orden;
@@ -3616,7 +3628,23 @@ async function refrescarTablero(){
 
   let html='';
   const loc=I18N[lang].locale;
-  tabEfectivos.forEach(cod=>{
+  /* Códigos que aparecen en el GRID PRINCIPAL (cuartos de encapsulación):
+     - Manuales (escritos por el supervisor): siempre se muestran.
+     - Automáticos (detectados por codigosEnProceso): solo si el encapsulado está en proceso.
+     Los códigos con solo packeting activo pero encapsulado cerrado NO salen en el grid principal;
+     sí aparecen en renderTablePacketing (sección Packeting abajo). */
+  const codigosCuarto = tabEfectivos.filter(cod=>{
+    if(tabCodigos.indexOf(cod)>=0) return true; /* manual: siempre */
+    return encapsuladoEnProceso(datos[cod]);
+  });
+  if(!codigosCuarto.length){
+    grid.innerHTML='';
+    empty.style.display='block';
+    renderTablePacketing(tabEfectivos, tabDatos);
+    return;
+  }
+  empty.style.display='none';
+  codigosCuarto.forEach(cod=>{
     const d=datos[cod];
     if(!d){
       html+=`<div class="ord-card miss">
@@ -4157,13 +4185,19 @@ async function refrescarQC(){
 
 function renderQC(codigos){
   const grid=$('qcGrid'), empty=$('qcEmpty');
-  if(!codigos || !codigos.length){
-    grid.innerHTML=''; empty.style.display='block'; return;
+  /* El grid principal solo muestra órdenes con el ENCAPSULADO en proceso.
+     Las órdenes cuyo encapsulado está cerrado pero con packeting activo NO deben
+     aparecer aquí; sí aparecen en renderQcPacketing (sección Packeting abajo). */
+  const codigosCuarto = (codigos||[]).filter(c=> encapsuladoEnProceso(qcDatos[c]));
+  if(!codigosCuarto.length){
+    grid.innerHTML=''; empty.style.display='block';
+    renderQcPacketing(codigos);
+    return;
   }
   empty.style.display='none';
   const loc=I18N[lang].locale;
   let html='';
-  codigos.forEach(cod=>{
+  codigosCuarto.forEach(cod=>{
     const d = qcDatos[cod];
     if(!d){
       html+=`<div class="ord-card miss">
