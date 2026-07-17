@@ -253,6 +253,15 @@
     font-size:14px;color:var(--muted);text-align:right}
   .rep-total b{color:var(--accent);font-size:18px}
 
+  /* Aviso "rota tu teléfono" — solo visible en móvil portrait (≤640px).
+     En landscape del celular (>640px) desaparece y se ve la tabla completa. */
+  .rep-rotate-hint{ display:none }
+  @media (max-width: 640px){
+    .rep-rotate-hint{ display:block; padding:9px 12px; margin:6px 0 4px;
+      background:var(--panel2); border:1px solid var(--line); border-radius:8px;
+      color:var(--muted); font-size:12px; text-align:center; line-height:1.4 }
+  }
+
   /* ===== Reporte diario en móvil =====
      En pantallas angostas la tabla no cabe en 6 columnas. Convertimos cada fila
      en una TARJETA apilada verticalmente: toda la info visible sin cortes ni scroll.
@@ -1125,6 +1134,7 @@
       <button class="btn" id="repCerrar" style="padding:6px 12px" data-i18n="close">Close</button>
     </div>
     <div class="sub" id="repSub">—</div>
+    <div class="rep-rotate-hint" data-i18n="repRotateHint">🔄 Rotate your phone horizontally to see the report in full.</div>
     <div id="repBody"></div>
   </div>
 </div>
@@ -2218,6 +2228,7 @@ const I18N = {
     dayReportBtn:'📋 Daily report', dayReportTitle:'Daily production report', close:'Close',
     autoInProcess:'auto', autoInProcessHint:'Shown automatically because it is in process.',
     dayReportSub:'Final production of the day for all open orders.',
+    repRotateHint:'🔄 Rotate your phone horizontally to see the report in full.',
     repColRoom:'Room', repColOrder:'Order', repColProduct:'Product', repColToday:'Today', repColTotal:'Accum.', repColStatus:'Status',
     repNoData:'No data for the orders on the list.', repTotalDay:'Total produced today:', repPrint:'🖨️ Print',
     repCapsSectionTitle:'💊 Encapsulation', repPkSectionTitle:'📦 Packeting',
@@ -2529,6 +2540,7 @@ const I18N = {
     dayReportBtn:'📋 Reporte del día', dayReportTitle:'Reporte de producción del día', close:'Cerrar',
     autoInProcess:'auto', autoInProcessHint:'Se muestra automáticamente porque está en proceso.',
     dayReportSub:'Producción final del día de todas las órdenes abiertas.',
+    repRotateHint:'🔄 Gira tu teléfono horizontalmente para ver el reporte completo.',
     repColRoom:'Room', repColOrder:'Orden', repColProduct:'Producto', repColToday:'Hoy', repColTotal:'Acum.', repColStatus:'Estado',
     repNoData:'Sin datos para las órdenes de la lista.', repTotalDay:'Total producido hoy:', repPrint:'🖨️ Imprimir',
     repCapsSectionTitle:'💊 Encapsulación', repPkSectionTitle:'📦 Packeting',
