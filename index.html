@@ -241,8 +241,10 @@
   .rep-table{width:100%;border-collapse:collapse;font-size:13px;table-layout:fixed}
   .rep-table th{font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);
     font-weight:700;text-align:left;padding:8px;border-bottom:1px solid var(--line);vertical-align:bottom}
-  .rep-table td{padding:9px 8px;border-bottom:0.5px solid var(--line);color:var(--ink);font-variant-numeric:tabular-nums;vertical-align:middle;
-    word-break:break-word}
+  /* text-align:left explícito: hay una regla global th,td{text-align:right} que si no,
+     se hereda y hace que las celdas del reporte queden alineadas a la derecha. */
+  .rep-table td{padding:9px 8px;border-bottom:0.5px solid var(--line);color:var(--ink);font-variant-numeric:tabular-nums;
+    vertical-align:middle;text-align:left;word-wrap:break-word}
   /* Etiqueta "Room" que precede al número del cuarto en la tabla de packeting del reporte */
   .rep-room-tag{display:inline-block;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;
     color:var(--muted);padding:1px 5px;border:1px solid var(--line);border-radius:6px;
@@ -4002,8 +4004,8 @@ async function abrirReporteDia(){
         <div style="overflow-x:auto">
           <table class="rep-table">
             <colgroup>
-              <col style="width:12%"><col style="width:22%"><col style="width:26%">
-              <col style="width:10%"><col style="width:10%"><col style="width:20%">
+              <col style="width:9%"><col style="width:19%"><col style="width:24%">
+              <col style="width:13%"><col style="width:13%"><col style="width:22%">
             </colgroup>
             <thead><tr>
               <th>${t('repColRoom')}</th><th>${t('repColOrder')}</th><th>${t('repColProduct')}</th>
@@ -4040,8 +4042,8 @@ async function abrirReporteDia(){
         <div style="overflow-x:auto">
           <table class="rep-table">
             <colgroup>
-              <col style="width:12%"><col style="width:22%"><col style="width:26%">
-              <col style="width:10%"><col style="width:10%"><col style="width:20%">
+              <col style="width:9%"><col style="width:19%"><col style="width:24%">
+              <col style="width:13%"><col style="width:13%"><col style="width:22%">
             </colgroup>
             <thead><tr>
               <th>${t('repPkColLine')}</th><th>${t('repPkColOrder')}</th><th>${t('repPkColProduct')}</th>
