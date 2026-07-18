@@ -452,18 +452,24 @@
   #pkActivasGrid .ord-card{border-left:3px solid var(--accent);margin-bottom:12px}
   #pkActivasGrid .ord-card:last-child{margin-bottom:0}
   #pkActivasEmpty{color:var(--muted);font-size:13px;padding:8px 0;text-align:center}
-  /* Chips de barriles con estado present/absent (clickeables) */
+  /* Chips de barriles: 3 estados de recepción en línea
+       - default (pending): declarado, aún no escaneado → gris, clickeable para marcar ausente
+       - .scanned: escaneado en línea → verde, no clickeable
+       - .absent: marcado manualmente como no llegó → rojo tachado, clickeable para deshacer
+       - .reported: reportado a QC → amarillo, no clickeable */
   .pk-mani-grid{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0 12px}
   .pk-mani-chip{display:inline-flex;align-items:center;gap:6px;font-size:12px;padding:5px 10px;
-    border-radius:8px;background:rgba(45,212,167,.14);color:var(--accent);border:1px solid rgba(45,212,167,.4);
+    border-radius:8px;background:transparent;color:var(--muted);border:1px dashed var(--line);
     cursor:pointer;user-select:none;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
     transition:all .15s}
-  .pk-mani-chip:hover{background:rgba(45,212,167,.22)}
-  .pk-mani-chip.absent{background:transparent;color:var(--muted);border-color:var(--line);
-    text-decoration:line-through;opacity:.6}
-  .pk-mani-chip.absent:hover{opacity:.9;background:rgba(88,101,112,.1)}
-  /* Chip de barril reportado por packeting: pendiente disposición de QC */
-  .pk-mani-chip.reported{background:rgba(240,180,41,.14);color:var(--warn);border-color:rgba(240,180,41,.5);cursor:default}
+  .pk-mani-chip:hover{background:rgba(88,101,112,.15);border-style:solid}
+  .pk-mani-chip.scanned{background:rgba(45,212,167,.14);color:var(--accent);border:1px solid rgba(45,212,167,.4);
+    cursor:default}
+  .pk-mani-chip.scanned:hover{background:rgba(45,212,167,.14)}
+  .pk-mani-chip.absent{background:rgba(255,107,107,.10);color:var(--danger);border:1px solid rgba(255,107,107,.4);
+    text-decoration:line-through}
+  .pk-mani-chip.absent:hover{background:rgba(255,107,107,.18)}
+  .pk-mani-chip.reported{background:rgba(240,180,41,.14);color:var(--warn);border:1px solid rgba(240,180,41,.5);cursor:default}
   .pk-mani-chip.reported:hover{background:rgba(240,180,41,.14)}
   .pk-mani-chip .cb-mark{font-weight:800;font-size:11px}
   .pk-mani-summary{font-size:12px;color:var(--muted);margin-bottom:6px}
@@ -1609,11 +1615,12 @@ function normalizar(d){ d=d||{}; d.orden=d.orden||{producto:'',lote:'',orden:'',
     if(d.packeting.finished===undefined)      d.packeting.finished=false;
     if(d.packeting.finishedTs===undefined)    d.packeting.finishedTs=null;
     if(d.packeting.finishedBotes===undefined) d.packeting.finishedBotes=null;
-    /* barrilesAusentes: uids de barriles declarados que packeting marca como no-presentes.
-       Todos los declarados se asumen presentes por default; el operador desmarca solo los faltantes.
-       Al cerrar la orden, barrilesProcesados = declarados - ausentes. */
+    /* barrilesAusentes: uids de barriles declarados que packeting marca manualmente como ausentes
+       (no llegaron a la línea). Los declarados NO escaneados y NO ausentes quedan como "pendientes".
+       El operador puede click en un chip pendiente para marcarlo ausente.
+       Al cerrar la orden, barrilesProcesados = escaneados en línea (no incluye ausentes ni pendientes). */
     if(!Array.isArray(d.packeting.barrilesAusentes)) d.packeting.barrilesAusentes = [];
-    /* barrilesProcesados: valor congelado al cerrar la orden (declarados - ausentes al momento de cerrar) */
+    /* barrilesProcesados: valor congelado al cerrar (escaneados en barrilesQR al momento del cierre) */
     if(d.packeting.barrilesProcesados===undefined) d.packeting.barrilesProcesados=null;
   }
   return d; }
@@ -2426,9 +2433,13 @@ const I18N = {
     /* Active orders panel in packeting view */
     pkActivasSection:'📦 Active orders on your line',
     pkActivasEmpty:'No active orders on this line. Scan a QR to start one.',
-    pkBarrilesPresentes:'Barrels present',
-    pkBarrilTitlePresent:'Present. Tap to mark absent.',
-    pkBarrilTitleAbsent:'Absent. Tap to mark present.',
+    pkBarrilesPresentes:'Scanned',
+    pkBarrilTitlePresent:'Scanned in line.',
+    pkBarrilTitleAbsent:'Marked absent. Tap to undo.',
+    pkBarrilTitlePending:'Pending. Tap to mark absent.',
+    pkAskMarcarAusente:"Mark this barrel as absent? It won't be scanned into this order.",
+    pkAskDesmarcarAusente:'Unmark this barrel as absent?',
+    packBarrilFueraLista:'This barrel is not in the declared list of this order. Rejected.',
     pkFirstSampleRequired:'First sample must be taken from packeting before updating production.',
     pkAlreadyPresent:(bn)=>`Barrel ${bn} already marked present.`,
     pkMarkedPresent:(bn)=>`✓ Barrel ${bn} marked present.`,
@@ -2747,9 +2758,13 @@ const I18N = {
     /* Panel de líneas activas en la vista packeting */
     pkActivasSection:'📦 Órdenes activas en tu línea',
     pkActivasEmpty:'No hay órdenes activas en esta línea. Escanea un QR para iniciar una.',
-    pkBarrilesPresentes:'Barriles presentes',
-    pkBarrilTitlePresent:'Presente. Toca para marcar como no presente.',
-    pkBarrilTitleAbsent:'No presente. Toca para marcar presente.',
+    pkBarrilesPresentes:'Escaneados',
+    pkBarrilTitlePresent:'Escaneado en línea.',
+    pkBarrilTitleAbsent:'Marcado como ausente. Toca para deshacer.',
+    pkBarrilTitlePending:'Pendiente. Toca para marcar como ausente.',
+    pkAskMarcarAusente:'¿Marcar este barril como ausente? No entrará en esta orden.',
+    pkAskDesmarcarAusente:'¿Desmarcar este barril como ausente?',
+    packBarrilFueraLista:'Este barril no está en la lista declarada de esta orden. Rechazado.',
     pkFirstSampleRequired:'Debes tomar la primera muestra desde packeting antes de actualizar producción.',
     pkAlreadyPresent:(bn)=>`Barril ${bn} ya está marcado presente.`,
     pkMarkedPresent:(bn)=>`✓ Barril ${bn} marcado presente.`,
@@ -5709,6 +5724,20 @@ async function procesarBarril(datos){
     return;
   }
 
+  /* Verificar que el barril esté en la lista declarada de la orden.
+     Si no lo está, rechazar el escaneo con alerta (caso: etiqueta de otra tanda,
+     barril de otro batch, error del operador de encapsulación).
+     Solo se aplica si HAY declaración; órdenes viejas sin declaración se permiten por retrocompat. */
+  const declarados = Array.isArray(data.barrilesDeclarados) ? data.barrilesDeclarados : [];
+  if(declarados.length > 0){
+    const enLista = declarados.some(d => d && d.uid === datos.uid);
+    if(!enLista){
+      setCtx();
+      packMostrarMsg(t('packBarrilFueraLista'),'err'); beep(false);
+      return;
+    }
+  }
+
   /* agregar el barril */
   data.barrilesQR.push({ uid:datos.uid, ts:Date.now(), num:datos.i||null, bn:datos.bn||null });
 
@@ -6083,11 +6112,12 @@ async function guardarPackFinish(){
   p.finished = true;
   p.finishedTs = new Date().toISOString();
   p.finishedBotes = final;
-  /* barriles procesados = declarados - ausentes (congela el conteo al momento del cierre) */
+  /* barriles procesados = escaneados en línea (los que están en barrilesQR con estado
+     'rec' o 'rep'). Los pendientes (nunca escaneados) y ausentes se descartan.
+     Este conteo se congela al momento del cierre. */
   const man = manifiestoBarriles(data);
   const items = (man && man.items) ? man.items.filter(x=>x.estado!=='ret') : [];
-  const ausentes = new Set(p.barrilesAusentes||[]);
-  p.barrilesProcesados = items.filter(x=>!ausentes.has(x.uid)).length;
+  p.barrilesProcesados = items.filter(x=>x.estado==='rec' || x.estado==='rep').length;
   /* cerrar el dia de hoy si esta abierto (para que quede consistente el conteo) */
   const hoyK = dayKey(new Date());
   if(p.dias[hoyK] && !p.dias[hoyK].closed){
@@ -6221,32 +6251,45 @@ function renderPkActivas(codigos, cache){
           <span style="color:var(--muted)">${producidosTotal.toLocaleString(loc)} / ${target.toLocaleString(loc)} ${t('pkUnit')}</span></div>
       </div>`;
     }
-    /* Manifest de barriles con checkboxes toggle */
+    /* Manifest de barriles con 3 estados: pendiente, escaneado (verde), ausente (rojo)
+       - Pendiente: declarado, no escaneado, no marcado como ausente → click para marcar ausente
+       - Escaneado: presente en barrilesQR → verde, no clickeable (no permite des-escanear)
+       - Ausente: uid en barrilesAusentes → rojo tachado, click para deshacer */
     const man = manifiestoBarriles(d);
     const ausentes = new Set(p.barrilesAusentes||[]);
     let manHtml = '';
     if(man && man.items && man.items.length){
       const items = man.items.filter(x=>x.estado!=='ret'); /* excluir retirados por QC */
       items.sort((a,b)=>(a.bn||0)-(b.bn||0));
-      const presentes = items.filter(x=>!ausentes.has(x.uid)).length;
-      manHtml = `<div class="pk-mani-summary">${t('pkBarrilesPresentes')}: <b>${presentes}</b> / ${items.length}</div>
+      /* escaneados = estado 'rec' o 'rep' (los que aparecen en barrilesQR) */
+      const escaneados = items.filter(x=>x.estado==='rec' || x.estado==='rep').length;
+      manHtml = `<div class="pk-mani-summary">${t('pkBarrilesPresentes')}: <b>${escaneados}</b> / ${items.length}</div>
         <div class="pk-mani-grid">${
           items.map(x=>{
             const isAbs = ausentes.has(x.uid);
             const isRep = x.estado==='rep'; /* reportado, esperando QC */
+            const isScan = x.estado==='rec'; /* escaneado en línea */
             const etq = x.bn!=null ? ('#'+x.bn) : '•';
             const uidSafe = String(x.uid||'').replace(/'/g,'&#39;').replace(/"/g,'&quot;');
             const codSafe = String(cod).replace(/'/g,'&#39;');
-            /* prioridad visual: reportado > ausente > presente */
+            /* prioridad visual: reportado > escaneado > ausente > pendiente */
             if(isRep){
               return `<span class="pk-mani-chip reported" title="${t('packRepTitleChip')||'Reportado a QC'}">
                 <span class="cb-mark">⚠️</span>${etq}</span>`;
             }
-            const title = isAbs ? t('pkBarrilTitleAbsent') : t('pkBarrilTitlePresent');
-            const mark = isAbs ? '☐' : '✓';
-            return `<span class="pk-mani-chip${isAbs?' absent':''}" title="${title}"
+            if(isScan){
+              return `<span class="pk-mani-chip scanned" title="${t('pkBarrilTitlePresent')}">
+                <span class="cb-mark">✓</span>${etq}</span>`;
+            }
+            if(isAbs){
+              return `<span class="pk-mani-chip absent" title="${t('pkBarrilTitleAbsent')}"
+                onclick="pkToggleBarril('${codSafe}','${uidSafe}')">
+                <span class="cb-mark">☒</span>${etq}</span>`;
+            }
+            /* pendiente por default */
+            return `<span class="pk-mani-chip" title="${t('pkBarrilTitlePending')}"
               onclick="pkToggleBarril('${codSafe}','${uidSafe}')">
-              <span class="cb-mark">${mark}</span>${etq}</span>`;
+              <span class="cb-mark">☐</span>${etq}</span>`;
           }).join('')
         }</div>`;
     }
@@ -6275,15 +6318,27 @@ function renderPkActivas(codigos, cache){
   grid.innerHTML = html;
 }
 
-/* Toggle presencia de un barril: guarda inmediato en la nube. */
+/* Toggle presencia de un barril:
+   - Si YA está escaneado en línea (uid en barrilesQR), no hacer nada (no permitir des-escanear).
+   - Si está ausente → confirmar y quitar de ausentes (vuelve a pendiente).
+   - Si está pendiente → confirmar y marcarlo ausente. */
 async function pkToggleBarril(cod, uid){
   const data = pkActivasCache[cod];
   if(!data || !data.packeting) return;
+  /* Guardia: si el barril está escaneado, no se puede tocar */
+  const escaneado = Array.isArray(data.barrilesQR) &&
+    data.barrilesQR.some(b=>b && b.uid===uid && !b.removed);
+  if(escaneado) return;
   const p = data.packeting;
   p.barrilesAusentes = Array.isArray(p.barrilesAusentes) ? p.barrilesAusentes : [];
   const idx = p.barrilesAusentes.indexOf(uid);
-  if(idx >= 0){ p.barrilesAusentes.splice(idx, 1); } /* estaba ausente → volver presente */
-  else       { p.barrilesAusentes.push(uid); }        /* estaba presente → marcar ausente */
+  if(idx >= 0){
+    if(!confirm(t('pkAskDesmarcarAusente'))) return;
+    p.barrilesAusentes.splice(idx, 1); /* ausente → pendiente */
+  } else {
+    if(!confirm(t('pkAskMarcarAusente'))) return;
+    p.barrilesAusentes.push(uid); /* pendiente → ausente */
+  }
   const ok = await escribirOrden(cod, data);
   if(!ok){ packMostrarMsg(t('packSaveErr'),'err'); return; }
   refrescarPkActivas();
