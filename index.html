@@ -5108,9 +5108,10 @@ function mostrarLauncher(rolesHabilitados, esAdmin){
          para que el rol destino muestre el botón "Sign out". */
       location.href = card.dataset.href;
     } else {
-      /* Rol específico: marca en sessionStorage y recarga la MISMA URL para que
-         applyURL() salte el launcher esta vez y ejecute la lógica del rol. */
-      sessionStorage.setItem('gvip_launcher_'+card.dataset.skip, '1');
+      /* Rol específico: marca temporal de un solo uso y recarga.
+         La marca se CONSUME al aplicarse (ver debeMostrarLauncher), así que
+         una recarga posterior o abrir el link fresh vuelve a mostrar el launcher. */
+      sessionStorage.setItem('gvip_launcher_skip', card.dataset.skip);
       location.reload();
     }
   };
@@ -5141,11 +5142,15 @@ function applyURL(){
   }
   /* Helper: ¿este rol debe ver el launcher esta vez, o saltarlo?
      - Los links con acción específica (orden=X, pack=1, tablero=1) SIEMPRE saltan.
-     - Si ya se pasó por el launcher para este rol (sessionStorage), también salta.
-     - En cualquier otro caso, se muestra el launcher con solo su tarjeta habilitada. */
+     - Si el usuario acaba de hacer click en su tarjeta del launcher, la marca temporal
+       'gvip_launcher_skip' coincide con este rol. La CONSUMIMOS (borramos) y saltamos.
+     - En cualquier otro caso (abrir el link fresh, recargar la pestaña) SE MUESTRA el launcher. */
   function debeMostrarLauncher(skipKey){
     if(cod || pack1 || tab1) return false;
-    if(sessionStorage.getItem('gvip_launcher_'+skipKey)==='1') return false;
+    if(sessionStorage.getItem('gvip_launcher_skip')===skipKey){
+      sessionStorage.removeItem('gvip_launcher_skip');
+      return false;
+    }
     return true;
   }
   if(rol==='mecanico' && clave===CLAVE_MECANICO){
