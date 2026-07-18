@@ -719,63 +719,9 @@
   .reprint-warn{background:rgba(240,180,41,.10);border:1px solid rgba(240,180,41,.4);
     border-radius:8px;padding:11px 13px;font-size:12px;color:var(--warn);margin-bottom:12px;line-height:1.55}
   .reprint-warn b{color:var(--warn)}
-
-  /* ===== Admin launcher — pantalla de selección de rol para admin =====
-     Solo se activa cuando la URL trae ?rol=admin&clave=admin2026.
-     Overlay a pantalla completa por encima de todo lo demás. */
-  #launcher{position:fixed;inset:0;background:var(--bg);z-index:9999;
-    display:none;flex-direction:column;align-items:center;justify-content:flex-start;
-    padding:40px 20px;overflow-y:auto}
-  #launcher.show{display:flex}
-  #launcher .lnc-title{font-size:22px;font-weight:600;color:var(--ink);margin:0 0 6px;text-align:center}
-  #launcher .lnc-sub{font-size:13px;color:var(--muted);margin:0 0 28px;text-align:center;max-width:520px}
-  #launcher .lnc-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));
-    gap:14px;width:100%;max-width:720px}
-  .lnc-card{background:var(--panel);border:1px solid var(--line);border-radius:14px;
-    padding:16px 18px;display:flex;flex-direction:column;gap:8px;
-    transition:border-color .15s, transform .15s}
-  .lnc-card:not(.lnc-locked):hover{border-color:var(--accent);transform:translateY(-2px);cursor:pointer}
-  /* Tarjeta bloqueada: gris, sin interacción */
-  .lnc-card.lnc-locked{opacity:.5;cursor:not-allowed}
-  .lnc-card.lnc-locked .lnc-ico{filter:grayscale(1)}
-  .lnc-card.lnc-locked .lnc-state{color:var(--muted)}
-  .lnc-card.lnc-locked .lnc-open{opacity:.6;cursor:not-allowed}
-  .lnc-card .lnc-head{display:flex;align-items:center;justify-content:space-between;gap:8px}
-  .lnc-card .lnc-ico{position:relative;width:44px;height:44px;border-radius:10px;
-    background:var(--panel2);display:inline-flex;align-items:center;justify-content:center;
-    font-size:24px;line-height:1}
-  .lnc-card .lnc-ico .lnc-badge{position:absolute;top:-4px;right:-6px;font-size:15px;line-height:1;
-    text-shadow:0 0 3px var(--panel)}
-  .lnc-card .lnc-state{font-size:11px;color:var(--accent);text-transform:uppercase;letter-spacing:.6px;
-    display:inline-flex;align-items:center;gap:4px}
-  .lnc-card .lnc-name{font-size:15px;font-weight:700;color:var(--ink);margin:0}
-  .lnc-card .lnc-desc{font-size:12px;color:var(--muted);margin:0;line-height:1.5;min-height:32px}
-  .lnc-card .lnc-open{margin-top:6px;background:transparent;border:1px solid var(--line);color:var(--ink);
-    padding:8px 12px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;
-    transition:background .12s, border-color .12s}
-  .lnc-card .lnc-open:hover{background:var(--panel2);border-color:var(--accent)}
-  /* Botón Sign out — flotante arriba a la derecha en vistas abiertas por admin */
-  .admin-signout{position:fixed;top:12px;right:12px;z-index:8500;
-    background:var(--panel);border:1px solid var(--line);color:var(--ink);
-    padding:6px 12px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;
-    display:none;align-items:center;gap:6px;box-shadow:0 4px 10px rgba(0,0,0,.35)}
-  .admin-signout:hover{border-color:var(--accent);background:var(--panel2)}
-  body.admin-mode .admin-signout{display:inline-flex}
 </style>
 </head>
 <body>
-<!-- Admin launcher: pantalla de selección de rol (solo visible con ?rol=admin&clave=...) -->
-<div id="launcher">
-  <h1 class="lnc-title">Production Control · GVIP</h1>
-  <p class="lnc-sub" data-i18n="lncSub">Choose a role to open its view. All roles are accessible with the admin key.</p>
-  <div class="lnc-grid" id="lncGrid"></div>
-</div>
-
-<!-- Botón Sign out visible solo cuando el admin entró a un rol -->
-<button class="admin-signout" id="adminSignout" title="Sign out to launcher">
-  ← <span data-i18n="lncSignout">Sign out</span>
-</button>
-
 <div class="wrap">
 
   <header class="top">
@@ -2324,10 +2270,6 @@ const I18N = {
     autoInProcess:'auto', autoInProcessHint:'Shown automatically because it is in process.',
     dayReportSub:'Final production of the day for all open orders.',
     repRotateHint:'🔄 Rotate your phone horizontally to see the report in full.',
-    lncSub:'Choose a role to open its view.',
-    lncSubAdmin:'Admin session · All roles are available. Choose one to open.',
-    lncSubRole:'Your link grants access to the highlighted role. Click to open.',
-    lncOpen:'Open', lncAccessGranted:'Access granted', lncLocked:'Locked', lncSignout:'Sign out',
     qcSampleLblsBtn:'🏷️ Sample labels',
     qcSampleLblsTitle:'🏷️ Sample labels',
     qcSampleLblsSub:'Fill in the fields, choose how many labels you need, and print. 10 labels per US Letter sheet (2×5).',
@@ -2650,10 +2592,6 @@ const I18N = {
     autoInProcess:'auto', autoInProcessHint:'Se muestra automáticamente porque está en proceso.',
     dayReportSub:'Producción final del día de todas las órdenes abiertas.',
     repRotateHint:'🔄 Gira tu teléfono horizontalmente para ver el reporte completo.',
-    lncSub:'Elige un rol para abrir su vista.',
-    lncSubAdmin:'Sesión de admin · Todos los roles están disponibles. Elige uno para abrir.',
-    lncSubRole:'Tu link da acceso al rol resaltado. Haz click para abrir.',
-    lncOpen:'Abrir', lncAccessGranted:'Acceso concedido', lncLocked:'Bloqueado', lncSignout:'Cerrar sesión',
     qcSampleLblsBtn:'🏷️ Sample labels',
     qcSampleLblsTitle:'🏷️ Sample labels',
     qcSampleLblsSub:'Llena los campos, elige cuántas etiquetas necesitas e imprime. 10 etiquetas por hoja US Letter (2×5).',
@@ -3838,7 +3776,6 @@ const CLAVE_SUPERVISOR = "super2026";
 const CLAVE_MECANICO = "mecanico2026";
 const CLAVE_PACKETING = "packeting2026";
 const CLAVE_QC = "qc2026";
-const CLAVE_ADMIN = "admin2026";
 /* ============================================================== */
 
 /* Enlaces:
@@ -5056,118 +4993,17 @@ function refrescarRol(){
   $('rolTag').textContent = qc ? t('qcTag') : (mecanico ? t('mechTag') : (supervisor ? t('supervisor') : t('operator')));
 }
 
-/* ===== Admin launcher — pantalla de selección de rol =====
-   Se muestra en dos casos:
-   1) Admin (?rol=admin&clave=admin2026): todos los roles habilitados.
-   2) Cualquier otro rol al abrir su link: solo su tarjeta habilitada, resto en gris con candado.
-   Para no molestar en cada recarga, una vez que el usuario da click en su rol se guarda
-   una marca en sessionStorage y las siguientes veces salta directo (hasta cerrar el navegador). */
-function mostrarLauncher(rolesHabilitados, esAdmin){
-  const habilitados = new Set(rolesHabilitados || []);
-  const roles = [
-    { id:'operator',   name:'Operator',   ico:'<span>👷</span>',
-      desc:'Sample registration and progress updates for a single order.',
-      href:'index.html', skipKey:'operator' },
-    { id:'supervisor', name:'Supervisor', ico:'<span>👷</span><span class="lnc-badge">🎖️</span>',
-      desc:'Order oversight, labels, incidents and board.',
-      href:'?rol=sup&clave='+CLAVE_SUPERVISOR, skipKey:'supervisor' },
-    { id:'mechanic',   name:'Mechanic',   ico:'<span>🔧</span>',
-      desc:'Maintenance incident board.',
-      href:'?rol=mecanico&clave='+CLAVE_MECANICO, skipKey:'mechanic' },
-    { id:'packeting',  name:'Packeting',  ico:'<span>📦</span>',
-      desc:'Barrel manifest tracking and QR scanner.',
-      href:'?rol=packeting&clave='+CLAVE_PACKETING, skipKey:'packeting' },
-    { id:'qc',         name:'QC',         ico:'<span>🛡️</span><span class="lnc-badge">✅</span>',
-      desc:'Quality dashboard, first sample and count updates.',
-      href:'?rol=qc&clave='+CLAVE_QC, skipKey:'qc' },
-    { id:'tablero',    name:'Board',      ico:'<span>📺</span>',
-      desc:'Display board for in-process orders.',
-      href:'?rol=sup&clave='+CLAVE_SUPERVISOR+'&tablero=1', skipKey:'tablero' },
-  ];
-  const grid = $('lncGrid');
-  grid.innerHTML = roles.map(r=>{
-    const on = habilitados.has(r.id);
-    return `<div class="lnc-card${on?'':' lnc-locked'}" data-href="${r.href}" data-skip="${r.skipKey}" data-on="${on?'1':'0'}">
-      <div class="lnc-head">
-        <div class="lnc-ico">${r.ico}</div>
-        <span class="lnc-state">${on ? '✓ '+t('lncAccessGranted') : '🔒 '+t('lncLocked')}</span>
-      </div>
-      <p class="lnc-name">${r.name}</p>
-      <p class="lnc-desc">${r.desc}</p>
-      <button class="lnc-open" ${on?'':'disabled'}>${t('lncOpen')} ${r.name.toLowerCase()} →</button>
-    </div>`;
-  }).join('');
-  /* Actualizar el subtítulo según el modo */
-  $('lncSub').textContent = esAdmin ? t('lncSubAdmin') : t('lncSubRole');
-  /* Reset del listener para evitar duplicados en cambios de idioma */
-  grid.onclick = e=>{
-    const card = e.target.closest('.lnc-card');
-    if(!card || card.dataset.on!=='1') return;
-    if(esAdmin){
-      /* Admin: redirige a la URL del rol. La sesión admin ya está marcada,
-         para que el rol destino muestre el botón "Sign out". */
-      location.href = card.dataset.href;
-    } else {
-      /* Rol específico: marca temporal de un solo uso y recarga.
-         La marca se CONSUME al aplicarse (ver debeMostrarLauncher), así que
-         una recarga posterior o abrir el link fresh vuelve a mostrar el launcher. */
-      sessionStorage.setItem('gvip_launcher_skip', card.dataset.skip);
-      location.reload();
-    }
-  };
-  $('launcher').classList.add('show');
-}
-
-/* Sign out del admin: limpia la sesión y vuelve al launcher */
-function adminSignout(){
-  sessionStorage.removeItem('gvip_admin_session');
-  location.href = '?rol=admin&clave='+CLAVE_ADMIN;
-}
-
 function applyURL(){
   const p=new URLSearchParams(location.search);
   const cod=p.get('orden');
   const rol=p.get('rol'); const clave=p.get('clave');
-  const pack1 = p.get('pack')==='1';
-  const tab1 = p.get('tablero')==='1';
-  /* Rol ADMIN: launcher con todos los roles habilitados. */
-  if(rol==='admin' && clave===CLAVE_ADMIN){
-    sessionStorage.setItem('gvip_admin_session','1');
-    mostrarLauncher(['operator','supervisor','mechanic','packeting','qc','tablero'], true);
-    return { cod:null, tablero:false, mecanico:false, packeting:false, qc:false, admin:true, launcher:true };
-  }
-  /* Si hay sesión de admin activa (ya vino del launcher del admin), mostrar botón Sign out */
-  if(sessionStorage.getItem('gvip_admin_session')==='1'){
-    document.body.classList.add('admin-mode');
-  }
-  /* Helper: ¿este rol debe ver el launcher esta vez, o saltarlo?
-     - Los links con acción específica (orden=X, pack=1, tablero=1) SIEMPRE saltan.
-     - Si el usuario acaba de hacer click en su tarjeta del launcher, la marca temporal
-       'gvip_launcher_skip' coincide con este rol. La CONSUMIMOS (borramos) y saltamos.
-     - En cualquier otro caso (abrir el link fresh, recargar la pestaña) SE MUESTRA el launcher. */
-  function debeMostrarLauncher(skipKey){
-    if(cod || pack1 || tab1) return false;
-    if(sessionStorage.getItem('gvip_launcher_skip')===skipKey){
-      sessionStorage.removeItem('gvip_launcher_skip');
-      return false;
-    }
-    return true;
-  }
   if(rol==='mecanico' && clave===CLAVE_MECANICO){
-    if(debeMostrarLauncher('mechanic')){
-      mostrarLauncher(['mechanic'], false);
-      return { cod:null, tablero:false, mecanico:false, packeting:false, qc:false, admin:false, launcher:true };
-    }
     mecanico=true;
     $('rolTag').classList.add('mec');
     refrescarRol();
     return { cod:null, tablero:false, mecanico:true, packeting:false, qc:false };
   }
   if(rol==='packeting' && clave===CLAVE_PACKETING){
-    if(debeMostrarLauncher('packeting')){
-      mostrarLauncher(['packeting'], false);
-      return { cod:null, tablero:false, mecanico:false, packeting:false, qc:false, admin:false, launcher:true };
-    }
     packeting=true;
     $('rolTag').classList.add('pack');
     $('rolTag').textContent=t('packTitle');
@@ -5178,11 +5014,6 @@ function applyURL(){
      Con ?rol=qc&clave=qc2026&orden=CODIGO => entra a esa orden (modo operador con topbar de regreso)
      Con ?rol=qc&clave=qc2026&pack=1 => modo escaner packeting */
   if(rol==='qc' && clave===CLAVE_QC){
-    /* QC con acciones directas (orden=X, pack=1) salta el launcher */
-    if(debeMostrarLauncher('qc')){
-      mostrarLauncher(['qc'], false);
-      return { cod:null, tablero:false, mecanico:false, packeting:false, qc:false, admin:false, launcher:true };
-    }
     qc=true;
     document.body.classList.add('qc');
     $('rolTag').classList.add('sup');
@@ -5206,12 +5037,6 @@ function applyURL(){
     return { cod:null, tablero:false, mecanico:false, packeting:false, qc:true, qcPack:false };
   }
   if(rol==='sup' && clave===CLAVE_SUPERVISOR){
-    /* Supervisor puro (sin tablero=1) muestra el launcher intermedio.
-       El Board ya salta gracias a debeMostrarLauncher (tab1 activo). */
-    if(debeMostrarLauncher('supervisor')){
-      mostrarLauncher(['supervisor'], false);
-      return { cod:null, tablero:false, mecanico:false, packeting:false, qc:false, admin:false, launcher:true };
-    }
     supervisor=true;
     document.body.classList.add('supervisor');
     $('supBanner').classList.add('show');
@@ -6778,11 +6603,6 @@ aplicarIdioma();
 
 initSupabase();
 const initInfo=applyURL();
-/* Modo launcher (admin o rol específico): el launcher está visible y toma el control.
-   No arrancamos ninguna otra lógica ni renderizamos la vista del rol debajo. */
-if(initInfo.launcher){
-  /* nada más — el launcher decide qué pasa al hacer click */
-} else {
 fillOrden(); render();
 if(initInfo.qc){
   /* QC: siempre iniciamos el dashboard (registra listeners, timers).
@@ -6805,9 +6625,6 @@ if(initInfo.qc){
 } else if(initInfo.cod){
   abrirOrden(initInfo.cod);
 }
-}
-/* Registrar Sign out (visible solo si hay sesión admin) */
-if($('adminSignout')) $('adminSignout').addEventListener('click', adminSignout);
 </script>
 </body>
 </html>
