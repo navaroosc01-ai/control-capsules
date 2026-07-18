@@ -5134,7 +5134,7 @@ function applyURL(){
   if(rol==='admin' && clave===CLAVE_ADMIN){
     sessionStorage.setItem('gvip_admin_session','1');
     mostrarLauncher(['operator','supervisor','mechanic','packeting','qc','tablero'], true);
-    return { cod:null, tablero:false, mecanico:false, packeting:false, qc:false, admin:true };
+    return { cod:null, tablero:false, mecanico:false, packeting:false, qc:false, admin:true, launcher:true };
   }
   /* Si hay sesión de admin activa (ya vino del launcher del admin), mostrar botón Sign out */
   if(sessionStorage.getItem('gvip_admin_session')==='1'){
@@ -5156,7 +5156,7 @@ function applyURL(){
   if(rol==='mecanico' && clave===CLAVE_MECANICO){
     if(debeMostrarLauncher('mechanic')){
       mostrarLauncher(['mechanic'], false);
-      return { cod:null, tablero:false, mecanico:false, packeting:false, qc:false, admin:false };
+      return { cod:null, tablero:false, mecanico:false, packeting:false, qc:false, admin:false, launcher:true };
     }
     mecanico=true;
     $('rolTag').classList.add('mec');
@@ -5166,7 +5166,7 @@ function applyURL(){
   if(rol==='packeting' && clave===CLAVE_PACKETING){
     if(debeMostrarLauncher('packeting')){
       mostrarLauncher(['packeting'], false);
-      return { cod:null, tablero:false, mecanico:false, packeting:false, qc:false, admin:false };
+      return { cod:null, tablero:false, mecanico:false, packeting:false, qc:false, admin:false, launcher:true };
     }
     packeting=true;
     $('rolTag').classList.add('pack');
@@ -5181,7 +5181,7 @@ function applyURL(){
     /* QC con acciones directas (orden=X, pack=1) salta el launcher */
     if(debeMostrarLauncher('qc')){
       mostrarLauncher(['qc'], false);
-      return { cod:null, tablero:false, mecanico:false, packeting:false, qc:false, admin:false };
+      return { cod:null, tablero:false, mecanico:false, packeting:false, qc:false, admin:false, launcher:true };
     }
     qc=true;
     document.body.classList.add('qc');
@@ -5210,7 +5210,7 @@ function applyURL(){
        El Board ya salta gracias a debeMostrarLauncher (tab1 activo). */
     if(debeMostrarLauncher('supervisor')){
       mostrarLauncher(['supervisor'], false);
-      return { cod:null, tablero:false, mecanico:false, packeting:false, qc:false, admin:false };
+      return { cod:null, tablero:false, mecanico:false, packeting:false, qc:false, admin:false, launcher:true };
     }
     supervisor=true;
     document.body.classList.add('supervisor');
@@ -6778,11 +6778,10 @@ aplicarIdioma();
 
 initSupabase();
 const initInfo=applyURL();
-/* Modo admin: se muestra el launcher y no arrancamos ninguna otra vista.
-   El resto de la app queda inerte hasta que el admin haga click en un rol. */
-if(initInfo.admin){
-  /* Registrar el botón Sign out (aunque en modo admin puro no se muestra) */
-  if($('adminSignout')) $('adminSignout').addEventListener('click', adminSignout);
+/* Modo launcher (admin o rol específico): el launcher está visible y toma el control.
+   No arrancamos ninguna otra lógica ni renderizamos la vista del rol debajo. */
+if(initInfo.launcher){
+  /* nada más — el launcher decide qué pasa al hacer click */
 } else {
 fillOrden(); render();
 if(initInfo.qc){
@@ -6806,10 +6805,9 @@ if(initInfo.qc){
 } else if(initInfo.cod){
   abrirOrden(initInfo.cod);
 }
-/* Cierre del else del modo admin: si NO estamos en modo admin puro,
-   registramos el botón "Sign out" (visible solo si hay sesión admin activa) */
-if($('adminSignout')) $('adminSignout').addEventListener('click', adminSignout);
 }
+/* Registrar Sign out (visible solo si hay sesión admin) */
+if($('adminSignout')) $('adminSignout').addEventListener('click', adminSignout);
 </script>
 </body>
 </html>
