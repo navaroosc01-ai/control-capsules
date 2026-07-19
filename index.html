@@ -2351,6 +2351,7 @@ const I18N = {
     packLastBatch:'Current batch', packBarrels:'barrels', packLog:'Recent scans', packRemovedList:'Removed',
     packReady:'Point the camera at a barrel QR code.', packScanning:'Scanning…',
     packAdded:(b)=>`✓ Barrel added to ${b}`, packDup:'⚠️ This barrel was already scanned',
+    packAskProblema:'⚠️ Barrel already scanned. Was it an error, or does it have a problem?',
     packAddedN:(n,b)=>`✓ Barrel #${n} added to ${b}`, packScannedList:'Scanned barrels',
     packBadQR:'✕ Unrecognized QR (not a barrel label)', packNoOrder:'✕ Order not found for this barrel',
     packSaving:'Saving…', packSaveErr:'✕ Could not save, try again', packSaved:'Saved to cloud',
@@ -2676,6 +2677,7 @@ const I18N = {
     packLastBatch:'Batch actual', packBarrels:'barriles', packLog:'Escaneos recientes', packRemovedList:'Retirados',
     packReady:'Apunta la cámara al código QR de un barril.', packScanning:'Escaneando…',
     packAdded:(b)=>`✓ Barril agregado a ${b}`, packDup:'⚠️ Este barril ya fue escaneado',
+    packAskProblema:'⚠️ Barril ya escaneado. ¿Fue por error o tiene problema?',
     packAddedN:(n,b)=>`✓ Barril #${n} agregado a ${b}`, packScannedList:'Barriles escaneados',
     packBadQR:'✕ QR no reconocido (no es un label de barril)', packNoOrder:'✕ No se encontró la orden de este barril',
     packSaving:'Guardando…', packSaveErr:'✕ No se pudo guardar, intenta de nuevo', packSaved:'Guardado en la nube',
@@ -5769,20 +5771,15 @@ async function procesarBarril(datos){
   /* Refrescar panel de órdenes activas en esta línea (checkboxes, contadores) */
   if(pkActivasOn) refrescarPkActivas();
 
-  /* Hook packeting production: 3 casos según el estado de packeting.
+  /* Hook packeting production: 2 casos según el estado de packeting.
      - No hay packeting: prompt iniciar orden en la línea (flujo original)
      - Packeting activa en OTRA línea: warning
-     - Packeting activa en ESTA línea: el escaneo es un intento de REPORTE a QC → abrir modal
-       de reporte (con opción "fue error de escaneo" para descartar sin registrar problema) */
+     Nota: si la orden ya está activa en ESTA línea, el escaneo ya se agregó correctamente
+     al manifiesto y no debe abrir el modal de reporte a QC. Ese modal aparece solo cuando
+     el mismo barril se re-escanea (lo maneja el bloque `if(existente){...}` arriba). */
   const lineaNum = typeof packLinea!=='undefined' ? packLinea : (window.packLinea||null);
   if(!qc && lineaNum && !data.packeting){
     setTimeout(()=>abrirModalPackStart(codFinal, data, batch, producto, lineaNum), 250);
-  } else if(!qc && lineaNum && data.packeting && !data.packeting.finished && data.packeting.linea===lineaNum){
-    /* Orden activa en esta línea: escanear = intento de reporte. Abrir modal de reporte. */
-    setTimeout(()=>{
-      packMostrarMsg(t('packAskProblema'),'dup');
-      abrirPackReporte(codFinal, datos.uid, datos.bn!=null?datos.bn:null, data);
-    }, 200);
   } else if(!qc && lineaNum && data.packeting && !data.packeting.finished && data.packeting.linea && data.packeting.linea!==lineaNum){
     /* orden de packeting ya activa en OTRA linea (y no finalizada): avisar sin bloquear */
     packMostrarMsg(t('pkOtherLine')(data.packeting.linea),'dup');
