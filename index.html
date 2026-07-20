@@ -725,6 +725,29 @@
   .reprint-warn{background:rgba(240,180,41,.10);border:1px solid rgba(240,180,41,.4);
     border-radius:8px;padding:11px 13px;font-size:12px;color:var(--warn);margin-bottom:12px;line-height:1.55}
   .reprint-warn b{color:var(--warn)}
+  /* ===== Sample labels (QC): position picker grid + blank toggle ===== */
+  .slbl-pos-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;
+    font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;font-weight:700}
+  .slbl-pos-mode{font-weight:800;color:var(--accent);text-transform:none;letter-spacing:0;font-size:12px}
+  .slbl-pos-reset{color:var(--muted);text-decoration:underline;cursor:pointer;font-size:11px;
+    font-weight:600;background:none;border:none;padding:0;font-family:inherit;margin-left:8px}
+  .slbl-pos-reset:hover{color:var(--accent)}
+  .slbl-pos-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:6px;
+    padding:10px;background:var(--panel2);border:1px solid var(--line);border-radius:10px;max-width:200px}
+  .slbl-pos-cell{aspect-ratio:2/1;display:flex;align-items:center;justify-content:center;
+    background:var(--panel);border:1px solid var(--line);border-radius:6px;
+    font-weight:800;font-size:14px;color:var(--muted);font-variant-numeric:tabular-nums;
+    cursor:pointer;user-select:none;transition:.12s}
+  .slbl-pos-cell:hover{border-color:var(--accent);color:var(--accent)}
+  .slbl-pos-cell.on{background:rgba(61,220,151,.16);border-color:var(--accent);color:var(--accent)}
+  .slbl-pos-cell.disabled{opacity:.45;cursor:not-allowed}
+  .slbl-pos-cell.disabled:hover{border-color:var(--line);color:var(--muted)}
+  .slbl-blank-row{display:flex;align-items:center;gap:9px;padding:9px 11px;
+    background:var(--panel2);border:1px solid var(--line);border-radius:8px;margin-bottom:6px}
+  .slbl-blank-row input[type=checkbox]{width:auto;margin:0;cursor:pointer;transform:scale(1.15)}
+  .slbl-blank-row label{margin:0;cursor:pointer;font-size:13px;color:var(--fg)}
+  .slbl-blank-row .hint{font-size:11px;color:var(--muted);margin-left:auto}
+  .slbl-dim{opacity:.45;transition:.15s}
 </style>
 </head>
 <body>
@@ -1154,6 +1177,11 @@
       <button class="btn" id="sampleLblCerrar" style="padding:6px 12px" data-i18n="close">Close</button>
     </div>
     <p class="sub" data-i18n="qcSampleLblsSub">Fill in the fields, choose how many labels you need, and print. 10 labels per US Letter sheet (2×5).</p>
+    <div class="slbl-blank-row">
+      <input id="slblBlank" type="checkbox">
+      <label for="slblBlank" data-i18n="lblBlankOnly">Blank labels (format only)</label>
+      <span class="hint" data-i18n="lblBlankHint">skips fields</span>
+    </div>
     <div class="row">
       <label data-i18n="lblProduct">Product</label>
       <input id="slblProduct" type="text" maxlength="80" placeholder="Ex. Curcumin C3 Complex">
@@ -1179,6 +1207,14 @@
     <div class="row">
       <label data-i18n="lblQty">Number of labels</label>
       <input id="slblQty" type="text" inputmode="numeric" value="10" style="max-width:120px">
+    </div>
+    <div class="row" id="slblPosRow">
+      <div class="slbl-pos-head">
+        <span data-i18n="lblPositions">Positions on sheet</span>
+        <span><span class="slbl-pos-mode" id="slblPosMode" data-i18n="lblPosAuto">Auto</span><button type="button" class="slbl-pos-reset" id="slblPosReset" style="display:none" data-i18n="lblPosReset">reset</button></span>
+      </div>
+      <div class="slbl-pos-grid" id="slblPosGrid"></div>
+      <div class="hint" style="margin-top:6px" data-i18n="lblPosHint">Click a cell to select specific positions (single sheet only).</div>
     </div>
     <div class="actions">
       <button class="btn primary" id="slblGen" data-i18n="lblGenerateBtn">🖨️ Generate PDF</button>
@@ -2283,10 +2319,15 @@ const I18N = {
     lblProduct:'Product', lblBatch:'Batch #', lblSampledBy:'Sampled by',
     lblDate:'Date', lblReason:'Reason', lblQty:'Number of labels',
     lblGenerateBtn:'🖨️ Generate PDF',
+    lblBlankOnly:'Blank labels (format only)', lblBlankHint:'skips fields',
+    lblPositions:'Positions on sheet', lblPosAuto:'Auto', lblPosManual:'Manual',
+    lblPosReset:'reset', lblPosHint:'Click a cell to select specific positions (single sheet only).',
+    lblPosMultiSheet:'Auto · {n} sheets',
     slblNeedProduct:'Enter a product.', slblNeedBatch:'Enter a batch #.',
     slblNeedSampledBy:'Enter the name of who is sampling.',
     slblNeedReason:'Enter a reason.',
     slblNeedQty:'Enter a valid number of labels (1 to 200).',
+    slblNeedPositions:'Select at least one position on the sheet.',
     repColRoom:'Room', repColOrder:'Order', repColProduct:'Product', repColToday:'Today', repColTotal:'Accum.', repColStatus:'Status',
     repNoData:'No data for the orders on the list.', repTotalDay:'Total produced today:', repPrint:'🖨️ Print',
     repCapsSectionTitle:'💊 Encapsulation', repPkSectionTitle:'📦 Packeting',
@@ -2610,10 +2651,15 @@ const I18N = {
     lblProduct:'Producto', lblBatch:'Batch #', lblSampledBy:'Sampled by',
     lblDate:'Fecha', lblReason:'Reason', lblQty:'Cantidad de etiquetas',
     lblGenerateBtn:'🖨️ Generar PDF',
+    lblBlankOnly:'Etiquetas en blanco (solo formato)', lblBlankHint:'omite campos',
+    lblPositions:'Posiciones en la hoja', lblPosAuto:'Auto', lblPosManual:'Manual',
+    lblPosReset:'reiniciar', lblPosHint:'Haz clic en una celda para elegir posiciones específicas (solo una hoja).',
+    lblPosMultiSheet:'Auto · {n} hojas',
     slblNeedProduct:'Ingresa un producto.', slblNeedBatch:'Ingresa un batch #.',
     slblNeedSampledBy:'Ingresa el nombre de quién muestrea.',
     slblNeedReason:'Ingresa un reason.',
     slblNeedQty:'Ingresa una cantidad válida (1 a 200).',
+    slblNeedPositions:'Selecciona al menos una posición en la hoja.',
     repColRoom:'Room', repColOrder:'Orden', repColProduct:'Producto', repColToday:'Hoy', repColTotal:'Acum.', repColStatus:'Estado',
     repNoData:'Sin datos para las órdenes de la lista.', repTotalDay:'Total producido hoy:', repPrint:'🖨️ Imprimir',
     repCapsSectionTitle:'💊 Encapsulación', repPkSectionTitle:'📦 Packeting',
@@ -4265,6 +4311,83 @@ const LOGO_SABINSA_B64 = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAMgAAADy
    Todos los labels de un lote llevan Sample #: 1 (según requerimiento).
    ========================================================================= */
 const modalSampleLbls = $('modalSampleLbls');
+
+/* Estado del selector de posiciones (una hoja = 10 posiciones).
+   slblManual=false → posiciones 1..qty (modo auto, sigue al input).
+   slblManual=true  → el usuario picó posiciones específicas y slblSelected manda. */
+const SLBL_PER_PAGE = 10;
+let slblManual = false;
+let slblSelected = new Set(); /* posiciones seleccionadas 1..10 */
+
+function slblSincronizarAuto(){
+  /* En modo auto: refleja el qty del input en el set de seleccionadas (máx 10). */
+  slblSelected = new Set();
+  const qty = Math.max(0, parseInt($('slblQty').value)||0);
+  const n = Math.min(qty, SLBL_PER_PAGE);
+  for(let i=1;i<=n;i++) slblSelected.add(i);
+}
+
+function slblRenderGrid(){
+  const grid = $('slblPosGrid');
+  if(!grid) return;
+  const qty = Math.max(0, parseInt($('slblQty').value)||0);
+  const multiSheet = qty > SLBL_PER_PAGE;
+
+  if(!slblManual) slblSincronizarAuto();
+
+  grid.innerHTML = '';
+  for(let i=1;i<=SLBL_PER_PAGE;i++){
+    const cell = document.createElement('div');
+    let cls = 'slbl-pos-cell';
+    if(slblSelected.has(i) && !multiSheet) cls += ' on';
+    if(multiSheet) cls += ' disabled';
+    cell.className = cls;
+    cell.textContent = i;
+    cell.dataset.pos = i;
+    if(!multiSheet){
+      cell.addEventListener('click', ()=>{
+        slblManual = true;
+        if(slblSelected.has(i)) slblSelected.delete(i);
+        else slblSelected.add(i);
+        /* qty espeja el count de posiciones seleccionadas */
+        $('slblQty').value = String(slblSelected.size);
+        slblRenderGrid();
+      });
+    }
+    grid.appendChild(cell);
+  }
+  slblActualizarModo();
+}
+
+function slblActualizarModo(){
+  const modeEl = $('slblPosMode');
+  const resetEl = $('slblPosReset');
+  if(!modeEl || !resetEl) return;
+  const qty = Math.max(0, parseInt($('slblQty').value)||0);
+  if(qty > SLBL_PER_PAGE){
+    const sheets = Math.ceil(qty/SLBL_PER_PAGE);
+    const tpl = t('lblPosMultiSheet') || 'Auto · {n} sheets';
+    modeEl.textContent = tpl.replace('{n}', sheets);
+    resetEl.style.display = 'none';
+  } else if(slblManual){
+    modeEl.textContent = t('lblPosManual') || 'Manual';
+    resetEl.style.display = '';
+  } else {
+    modeEl.textContent = t('lblPosAuto') || 'Auto';
+    resetEl.style.display = 'none';
+  }
+}
+
+function slblAplicarBlank(){
+  /* Atenúa visualmente los campos que se ignoran cuando "blank" está activo. */
+  const blank = $('slblBlank') && $('slblBlank').checked;
+  ['slblProduct','slblBatch','slblSampledBy','slblDate','slblReason'].forEach(id=>{
+    const el = $(id);
+    if(!el) return;
+    if(blank) el.classList.add('slbl-dim'); else el.classList.remove('slbl-dim');
+  });
+}
+
 function abrirSampleLbls(){
   /* pre-llenar la fecha con hoy */
   const hoy = new Date();
@@ -4272,6 +4395,11 @@ function abrirSampleLbls(){
   $('slblDate').value = isoHoy;
   /* cantidad default: 10 (una hoja completa) */
   if(!$('slblQty').value) $('slblQty').value = '10';
+  /* reset del selector de posiciones a modo auto */
+  slblManual = false;
+  if($('slblBlank')) $('slblBlank').checked = false;
+  slblAplicarBlank();
+  slblRenderGrid();
   modalSampleLbls.classList.add('show');
   setTimeout(()=>$('slblProduct').focus(), 50);
 }
@@ -4280,7 +4408,21 @@ if($('qcSampleLbls')) $('qcSampleLbls').addEventListener('click', abrirSampleLbl
 if($('sampleLblCerrar')) $('sampleLblCerrar').addEventListener('click', cerrarSampleLbls);
 modalSampleLbls.addEventListener('click', e=>{ if(e.target===modalSampleLbls) cerrarSampleLbls(); });
 
+/* Cuando el usuario cambia el input de cantidad → vuelve a modo auto */
+if($('slblQty')) $('slblQty').addEventListener('input', ()=>{
+  slblManual = false;
+  slblRenderGrid();
+});
+/* Reset link: vuelve a modo auto */
+if($('slblPosReset')) $('slblPosReset').addEventListener('click', ()=>{
+  slblManual = false;
+  slblRenderGrid();
+});
+/* Blank checkbox: atenúa campos y salta validaciones al generar */
+if($('slblBlank')) $('slblBlank').addEventListener('change', slblAplicarBlank);
+
 async function generarSampleLabelsPDF(){
+  const blank = $('slblBlank') && $('slblBlank').checked;
   const producto = $('slblProduct').value.trim();
   const batch = $('slblBatch').value.trim();
   const sampledBy = $('slblSampledBy').value.trim();
@@ -4288,15 +4430,18 @@ async function generarSampleLabelsPDF(){
   const reason = $('slblReason').value.trim();
   const cantidad = Math.max(0, Math.min(200, parseInt($('slblQty').value)||0));
 
-  if(!producto){ alert(t('slblNeedProduct')); return; }
-  if(!batch){ alert(t('slblNeedBatch')); return; }
-  if(!sampledBy){ alert(t('slblNeedSampledBy')); return; }
-  if(!reason){ alert(t('slblNeedReason')); return; }
+  /* En modo "blank" saltamos las validaciones de campos: solo se necesita cantidad. */
+  if(!blank){
+    if(!producto){ alert(t('slblNeedProduct')); return; }
+    if(!batch){ alert(t('slblNeedBatch')); return; }
+    if(!sampledBy){ alert(t('slblNeedSampledBy')); return; }
+    if(!reason){ alert(t('slblNeedReason')); return; }
+  }
   if(!cantidad){ alert(t('slblNeedQty')); return; }
 
   /* Fecha visible en el label: DD-Mon-YYYY (compatible con lo que ven en planta) */
   let fechaTxt = '';
-  if(dateISO){
+  if(!blank && dateISO){
     const p = dateISO.split('-');
     if(p.length===3){
       const meses=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
@@ -4315,17 +4460,41 @@ async function generarSampleLabelsPDF(){
 
   const doc = new jsPDF({unit:'mm', format:[PAGE_W,PAGE_H]});
 
-  for(let i=0;i<cantidad;i++){
-    const idx = i%PER_PAGE;
-    if(i>0 && idx===0) doc.addPage([PAGE_W,PAGE_H]);
-    const col = idx%COLS, row = Math.floor(idx/COLS);
-    const x = MX + col*(LW+GAP_X), y = MY + row*(LH+GAP_Y);
-    dibujarSampleLabel(doc, x, y, LW, LH, {
-      producto, batch, fecha:fechaTxt, sampledBy, reason
-    });
+  /* Construir la lista de "slots absolutos" (0-indexed) en los que hay que dibujar.
+     - Si cantidad > 10 o modo auto: secuencial 0..cantidad-1 a través de páginas.
+     - Si cantidad <= 10 y modo manual: las posiciones que el usuario picó (0-indexadas). */
+  let slots = [];
+  if(cantidad > PER_PAGE || !slblManual){
+    for(let i=0;i<cantidad;i++) slots.push(i);
+  } else {
+    slots = Array.from(slblSelected).sort((a,b)=>a-b).map(p=>p-1);
+    if(!slots.length){ alert(t('slblNeedPositions')); return; }
   }
 
-  const safe = (batch.replace(/[^a-zA-Z0-9_-]/g,'') || 'batch');
+  const datosLabel = blank
+    ? { producto:'', batch:'', fecha:'', sampledBy:'', reason:'' }
+    : { producto, batch, fecha:fechaTxt, sampledBy, reason };
+
+  let paginaActual = 0;
+  for(let i=0;i<slots.length;i++){
+    const slot = slots[i];
+    const pagina = Math.floor(slot/PER_PAGE);
+    const idxEnPagina = slot % PER_PAGE;
+    if(i===0){
+      /* la 1ª hoja ya existe; si la 1ª etiqueta cae en pag>0, agregamos hojas para llegar ahí */
+      for(let p=0;p<pagina;p++) doc.addPage([PAGE_W,PAGE_H]);
+      paginaActual = pagina;
+    } else if(pagina !== paginaActual){
+      /* cambio de página en secuencia auto */
+      for(let p=paginaActual;p<pagina;p++) doc.addPage([PAGE_W,PAGE_H]);
+      paginaActual = pagina;
+    }
+    const col = idxEnPagina%COLS, row = Math.floor(idxEnPagina/COLS);
+    const x = MX + col*(LW+GAP_X), y = MY + row*(LH+GAP_Y);
+    dibujarSampleLabel(doc, x, y, LW, LH, datosLabel);
+  }
+
+  const safe = blank ? 'blank' : (batch.replace(/[^a-zA-Z0-9_-]/g,'') || 'batch');
   doc.save('sample_labels_'+safe+'.pdf');
   cerrarSampleLbls();
 }
@@ -4408,9 +4577,11 @@ function dibujarSampleLabel(doc, x, y, LW, LH, data){
   doc.text('Product:', rightX + labelPad, boxY + rightFieldH*0 + 3);
   if(data.producto){
     doc.setFont('helvetica','bold');
-    doc.setFontSize(9);
+    doc.setFontSize(8);
     const prod = doc.splitTextToSize(data.producto, rightW - 2*labelPad);
-    doc.text(prod.slice(0,2), rightX + labelPad, boxY + rightFieldH*0 + 6.5);
+    /* lineHeightFactor:1.0 apretamos el interlineado para que 2 líneas de producto
+       no toquen el divisor inferior (era el bug con productos largos a 9pt) */
+    doc.text(prod.slice(0,2), rightX + labelPad, boxY + rightFieldH*0 + 6, {lineHeightFactor:1.0});
     doc.setFontSize(8.5);
     doc.setFont('helvetica','normal');
   }
