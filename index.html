@@ -4605,12 +4605,12 @@ function dibujarSampleLabel(doc, x, y, LW, LH, data){
     doc.setFont('helvetica','normal');
   }
 
-  /* Código del documento al pie */
-  doc.setFont('helvetica','normal');
+  /* Código del documento al pie — bold y en negro para que resalte */
+  doc.setFont('helvetica','bold');
   doc.setFontSize(7);
-  doc.setTextColor(80,80,80);
-  doc.text('LB0005-2', ix, y + LH - 1);
   doc.setTextColor(0,0,0);
+  doc.text('LB0005-2', ix, y + LH - 1);
+  doc.setFont('helvetica','normal');
 }
 
 if($('slblGen')) $('slblGen').addEventListener('click', generarSampleLabelsPDF);
