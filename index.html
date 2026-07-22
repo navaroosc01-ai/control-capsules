@@ -542,6 +542,34 @@
     border-top-color:var(--accent);border-radius:50%;animation:qcSpin 0.9s linear infinite}
   @keyframes qcSpin{to{transform:rotate(360deg)}}
 
+  /* ===== Modo enlace-de-cuarto (?cuarto=N): oculta la interfaz hasta resolver
+     la orden activa del cuarto. Si la encuentra, se quita la clase y el operador
+     ve la interfaz normal + se abre automaticamente el modal de produccion. Si no
+     la encuentra, el panel muestra "sin orden activa" con reintento cada 30s. */
+  body.room-link .wrap > .card,
+  body.room-link .connbar,
+  body.room-link .sup-banner,
+  body.room-link .big-btn,
+  body.room-link #diaCerradoAviso{display:none !important}
+  body.room-link #roomLinkPanel{display:flex}
+  .room-link-panel{display:none;flex-direction:column;align-items:center;justify-content:center;
+    min-height:280px;gap:14px;padding:36px 24px;background:var(--panel);
+    border:1px solid var(--line);border-radius:var(--radius);color:var(--muted);
+    font-size:14px;text-align:center}
+  .room-link-panel .rl-badge{display:inline-block;padding:6px 14px;
+    background:var(--accent);color:#06241c;border-radius:20px;font-weight:800;font-size:12px;
+    letter-spacing:.6px;text-transform:uppercase}
+  .room-link-panel .rl-spin{width:32px;height:32px;border:3px solid var(--line);
+    border-top-color:var(--accent);border-radius:50%;animation:qcSpin 0.9s linear infinite}
+  .room-link-panel .rl-title{font-size:18px;font-weight:800;color:var(--ink);line-height:1.3}
+  .room-link-panel .rl-title.rl-err{color:var(--danger)}
+  .room-link-panel .rl-sub{font-size:13px;color:var(--muted);max-width:360px;line-height:1.5}
+  .room-link-panel .rl-refresh{margin-top:4px}
+  .room-link-panel .rl-timer{font-size:11px;color:var(--muted);opacity:.75;margin-top:-4px}
+  .room-link-panel .rl-warn{padding:10px 14px;background:rgba(255,194,51,.14);
+    border:1px solid var(--warn);border-radius:8px;color:var(--warn);font-size:12px;
+    max-width:360px;font-weight:700}
+
   /* ===== Tablero del Manager Mecánico ===== */
   #mecBoard{display:none}
   body.mecanico #mecBoard{display:block}
@@ -914,6 +942,12 @@
   <div id="qcQuickLoading" class="qc-quick-loading">
     <div class="qc-quick-spin"></div>
     <div data-i18n="qcQuickLoading">Loading order…</div>
+  </div>
+
+  <!-- Panel visible en modo enlace-de-cuarto (?cuarto=N): muestra "buscando",
+       "cargando orden" o "sin orden activa". El contenido se rellena por JS. -->
+  <div id="roomLinkPanel" class="room-link-panel">
+    <div id="roomLinkContent"></div>
   </div>
 
   <!-- Barra de conexión / código de orden -->
@@ -2277,6 +2311,18 @@ const I18N = {
     qcDayClosedTitle:'Day already closed — production cannot be updated.',
     qcQuickLoading:'Loading order…',
     qcSaved:'Saved. Returning to active orders…',
+    /* Enlaces independientes por cuarto (?cuarto=N) */
+    roomLinkBadge:'Room',
+    roomLinkSearching:'Looking for active order…',
+    roomLinkSearchingSub:'Fetching the order that is currently in process in this room.',
+    roomLinkLoadingOrder:'Loading order',
+    roomLinkNone:'No active order in this room',
+    roomLinkNoneSub:'When a supervisor starts an order in this room, it will appear here automatically.',
+    roomLinkRefresh:'↻ Check now',
+    roomLinkAutoRefresh: n=>`Auto-retry in ${n} s…`,
+    roomLinkError:'Could not load orders',
+    roomLinkErrorSub:'Check the connection and try again.',
+    roomLinkMultiWarn:'⚠ Multiple active orders detected in this room — showing the most recent',
     newSample:'New sample', sampleTime:'Sample time', sampleTimeHint:'The system time is used by default. You can change it manually.',
     weight10:'Weight of 10 capsules (g)', weightPerCap:'Weight per capsule (mg)', operatorInitials:'Operator initials', operatorPh:'Ex. JP',
     cancel:'Cancel', saveSample:'Save sample',
@@ -2610,6 +2656,18 @@ const I18N = {
     qcDayClosedTitle:'Día ya cerrado — no se puede actualizar producción.',
     qcQuickLoading:'Cargando orden…',
     qcSaved:'Guardado. Volviendo a órdenes activas…',
+    /* Enlaces independientes por cuarto (?cuarto=N) */
+    roomLinkBadge:'Cuarto',
+    roomLinkSearching:'Buscando orden activa…',
+    roomLinkSearchingSub:'Consultando la orden que se está corriendo en este cuarto.',
+    roomLinkLoadingOrder:'Cargando orden',
+    roomLinkNone:'No hay orden activa en este cuarto',
+    roomLinkNoneSub:'Cuando un supervisor arranque una orden en este cuarto, aparecerá aquí automáticamente.',
+    roomLinkRefresh:'↻ Consultar ahora',
+    roomLinkAutoRefresh: n=>`Reintento automático en ${n} s…`,
+    roomLinkError:'No se pudieron cargar las órdenes',
+    roomLinkErrorSub:'Verifique la conexión e intente de nuevo.',
+    roomLinkMultiWarn:'⚠ Se detectaron varias órdenes activas en este cuarto — se abrió la más reciente',
     newSample:'Nueva muestra', sampleTime:'Hora de la toma', sampleTimeHint:'Se toma la hora del sistema por defecto. Puede modificarla manualmente.',
     weight10:'Peso de 10 cápsulas (g)', weightPerCap:'Peso por cápsula (mg)', operatorInitials:'Iniciales del operador', operatorPh:'Ej. JP',
     cancel:'Cancelar', saveSample:'Guardar muestra',
@@ -5177,6 +5235,150 @@ function ejecutarAccionQC(){
 }
 /* =============================================================== */
 
+/* =========================================================================
+   ENLACES INDEPENDIENTES POR CUARTO  (?cuarto=N)
+   -------------------------------------------------------------------------
+   El operador abre un enlace fijo por cuarto (por ej. ?cuarto=2). La app
+   busca en la nube la orden cuyo encapsulado esta en proceso Y cuyo campo
+   "orden" (nombre del cuarto) coincide con el parametro, la abre y abre
+   inmediatamente el modal de actualizacion de produccion.
+   Si no hay orden activa, muestra un panel amigable y reintenta cada 30s.
+========================================================================= */
+let roomLinkTimer = null;    /* setInterval del countdown de reintento */
+let roomLinkTarget = '';     /* cuarto solicitado por URL (string tal cual) */
+const ROOM_LINK_INTERVAL_S = 30;
+
+/* Normaliza el nombre del cuarto para comparar: quita prefijo "room"/"r",
+   espacios y pasa a minusculas. "Room 2", "room 2", "R 2", "2" => "2" */
+function normCuarto(s){
+  return String(s||'').trim().toLowerCase()
+    .replace(/^room\b\s*/i,'')
+    .replace(/^r\b\s+/i,'')
+    .replace(/\s+/g,'');
+}
+
+/* Devuelve un array de {cod, ts} con TODAS las ordenes cuyo encapsulado
+   esta en proceso y cuyo cuarto coincide con el solicitado. Orden: mas
+   reciente primero (usa 'actualizado' del row de Supabase). */
+async function codigoActivoEnCuarto(cuarto){
+  if(!CONFIGURED) return [];
+  const url = REST + '?select=codigo,data,actualizado&order=actualizado.desc';
+  const r = await fetch(url, { headers: HEADERS });
+  if(!r.ok) throw new Error('HTTP '+r.status);
+  const arr = await r.json();
+  const target = normCuarto(cuarto);
+  const out = [];
+  arr.forEach(row=>{
+    const cod = (row.codigo||'').toUpperCase();
+    const dd = row.data || {};
+    if(!cod || !dd.orden) return;
+    if(normCuarto(dd.orden.orden) !== target) return;
+    /* Solo cuenta si el encapsulado esta en proceso (o change over activo).
+       Packeting-solo NO califica (esos enlaces son para el cuarto de encapsulado). */
+    if(!encapsuladoEnProceso(dd)) return;
+    out.push({ cod, ts: row.actualizado });
+  });
+  return out;
+}
+
+/* Punto de entrada del modo enlace-de-cuarto */
+function iniciarRoomLink(cuartoParam){
+  roomLinkTarget = String(cuartoParam||'').trim();
+  pintarBuscandoCuarto();
+  resolverCuartoAhora();
+}
+
+function pintarBuscandoCuarto(){
+  const badge = escCuarto(roomLinkTarget);
+  $('roomLinkContent').innerHTML =
+    `<div class="rl-badge">${t('roomLinkBadge')} ${badge}</div>
+     <div class="rl-spin"></div>
+     <div class="rl-title">${t('roomLinkSearching')}</div>
+     <div class="rl-sub">${t('roomLinkSearchingSub')}</div>`;
+}
+
+async function resolverCuartoAhora(){
+  if(roomLinkTimer){ clearInterval(roomLinkTimer); roomLinkTimer=null; }
+  pintarBuscandoCuarto();
+  try{
+    const matches = await codigoActivoEnCuarto(roomLinkTarget);
+    if(matches && matches.length){
+      cargarOrdenDeCuarto(matches[0].cod, matches.length>1);
+    } else {
+      mostrarSinOrdenActivaEnCuarto();
+    }
+  }catch(e){
+    mostrarErrorCuarto();
+  }
+}
+
+async function cargarOrdenDeCuarto(cod, multi){
+  if(roomLinkTimer){ clearInterval(roomLinkTimer); roomLinkTimer=null; }
+  const badge = escCuarto(roomLinkTarget);
+  $('roomLinkContent').innerHTML =
+    `<div class="rl-badge">${t('roomLinkBadge')} ${badge}</div>
+     <div class="rl-spin"></div>
+     <div class="rl-title">${t('roomLinkLoadingOrder')} ${String(cod).replace(/</g,'&lt;')}</div>`;
+  /* Alinear el input de codigo con la orden encontrada (para consistencia visual
+     cuando quitamos la clase room-link y aparece la connbar). */
+  $('fCodigo').value = cod;
+  await abrirOrden(cod);
+  /* Revelar la interfaz normal de operador */
+  document.body.classList.remove('room-link');
+  /* Si hubo varias coincidencias, aviso discreto arriba (barra de conexion) */
+  if(multi){
+    setConn('bad', t('roomLinkMultiWarn'));
+  }
+  /* Abrir el modal de actualizacion de produccion del dia de hoy.
+     openParcialModal ya maneja el caso "dia cerrado" con su propio alert. */
+  setTimeout(()=>{
+    if(typeof openParcialModal==='function'){
+      openParcialModal(dayKey(new Date()));
+    }
+  }, 300);
+}
+
+function mostrarSinOrdenActivaEnCuarto(){
+  const badge = escCuarto(roomLinkTarget);
+  let segRest = ROOM_LINK_INTERVAL_S;
+  const pintar = ()=>{
+    $('roomLinkContent').innerHTML =
+      `<div class="rl-badge">${t('roomLinkBadge')} ${badge}</div>
+       <div class="rl-title">${t('roomLinkNone')}</div>
+       <div class="rl-sub">${t('roomLinkNoneSub')}</div>
+       <button class="btn primary rl-refresh" id="rlRefreshBtn">${t('roomLinkRefresh')}</button>
+       <div class="rl-timer" id="rlTimer">${t('roomLinkAutoRefresh')(segRest)}</div>`;
+    $('rlRefreshBtn').onclick = ()=>resolverCuartoAhora();
+  };
+  pintar();
+  if(roomLinkTimer){ clearInterval(roomLinkTimer); }
+  roomLinkTimer = setInterval(()=>{
+    segRest--;
+    if(segRest<=0){
+      clearInterval(roomLinkTimer); roomLinkTimer=null;
+      resolverCuartoAhora();
+    } else {
+      const tEl = $('rlTimer');
+      if(tEl) tEl.textContent = t('roomLinkAutoRefresh')(segRest);
+    }
+  }, 1000);
+}
+
+function mostrarErrorCuarto(){
+  const badge = escCuarto(roomLinkTarget);
+  $('roomLinkContent').innerHTML =
+    `<div class="rl-badge">${t('roomLinkBadge')} ${badge}</div>
+     <div class="rl-title rl-err">${t('roomLinkError')}</div>
+     <div class="rl-sub">${t('roomLinkErrorSub')}</div>
+     <button class="btn primary rl-refresh" id="rlRefreshBtn">${t('roomLinkRefresh')}</button>`;
+  $('rlRefreshBtn').onclick = ()=>resolverCuartoAhora();
+}
+
+/* Escapa el nombre del cuarto para pintarlo con seguridad en el badge */
+function escCuarto(s){
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
 function refrescarRol(){
   $('rolTag').textContent = qc ? t('qcTag') : (mecanico ? t('mechTag') : (supervisor ? t('supervisor') : t('operator')));
 }
@@ -5185,6 +5387,15 @@ function applyURL(){
   const p=new URLSearchParams(location.search);
   const cod=p.get('orden');
   const rol=p.get('rol'); const clave=p.get('clave');
+  /* Enlace independiente por cuarto de encapsulacion (?cuarto=N).
+     No requiere clave (es un enlace de operador). Solo se activa si no hay rol
+     de supervisor / mecanico / packeting / qc en la URL (esos ganan). */
+  const cuartoParam = p.get('cuarto');
+  if(cuartoParam && !rol){
+    document.body.classList.add('room-link');
+    return { cod:null, tablero:false, mecanico:false, packeting:false, qc:false,
+             roomLink:true, roomTarget: cuartoParam };
+  }
   if(rol==='mecanico' && clave===CLAVE_MECANICO){
     mecanico=true;
     $('rolTag').classList.add('mec');
@@ -6845,6 +7056,8 @@ if(initInfo.qc){
   iniciarPacketing();
 } else if(initInfo.tablero){
   iniciarTablero();
+} else if(initInfo.roomLink){
+  iniciarRoomLink(initInfo.roomTarget);
 } else if(initInfo.cod){
   abrirOrden(initInfo.cod);
 }
