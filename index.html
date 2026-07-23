@@ -2331,6 +2331,9 @@ const I18N = {
     roomKioskoSaved:'Progress saved',
     roomKioskoSavedSub: n=>`${n} capsules registered`,
     roomKioskoCancelConfirm:'Exit without saving? The value you typed will be lost.',
+    roomKioskoCancelled:'Session ended',
+    roomKioskoCancelledSub:'No changes were saved.',
+    roomKioskoScanAgain:'Scan the QR again to update.',
     roomKioskoDayClosed:'Day closed by supervisor',
     roomKioskoDayClosedSub:'Production can no longer be updated for today. If the supervisor reopens the day, tap the button below.',
     newSample:'New sample', sampleTime:'Sample time', sampleTimeHint:'The system time is used by default. You can change it manually.',
@@ -2686,6 +2689,9 @@ const I18N = {
     roomKioskoSaved:'Producción actualizada',
     roomKioskoSavedSub: n=>`${n} cápsulas registradas`,
     roomKioskoCancelConfirm:'¿Salir sin guardar? Se perderá el valor ingresado.',
+    roomKioskoCancelled:'Sesión finalizada',
+    roomKioskoCancelledSub:'No se guardaron cambios.',
+    roomKioskoScanAgain:'Escanee el QR de nuevo para actualizar.',
     roomKioskoDayClosed:'Día cerrado por el supervisor',
     roomKioskoDayClosedSub:'Ya no es posible actualizar la producción de hoy. Si el supervisor reabre el día, presione el botón de abajo.',
     newSample:'Nueva muestra', sampleTime:'Hora de la toma', sampleTimeHint:'Se toma la hora del sistema por defecto. Puede modificarla manualmente.',
@@ -3098,7 +3104,7 @@ $('pCancel').addEventListener('click',()=>{
     const hayValor = String($('pProd').value||'').trim()!=='';
     if(hayValor && !confirm(t('roomKioskoCancelConfirm'))) return;
     modalParcial.classList.remove('show');
-    mostrarKioskoOrdenActiva(roomLinkOrdenCod, '');
+    mostrarKioskoCancelado();
     return;
   }
   modalParcial.classList.remove('show');
@@ -5402,8 +5408,9 @@ async function cargarOrdenDeCuarto(cod, multi){
 
 /* ---------- Paneles del modo kiosko ---------- */
 
-/* Estado "orden activa": operador acaba de llegar o canceló el modal.
-   Muestra la orden en curso y un boton para actualizar produccion. */
+/* Estado "orden activa": panel de fondo mientras el modal parcial está abierto.
+   Sin botones: si el operador cierra el modal, la sesión termina y debe volver
+   a escanear el QR para actualizar de nuevo. */
 function mostrarKioskoOrdenActiva(cod, multiWarn){
   if(roomLinkTimer){ clearInterval(roomLinkTimer); roomLinkTimer=null; }
   const badge = escCuarto(roomLinkTarget);
@@ -5412,17 +5419,11 @@ function mostrarKioskoOrdenActiva(cod, multiWarn){
     `<div class="rl-badge">${t('roomLinkBadge')} ${badge}</div>
      <div class="rl-title">${t('roomKioskoOrderActive')}</div>
      <div class="rl-sub">${t('roomKioskoOrderCode')(codTxt)}</div>
-     <button class="btn primary rl-refresh" id="rlOpenParcialBtn">${t('roomKioskoUpdate')}</button>
      ${multiWarn||''}`;
-  const btn = $('rlOpenParcialBtn');
-  if(btn) btn.onclick = ()=>{
-    if(hoyCerrado()){ mostrarKioskoDiaCerrado(roomLinkOrdenCod, ''); return; }
-    openParcialModal(dayKey(new Date()));
-  };
 }
 
-/* Estado "guardado con exito": muestra el avance registrado y permite volver
-   a actualizar sin volver a escanear el QR. */
+/* Estado "guardado con exito": sesión finalizada. Sin botones — para volver a
+   actualizar, el operador debe escanear el QR del cuarto de nuevo. */
 function mostrarKioskoExito(avance){
   if(roomLinkTimer){ clearInterval(roomLinkTimer); roomLinkTimer=null; }
   const badge = escCuarto(roomLinkTarget);
@@ -5434,12 +5435,20 @@ function mostrarKioskoExito(avance){
      <div class="rl-title" style="color:var(--ok)">✓ ${t('roomKioskoSaved')}</div>
      <div class="rl-sub">${t('roomKioskoSavedSub')(nfmt)}</div>
      <div class="rl-sub" style="opacity:.7">${t('roomKioskoOrderCode')(codTxt)}</div>
-     <button class="btn primary rl-refresh" id="rlOpenParcialBtn">${t('roomKioskoUpdateAgain')}</button>`;
-  const btn = $('rlOpenParcialBtn');
-  if(btn) btn.onclick = ()=>{
-    if(hoyCerrado()){ mostrarKioskoDiaCerrado(roomLinkOrdenCod, ''); return; }
-    openParcialModal(dayKey(new Date()));
-  };
+     <div class="rl-sub" style="margin-top:8px;font-weight:600">${t('roomKioskoScanAgain')}</div>`;
+}
+
+/* Estado "cancelado": el operador cerró el modal sin guardar. Sesión finalizada. */
+function mostrarKioskoCancelado(){
+  if(roomLinkTimer){ clearInterval(roomLinkTimer); roomLinkTimer=null; }
+  const badge = escCuarto(roomLinkTarget);
+  const codTxt = String(roomLinkOrdenCod||'').replace(/</g,'&lt;');
+  $('roomLinkContent').innerHTML =
+    `<div class="rl-badge">${t('roomLinkBadge')} ${badge}</div>
+     <div class="rl-title">${t('roomKioskoCancelled')}</div>
+     <div class="rl-sub">${t('roomKioskoCancelledSub')}</div>
+     <div class="rl-sub" style="opacity:.7">${t('roomKioskoOrderCode')(codTxt)}</div>
+     <div class="rl-sub" style="margin-top:8px;font-weight:600">${t('roomKioskoScanAgain')}</div>`;
 }
 
 /* Estado "dia cerrado": el supervisor cerró el día; no se puede actualizar.
