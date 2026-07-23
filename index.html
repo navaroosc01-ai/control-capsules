@@ -2323,6 +2323,16 @@ const I18N = {
     roomLinkError:'Could not load orders',
     roomLinkErrorSub:'Check the connection and try again.',
     roomLinkMultiWarn:'⚠ Multiple active orders detected in this room — showing the most recent',
+    /* Modo kiosko del cuarto: paneles despues de cargar / guardar */
+    roomKioskoOrderActive:'Active order in this room',
+    roomKioskoOrderCode: cod=>`Order ${cod}`,
+    roomKioskoUpdate:'Update production',
+    roomKioskoUpdateAgain:'Update again',
+    roomKioskoSaved:'Progress saved',
+    roomKioskoSavedSub: n=>`${n} capsules registered`,
+    roomKioskoCancelConfirm:'Exit without saving? The value you typed will be lost.',
+    roomKioskoDayClosed:'Day closed by supervisor',
+    roomKioskoDayClosedSub:'Production can no longer be updated for today. If the supervisor reopens the day, tap the button below.',
     newSample:'New sample', sampleTime:'Sample time', sampleTimeHint:'The system time is used by default. You can change it manually.',
     weight10:'Weight of 10 capsules (g)', weightPerCap:'Weight per capsule (mg)', operatorInitials:'Operator initials', operatorPh:'Ex. JP',
     cancel:'Cancel', saveSample:'Save sample',
@@ -2668,6 +2678,16 @@ const I18N = {
     roomLinkError:'No se pudieron cargar las órdenes',
     roomLinkErrorSub:'Verifique la conexión e intente de nuevo.',
     roomLinkMultiWarn:'⚠ Se detectaron varias órdenes activas en este cuarto — se abrió la más reciente',
+    /* Modo kiosko del cuarto: paneles despues de cargar / guardar */
+    roomKioskoOrderActive:'Orden activa en este cuarto',
+    roomKioskoOrderCode: cod=>`Orden ${cod}`,
+    roomKioskoUpdate:'Actualizar producción',
+    roomKioskoUpdateAgain:'Actualizar de nuevo',
+    roomKioskoSaved:'Producción actualizada',
+    roomKioskoSavedSub: n=>`${n} cápsulas registradas`,
+    roomKioskoCancelConfirm:'¿Salir sin guardar? Se perderá el valor ingresado.',
+    roomKioskoDayClosed:'Día cerrado por el supervisor',
+    roomKioskoDayClosedSub:'Ya no es posible actualizar la producción de hoy. Si el supervisor reabre el día, presione el botón de abajo.',
     newSample:'Nueva muestra', sampleTime:'Hora de la toma', sampleTimeHint:'Se toma la hora del sistema por defecto. Puede modificarla manualmente.',
     weight10:'Peso de 10 cápsulas (g)', weightPerCap:'Peso por cápsula (mg)', operatorInitials:'Iniciales del operador', operatorPh:'Ej. JP',
     cancel:'Cancelar', saveSample:'Guardar muestra',
@@ -3073,11 +3093,21 @@ function openParcialModal(key){
   modalParcial.classList.add('show'); setTimeout(()=>$('pProd').focus(),50);
 }
 $('pCancel').addEventListener('click',()=>{
+  if(roomLinkKiosko){
+    /* Solo confirmar si hay algo tecleado (evitar molestar si el campo está vacío) */
+    const hayValor = String($('pProd').value||'').trim()!=='';
+    if(hayValor && !confirm(t('roomKioskoCancelConfirm'))) return;
+    modalParcial.classList.remove('show');
+    mostrarKioskoOrdenActiva(roomLinkOrdenCod, '');
+    return;
+  }
   modalParcial.classList.remove('show');
   if(qcAccionRapida){ volverDashboardQC(t('qcBack').replace('← ','')); }
 });
 modalParcial.addEventListener('click',e=>{
   if(e.target===modalParcial){
+    /* En modo kiosko no permitimos cerrar tocando el fondo (evita cierres accidentales) */
+    if(roomLinkKiosko) return;
     modalParcial.classList.remove('show');
     if(qcAccionRapida){ volverDashboardQC(t('qcBack').replace('← ','')); }
   }
@@ -3085,14 +3115,27 @@ modalParcial.addEventListener('click',e=>{
 $('pSave').addEventListener('click',()=>{
   const key=modalParcial.dataset.key;
   const info=state.dias[key];
-  if(info && info.closed){ modalParcial.classList.remove('show'); render();
-    alert(t('alDayClosedAdv')); return; }
+  if(info && info.closed){
+    modalParcial.classList.remove('show'); render();
+    if(roomLinkKiosko){ mostrarKioskoDiaCerrado(roomLinkOrdenCod, ''); return; }
+    alert(t('alDayClosedAdv')); return;
+  }
   const prod=parseFloat($('pProd').value);
   const al=$('pAlert');
   if(!(prod>=0)){al.textContent=t('alEnterCaps');al.classList.add('show');return;}
   const dia=getDia(key);
   dia.avance = prod;              /* sustituye el valor anterior */
   dia.avanceTs = new Date().toISOString();
+  /* Modo kiosko: esperar confirmacion de Supabase y mostrar panel de exito */
+  if(roomLinkKiosko){
+    modalParcial.classList.remove('show'); render();
+    (async ()=>{
+      if(saveTimer){ clearTimeout(saveTimer); saveTimer=null; }
+      try{ await pushNow(); }catch(e){}
+      mostrarKioskoExito(prod);
+    })();
+    return;
+  }
   /* QC modo accion rapida: esperar guardado antes de redirigir */
   if(qcAccionRapida){
     modalParcial.classList.remove('show'); render();
@@ -5246,6 +5289,8 @@ function ejecutarAccionQC(){
 ========================================================================= */
 let roomLinkTimer = null;    /* setInterval del countdown de reintento */
 let roomLinkTarget = '';     /* cuarto solicitado por URL (string tal cual) */
+let roomLinkKiosko = false;  /* true cuando entramos por ?cuarto=N (modo kiosko) */
+let roomLinkOrdenCod = '';   /* codigo de orden cargada en modo kiosko */
 const ROOM_LINK_INTERVAL_S = 30;
 
 /* Normaliza el nombre del cuarto para comparar: quita prefijo "room"/"r",
@@ -5284,6 +5329,7 @@ async function codigoActivoEnCuarto(cuarto){
 /* Punto de entrada del modo enlace-de-cuarto */
 function iniciarRoomLink(cuartoParam){
   roomLinkTarget = String(cuartoParam||'').trim();
+  roomLinkKiosko = true;    /* modo kiosko: la UI del operador nunca se revela */
   pintarBuscandoCuarto();
   resolverCuartoAhora();
 }
@@ -5323,19 +5369,97 @@ async function cargarOrdenDeCuarto(cod, multi){
      cuando quitamos la clase room-link y aparece la connbar). */
   $('fCodigo').value = cod;
   await abrirOrden(cod);
-  /* Revelar la interfaz normal de operador */
+  roomLinkOrdenCod = cod;
+  /* Aviso multi-coincidencia (queda visible en el panel, no en connbar oculta) */
+  const multiWarn = multi ? `<div class="rl-warn">${t('roomLinkMultiWarn')}</div>` : '';
+  /* MODO KIOSKO: la UI del operador NO se revela. Solo abrimos el modal parcial
+     encima del roomLinkPanel. Al cerrar el modal, mostramos el panel de estado
+     (exito, cancelado o dia cerrado) con boton para reabrir el modal. */
+  if(roomLinkKiosko){
+    if(hoyCerrado()){
+      mostrarKioskoDiaCerrado(cod, multiWarn);
+    } else {
+      mostrarKioskoOrdenActiva(cod, multiWarn);
+      setTimeout(()=>{
+        if(typeof openParcialModal==='function'){
+          openParcialModal(dayKey(new Date()));
+        }
+      }, 300);
+    }
+    return;
+  }
+  /* Flujo legado (no kiosko): revelar la interfaz normal de operador */
   document.body.classList.remove('room-link');
-  /* Si hubo varias coincidencias, aviso discreto arriba (barra de conexion) */
   if(multi){
     setConn('bad', t('roomLinkMultiWarn'));
   }
-  /* Abrir el modal de actualizacion de produccion del dia de hoy.
-     openParcialModal ya maneja el caso "dia cerrado" con su propio alert. */
   setTimeout(()=>{
     if(typeof openParcialModal==='function'){
       openParcialModal(dayKey(new Date()));
     }
   }, 300);
+}
+
+/* ---------- Paneles del modo kiosko ---------- */
+
+/* Estado "orden activa": operador acaba de llegar o canceló el modal.
+   Muestra la orden en curso y un boton para actualizar produccion. */
+function mostrarKioskoOrdenActiva(cod, multiWarn){
+  if(roomLinkTimer){ clearInterval(roomLinkTimer); roomLinkTimer=null; }
+  const badge = escCuarto(roomLinkTarget);
+  const codTxt = String(cod||roomLinkOrdenCod||'').replace(/</g,'&lt;');
+  $('roomLinkContent').innerHTML =
+    `<div class="rl-badge">${t('roomLinkBadge')} ${badge}</div>
+     <div class="rl-title">${t('roomKioskoOrderActive')}</div>
+     <div class="rl-sub">${t('roomKioskoOrderCode')(codTxt)}</div>
+     <button class="btn primary rl-refresh" id="rlOpenParcialBtn">${t('roomKioskoUpdate')}</button>
+     ${multiWarn||''}`;
+  const btn = $('rlOpenParcialBtn');
+  if(btn) btn.onclick = ()=>{
+    if(hoyCerrado()){ mostrarKioskoDiaCerrado(roomLinkOrdenCod, ''); return; }
+    openParcialModal(dayKey(new Date()));
+  };
+}
+
+/* Estado "guardado con exito": muestra el avance registrado y permite volver
+   a actualizar sin volver a escanear el QR. */
+function mostrarKioskoExito(avance){
+  if(roomLinkTimer){ clearInterval(roomLinkTimer); roomLinkTimer=null; }
+  const badge = escCuarto(roomLinkTarget);
+  const codTxt = String(roomLinkOrdenCod||'').replace(/</g,'&lt;');
+  const nfmt = (typeof avance==='number' && isFinite(avance))
+    ? avance.toLocaleString('en-US') : '';
+  $('roomLinkContent').innerHTML =
+    `<div class="rl-badge">${t('roomLinkBadge')} ${badge}</div>
+     <div class="rl-title" style="color:var(--ok)">✓ ${t('roomKioskoSaved')}</div>
+     <div class="rl-sub">${t('roomKioskoSavedSub')(nfmt)}</div>
+     <div class="rl-sub" style="opacity:.7">${t('roomKioskoOrderCode')(codTxt)}</div>
+     <button class="btn primary rl-refresh" id="rlOpenParcialBtn">${t('roomKioskoUpdateAgain')}</button>`;
+  const btn = $('rlOpenParcialBtn');
+  if(btn) btn.onclick = ()=>{
+    if(hoyCerrado()){ mostrarKioskoDiaCerrado(roomLinkOrdenCod, ''); return; }
+    openParcialModal(dayKey(new Date()));
+  };
+}
+
+/* Estado "dia cerrado": el supervisor cerró el día; no se puede actualizar.
+   Boton para reintentar (por si el supervisor lo reabre). */
+function mostrarKioskoDiaCerrado(cod, multiWarn){
+  if(roomLinkTimer){ clearInterval(roomLinkTimer); roomLinkTimer=null; }
+  const badge = escCuarto(roomLinkTarget);
+  const codTxt = String(cod||roomLinkOrdenCod||'').replace(/</g,'&lt;');
+  $('roomLinkContent').innerHTML =
+    `<div class="rl-badge">${t('roomLinkBadge')} ${badge}</div>
+     <div class="rl-title">${t('roomKioskoDayClosed')}</div>
+     <div class="rl-sub">${t('roomKioskoDayClosedSub')}</div>
+     <div class="rl-sub" style="opacity:.7">${t('roomKioskoOrderCode')(codTxt)}</div>
+     <button class="btn rl-refresh" id="rlRetryBtn">${t('roomLinkRefresh')}</button>
+     ${multiWarn||''}`;
+  const btn = $('rlRetryBtn');
+  if(btn) btn.onclick = ()=>{
+    /* Recargar orden por si el supervisor reabrio el dia */
+    location.reload();
+  };
 }
 
 function mostrarSinOrdenActivaEnCuarto(){
