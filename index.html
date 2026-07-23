@@ -183,7 +183,7 @@
   body.supervisor .parcial-row .px,
   body.supervisor tbody .btn.danger{display:none !important}
   /* El supervisor VE los datos de la orden pero no puede editarlos */
-  body.supervisor input:not(#fCodigo):not(#tabCodigos):not(#incEditFecha):not(#incEditHora):not(#lblBatch):not(#lblNeto):not(#lblCant):not(#lblNumerar):not(#reprintBatch):not(#reprintNeto):not(#reprintNumerar):not(#pkFinishVal){pointer-events:none;opacity:.85;background:var(--panel)}
+  body.supervisor input:not(#fCodigo):not(#tabCodigos):not(#incEditFecha):not(#incEditHora):not(#lblBatch):not(#lblNeto):not(#lblCant):not(#lblNumerar):not(#reprintBatch):not(#reprintNeto):not(#reprintNumerar):not(#pkFinishVal):not(.qr-room-cb){pointer-events:none;opacity:.85;background:var(--panel)}
   body.supervisor #incEditFecha,
   body.supervisor #incEditHora{pointer-events:auto;opacity:1;background:var(--panel2)}
   body.supervisor #fCodigo{pointer-events:auto;opacity:1}
@@ -195,10 +195,11 @@
   body.supervisor #reprintNeto,
   body.supervisor #pkFinishVal{pointer-events:auto;opacity:1;background:var(--panel2)}
   body.supervisor #lblNumerar,
-  body.supervisor #reprintNumerar{pointer-events:auto;opacity:1}
+  body.supervisor #reprintNumerar,
+  body.supervisor .qr-room-cb{pointer-events:auto;opacity:1}
   /* Imprimir, CSV y Limpiar: solo visibles para el supervisor (y NO en el tablero) */
-  #btnImprimir, #btnCSV, #btnGrafica, #btnLimpiar, #btnRespaldo, #btnLabels{display:none}
-  body.supervisor:not(.tablero) #btnImprimir, body.supervisor:not(.tablero) #btnCSV, body.supervisor:not(.tablero) #btnGrafica, body.supervisor:not(.tablero) #btnLimpiar, body.supervisor:not(.tablero) #btnRespaldo, body.supervisor:not(.tablero) #btnLabels{display:inline-block !important}
+  #btnImprimir, #btnCSV, #btnGrafica, #btnLimpiar, #btnRespaldo, #btnLabels, #btnQrCuartos{display:none}
+  body.supervisor:not(.tablero) #btnImprimir, body.supervisor:not(.tablero) #btnCSV, body.supervisor:not(.tablero) #btnGrafica, body.supervisor:not(.tablero) #btnLimpiar, body.supervisor:not(.tablero) #btnRespaldo, body.supervisor:not(.tablero) #btnLabels, body.supervisor:not(.tablero) #btnQrCuartos{display:inline-block !important}
   /* Vista supervisor simplificada: ocultar rango/objetivo, tarjetas de stats y pill de rango */
   body.supervisor #filaRango,
   body.supervisor .stats,
@@ -1075,6 +1076,7 @@
       <button class="btn primary" id="btnImprimir" data-i18n="printSheet">🖨️ Print order sheet</button>
       <button class="btn primary" id="btnGrafica" data-i18n="printControlChart">🖨️ Print control chart (Sam's Club)</button>
       <button class="btn" id="btnLabels" data-i18n="lblBtnFull">🏷️ Print labels</button>
+      <button class="btn" id="btnQrCuartos" data-i18n="qrRoomsBtn">📱 Print room QR codes</button>
       <button class="btn" id="btnCSV" data-i18n="exportCsv">📥 Export CSV (Excel)</button>
       <button class="btn" id="btnRespaldo" data-i18n="backupJson">💾 Backup (JSON)</button>
       <button class="btn danger" id="btnLimpiar" data-i18n="clearOrder">🗑️ Clear order</button>
@@ -1437,6 +1439,27 @@
     <div class="actions">
       <button class="btn" id="reprintCancel" data-i18n="cancel">Cancel</button>
       <button class="btn primary" id="reprintGen" data-i18n="reprintGen">Reprint</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Generar QR de cuartos: supervisor - lista los cuartos con orden activa
+     y permite generar un PDF con 4 QRs por hoja para pegar en cada máquina/cuarto -->
+<div class="modal-bg" id="modalQrCuartos">
+  <div class="modal" style="max-width:520px">
+    <h3 data-i18n="qrRoomsTitle">📱 Generate QR codes for rooms</h3>
+    <div class="sub" data-i18n="qrRoomsDesc">Each QR opens the update-progress screen for that room. Operators just scan and enter production.</div>
+    <div class="alert" id="qrRoomsAlert"></div>
+    <div id="qrRoomsLoading" style="padding:14px 0;text-align:center;color:var(--muted)">
+      <div data-i18n="qrRoomsLoading">Looking for active orders…</div>
+    </div>
+    <div id="qrRoomsList" style="display:none;max-height:340px;overflow-y:auto;padding:4px 0;margin-top:4px"></div>
+    <div id="qrRoomsEmpty" style="display:none;padding:14px 8px;color:var(--muted);text-align:center">
+      <div data-i18n="qrRoomsEmpty">No active orders found. Start an order in a room, then come back.</div>
+    </div>
+    <div class="actions">
+      <button class="btn" id="qrRoomsCancel" data-i18n="cancel">Cancel</button>
+      <button class="btn primary" id="qrRoomsGen" data-i18n="qrRoomsGen" disabled>Generate PDF</button>
     </div>
   </div>
 </div>
@@ -2446,6 +2469,20 @@ const I18N = {
     reprintGenN:(n)=>`Reprint (${n})`,
     reprintNeedSel:'Select at least one barrel to reprint.',
     reprintUidWarn:(n)=>`⚠️ You are changing the <b>batch</b> of <b>${n}</b> label${n===1?'':'s'}. Their identity (uid) will change from <b>OLD_batch#N</b> to <b>NEW_batch#N</b>. Any previous scan is migrated to the new uid automatically. <b>Recommended:</b> physically destroy the old labels before applying the new ones.`,
+    /* Generador de QR por cuarto (supervisor) */
+    qrRoomsBtn:'📱 Print room QR codes',
+    qrRoomsTitle:'📱 Generate QR codes for rooms',
+    qrRoomsDesc:'Each QR opens the update-progress screen for that room. Operators just scan and enter production.',
+    qrRoomsLoading:'Looking for active orders…',
+    qrRoomsEmpty:'No active orders found. Start an order in a room, then come back.',
+    qrRoomsGen:'Generate PDF',
+    qrRoomsGenN:(n)=>`Generate PDF (${n})`,
+    qrRoomsRoomLabel:'ROOM',
+    qrRoomsOrderLabel:'Order',
+    qrRoomsScanInstr:'Scan to update production',
+    qrRoomsSelectAll:'Select all',
+    qrRoomsSelectNone:'Clear',
+    qrRoomsErr:'Could not load orders. Check your connection and try again.',
     barrelsQR:'Barrels scanned (QR)',
     packTitle:'Packeting — barrel scanning', packStart:'▶️ Start scanner', packStop:'⏹️ Stop scanner',
     packLastBatch:'Current batch', packBarrels:'barrels', packLog:'Recent scans', packRemovedList:'Removed',
@@ -2802,6 +2839,20 @@ const I18N = {
     reprintGenN:(n)=>`Reimprimir (${n})`,
     reprintNeedSel:'Selecciona al menos un barril para reimprimir.',
     reprintUidWarn:(n)=>`⚠️ Vas a cambiar el <b>batch</b> de <b>${n}</b> etiqueta${n===1?'':'s'}. Su identidad (uid) pasa de <b>BATCH_VIEJO#N</b> a <b>BATCH_NUEVO#N</b>. Los escaneos previos se migran al uid nuevo automáticamente. <b>Recomendado:</b> destruí físicamente las etiquetas viejas antes de pegar las nuevas.`,
+    /* Generador de QR por cuarto (supervisor) */
+    qrRoomsBtn:'📱 Imprimir QR de cuartos',
+    qrRoomsTitle:'📱 Generar códigos QR de cuartos',
+    qrRoomsDesc:'Cada QR abre la pantalla de actualización de producción del cuarto. El operador escanea e ingresa la producción.',
+    qrRoomsLoading:'Buscando órdenes activas…',
+    qrRoomsEmpty:'No se encontraron órdenes activas. Inicie una orden en un cuarto y vuelva.',
+    qrRoomsGen:'Generar PDF',
+    qrRoomsGenN:(n)=>`Generar PDF (${n})`,
+    qrRoomsRoomLabel:'CUARTO',
+    qrRoomsOrderLabel:'Orden',
+    qrRoomsScanInstr:'Escanee para actualizar producción',
+    qrRoomsSelectAll:'Seleccionar todos',
+    qrRoomsSelectNone:'Limpiar',
+    qrRoomsErr:'No se pudieron cargar las órdenes. Verifique su conexión e intente de nuevo.',
     barrelsQR:'Barriles leídos (QR)',
     packTitle:'Packeting — escaneo de barriles', packStart:'▶️ Iniciar escáner', packStop:'⏹️ Detener escáner',
     packLastBatch:'Batch actual', packBarrels:'barriles', packLog:'Escaneos recientes', packRemovedList:'Retirados',
@@ -5755,6 +5806,255 @@ $('lblCant').addEventListener('input', actualizarHojasLbl);
 $('lblCancel').addEventListener('click', cerrarLabels);
 $('lblGen').addEventListener('click', generarLabelsPDF);
 $('modalLabels').addEventListener('click', e=>{ if(e.target.id==='modalLabels') cerrarLabels(); });
+
+/* =============================================================================
+   GENERADOR DE QR POR CUARTO  (supervisor)
+   -----------------------------------------------------------------------------
+   Detecta automáticamente los cuartos con encapsulado en proceso, muestra la
+   lista al supervisor y genera un PDF Letter con 4 tarjetas por hoja (2x2).
+   Cada QR contiene el link fijo del cuarto: <base>/?cuarto=N — al escanearlo,
+   el operador entra al modo kiosko de ese cuarto (una sola pantalla para
+   actualizar producción).
+============================================================================= */
+
+let _qrRoomsDetected = [];  /* array de {cuarto (raw), key (normalizado), codigo, producto, batch} */
+let _qrRoomsSel = new Set(); /* claves normalizadas seleccionadas */
+
+/* Consulta Supabase y regresa TODOS los cuartos con encapsulado en proceso,
+   desduplicados por normCuarto y ordenados naturalmente. */
+async function detectarCuartosActivos(){
+  if(!CONFIGURED) return [];
+  const url = REST + '?select=codigo,data,actualizado&order=actualizado.desc';
+  const r = await fetch(url, { headers: HEADERS });
+  if(!r.ok) throw new Error('HTTP '+r.status);
+  const arr = await r.json();
+  const map = new Map(); /* key normalizado -> primer match (más reciente) */
+  arr.forEach(row=>{
+    const cod = (row.codigo||'').toUpperCase();
+    const dd = row.data || {};
+    if(!cod || !dd.orden || !dd.orden.orden) return;
+    if(!encapsuladoEnProceso(dd)) return;
+    const raw = String(dd.orden.orden).trim();
+    const key = normCuarto(raw);
+    if(!key) return;
+    if(map.has(key)) return; /* la lista viene ordenada por actualizado.desc: nos quedamos con la primera */
+    map.set(key, {
+      cuarto: raw,
+      key: key,
+      codigo: cod,
+      producto: dd.orden.producto || '',
+      batch: dd.orden.batch || ''
+    });
+  });
+  /* Orden natural: "2" antes que "10", "Room 2" antes que "Room 10" */
+  return Array.from(map.values()).sort((a,b)=>
+    a.key.localeCompare(b.key, undefined, {numeric:true, sensitivity:'base'})
+  );
+}
+
+/* URL base para armar el link del cuarto. Ejemplo:
+   https://navaroosc01-ai.github.io/control-capsules/?cuarto=2 */
+function baseUrlCuartos(){
+  return location.origin + location.pathname;
+}
+function urlCuarto(key){
+  return baseUrlCuartos() + '?cuarto=' + encodeURIComponent(key);
+}
+
+const modalQrCuartos = $('modalQrCuartos');
+
+function abrirQrCuartos(){
+  if(!supervisor){ return; }
+  _qrRoomsDetected = [];
+  _qrRoomsSel = new Set();
+  $('qrRoomsAlert').classList.remove('show'); $('qrRoomsAlert').textContent='';
+  $('qrRoomsList').style.display='none';
+  $('qrRoomsList').innerHTML='';
+  $('qrRoomsEmpty').style.display='none';
+  $('qrRoomsLoading').style.display='block';
+  $('qrRoomsGen').disabled = true;
+  $('qrRoomsGen').textContent = t('qrRoomsGen');
+  modalQrCuartos.classList.add('show');
+  /* Cargar en async para no bloquear la apertura del modal */
+  (async ()=>{
+    try{
+      const rooms = await detectarCuartosActivos();
+      _qrRoomsDetected = rooms;
+      _qrRoomsSel = new Set(rooms.map(r=>r.key)); /* pre-seleccionar todos */
+      $('qrRoomsLoading').style.display='none';
+      if(!rooms.length){
+        $('qrRoomsEmpty').style.display='block';
+        return;
+      }
+      $('qrRoomsList').style.display='block';
+      pintarListaQrCuartos();
+    }catch(e){
+      $('qrRoomsLoading').style.display='none';
+      const al = $('qrRoomsAlert');
+      al.textContent = t('qrRoomsErr');
+      al.classList.add('show');
+    }
+  })();
+}
+
+function pintarListaQrCuartos(){
+  const rows = _qrRoomsDetected.map(r=>{
+    const checked = _qrRoomsSel.has(r.key) ? 'checked' : '';
+    const cod = String(r.codigo||'').replace(/</g,'&lt;');
+    const raw = String(r.cuarto||'').replace(/</g,'&lt;');
+    const prod = String(r.producto||'').replace(/</g,'&lt;');
+    return `
+      <label class="qr-room-row" style="display:flex;align-items:center;gap:12px;padding:10px 12px;
+             border:1px solid var(--line);border-radius:8px;margin-bottom:6px;cursor:pointer;background:var(--panel2)">
+        <input type="checkbox" class="qr-room-cb" data-key="${r.key.replace(/"/g,'&quot;')}" ${checked}
+               style="width:18px;height:18px;flex:0 0 auto;cursor:pointer">
+        <div style="flex:1;min-width:0">
+          <div style="font-weight:800;font-size:15px;color:var(--ink)">${t('qrRoomsRoomLabel')} ${raw}</div>
+          <div style="font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
+            ${t('qrRoomsOrderLabel')} ${cod}${prod?(' · '+prod):''}
+          </div>
+        </div>
+      </label>`;
+  }).join('');
+  /* Toolbar seleccionar/limpiar arriba de la lista */
+  const toolbar = `
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-bottom:8px">
+      <button type="button" class="mini-btn" id="qrRoomsSelAll">${t('qrRoomsSelectAll')}</button>
+      <button type="button" class="mini-btn" id="qrRoomsSelNone">${t('qrRoomsSelectNone')}</button>
+    </div>`;
+  $('qrRoomsList').innerHTML = toolbar + rows;
+  /* wiring de checkboxes */
+  $('qrRoomsList').querySelectorAll('input[type=checkbox]').forEach(cb=>{
+    cb.addEventListener('change', ()=>{
+      const k = cb.dataset.key;
+      if(cb.checked) _qrRoomsSel.add(k); else _qrRoomsSel.delete(k);
+      actualizarBotonGenQr();
+    });
+  });
+  $('qrRoomsSelAll').addEventListener('click', ()=>{
+    _qrRoomsDetected.forEach(r=>_qrRoomsSel.add(r.key));
+    pintarListaQrCuartos(); actualizarBotonGenQr();
+  });
+  $('qrRoomsSelNone').addEventListener('click', ()=>{
+    _qrRoomsSel.clear();
+    pintarListaQrCuartos(); actualizarBotonGenQr();
+  });
+  actualizarBotonGenQr();
+}
+
+function actualizarBotonGenQr(){
+  const n = _qrRoomsSel.size;
+  $('qrRoomsGen').textContent = n ? t('qrRoomsGenN')(n) : t('qrRoomsGen');
+  $('qrRoomsGen').disabled = (n===0);
+}
+
+function cerrarQrCuartos(){
+  modalQrCuartos.classList.remove('show');
+}
+
+/* --------------------- generar el PDF (2x2 por hoja Letter) --------------------- */
+async function generarQrCuartosPDF(){
+  const seleccion = _qrRoomsDetected.filter(r=>_qrRoomsSel.has(r.key));
+  if(!seleccion.length) return;
+  const { jsPDF } = window.jspdf;
+
+  /* Letter portrait, 2x2 = 4 tarjetas por hoja */
+  const PAGE_W=215.9, PAGE_H=279.4;
+  const COLS=2, ROWS=2, PER_PAGE=COLS*ROWS;
+  const MX=10, MY=10, GAP_X=6, GAP_Y=6;
+  const CW=(PAGE_W-2*MX-GAP_X)/COLS;
+  const CH=(PAGE_H-2*MY-(ROWS-1)*GAP_Y)/ROWS;
+
+  const doc=new jsPDF({unit:'mm',format:[PAGE_W,PAGE_H]});
+
+  /* Pre-generar los QR (asíncrono) — el tamaño real lo controla addImage */
+  const qrs = await Promise.all(seleccion.map(r=> lblQrDataURL(urlCuarto(r.key)) ));
+
+  for(let i=0;i<seleccion.length;i++){
+    const idx=i%PER_PAGE;
+    if(i>0 && idx===0) doc.addPage([PAGE_W,PAGE_H]);
+    const col=idx%COLS, row=Math.floor(idx/COLS);
+    const x=MX+col*(CW+GAP_X), y=MY+row*(CH+GAP_Y);
+    dibujarTarjetaQrCuarto(doc, x, y, CW, CH, seleccion[i], qrs[i]);
+  }
+
+  const stamp = new Date().toISOString().slice(0,10).replace(/-/g,'');
+  doc.save('room_qrs_'+stamp+'.pdf');
+  cerrarQrCuartos();
+}
+
+function dibujarTarjetaQrCuarto(doc, x, y, W, H, room, qrDataUrl){
+  const pad=5;
+
+  /* Marco con línea punteada para facilitar el corte con tijeras */
+  doc.setDrawColor(160,160,160);
+  doc.setLineWidth(0.2);
+  doc.setLineDashPattern([1.5, 1.2], 0);
+  doc.rect(x, y, W, H);
+  doc.setLineDashPattern([], 0);
+
+  /* -------- Header: logo + subtitulo -------- */
+  const hdrY = y+pad;
+  try{
+    doc.addImage(LOGO_SABINSA_B64, 'PNG', x+pad, hdrY, 8, 9.8);
+  }catch(e){
+    /* fallback: circulo si el logo falla */
+    doc.setFillColor(0,0,0);
+    doc.circle(x+pad+3, hdrY+4.5, 3.2, 'F');
+  }
+  doc.setTextColor(0,0,0);
+  doc.setFont('helvetica','bold'); doc.setFontSize(10);
+  doc.text('GVIP · Production Control', x+pad+11, hdrY+7);
+
+  /* Separador */
+  doc.setDrawColor(180,180,180); doc.setLineWidth(0.25);
+  doc.line(x+pad, hdrY+13, x+W-pad, hdrY+13);
+
+  /* -------- Título grande: CUARTO N -------- */
+  doc.setTextColor(0,0,0);
+  doc.setFont('helvetica','bold'); doc.setFontSize(11);
+  doc.text(t('qrRoomsRoomLabel'), x+W/2, hdrY+20, {align:'center'});
+  doc.setFont('helvetica','bold'); doc.setFontSize(38);
+  const cuartoTxt = String(room.cuarto||room.key||'');
+  /* Extraer solo el número/identificador para mostrar grande */
+  const displayNum = String(room.key||cuartoTxt).toUpperCase();
+  doc.text(displayNum, x+W/2, hdrY+33, {align:'center'});
+
+  /* -------- QR grande centrado -------- */
+  const qrSize = Math.min(W-2*pad-4, 58); /* max 58mm */
+  const qrX = x + (W-qrSize)/2;
+  const qrY = hdrY + 38;
+  if(qrDataUrl){
+    try{ doc.addImage(qrDataUrl, 'PNG', qrX, qrY, qrSize, qrSize); }catch(e){}
+  }
+  /* Recuadro sutil alrededor del QR */
+  doc.setDrawColor(220,220,220); doc.setLineWidth(0.2);
+  doc.rect(qrX-1, qrY-1, qrSize+2, qrSize+2);
+
+  /* -------- Footer: instrucción + URL + orden actual -------- */
+  const footY = qrY + qrSize + 5;
+  doc.setFont('helvetica','bold'); doc.setFontSize(10); doc.setTextColor(0,0,0);
+  doc.text(t('qrRoomsScanInstr'), x+W/2, footY, {align:'center'});
+
+  /* URL en texto pequeño (para redundancia si el QR falla) */
+  doc.setFont('helvetica','normal'); doc.setFontSize(6.5); doc.setTextColor(120,120,120);
+  const urlTxt = urlCuarto(room.key);
+  /* wrap por si es larga */
+  const maxW = W - 2*pad;
+  const wrapped = doc.splitTextToSize(urlTxt, maxW);
+  doc.text(wrapped, x+W/2, footY+4, {align:'center'});
+
+  /* Orden actual (info) */
+  doc.setFont('helvetica','normal'); doc.setFontSize(7.5); doc.setTextColor(90,90,90);
+  const orderLine = t('qrRoomsOrderLabel')+': '+String(room.codigo||'');
+  doc.text(orderLine, x+W/2, y+H-pad-1, {align:'center'});
+}
+
+/* Listeners */
+$('btnQrCuartos').addEventListener('click', abrirQrCuartos);
+$('qrRoomsCancel').addEventListener('click', cerrarQrCuartos);
+$('qrRoomsGen').addEventListener('click', generarQrCuartosPDF);
+$('modalQrCuartos').addEventListener('click', e=>{ if(e.target.id==='modalQrCuartos') cerrarQrCuartos(); });
 
 /* ===================== REIMPRIMIR — corregir etiquetas ya emitidas =====================
    Solo supervisor. Regenera un PDF con los bn seleccionados usando los datos actuales.
