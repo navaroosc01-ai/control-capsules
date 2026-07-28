@@ -4728,6 +4728,19 @@ function dibujarSampleLabel(doc, x, y, LW, LH, data){
 
   /* Campos en la zona derecha: Product, Batch #, Reason */
   const rightFieldH = boxH / 3;
+
+  /* Adaptativo: calcular cuántas líneas necesita el producto en su tamaño real (8pt).
+     - Producto ≤ 2 líneas: comportamiento normal (Batch y Reason en su posición 1/3).
+     - Producto = 3 líneas: Batch # baja ~3mm, Reason baja ~1.5mm y se limita a 1 línea
+       para no chocar con el borde inferior del recuadro. */
+  doc.setFontSize(8);
+  const prodLines = data.producto ? doc.splitTextToSize(data.producto, rightW - 2*labelPad) : [''];
+  doc.setFontSize(8.5);
+  const numProdLines = Math.min(prodLines.length, 3);
+  const batchYOffset  = Math.max(0, numProdLines - 2) * 3.0;
+  const reasonYOffset = Math.max(0, numProdLines - 2) * 1.5;
+  const reasonMaxLines = numProdLines >= 3 ? 1 : 2;
+
   /* Product */
   doc.setFont('helvetica','normal');
   doc.setFontSize(8.5);
@@ -4735,28 +4748,27 @@ function dibujarSampleLabel(doc, x, y, LW, LH, data){
   if(data.producto){
     doc.setFont('helvetica','bold');
     doc.setFontSize(8);
-    const prod = doc.splitTextToSize(data.producto, rightW - 2*labelPad);
-    /* lineHeightFactor:1.0 apretamos el interlineado para que 2 líneas de producto
-       no toquen el divisor inferior (era el bug con productos largos a 9pt) */
-    doc.text(prod.slice(0,2), rightX + labelPad, boxY + rightFieldH*0 + 6, {lineHeightFactor:1.0});
+    /* lineHeightFactor:1.0 apretamos el interlineado; hasta 3 líneas cuando el
+       producto es largo (numProdLines calculado arriba). */
+    doc.text(prodLines.slice(0, numProdLines), rightX + labelPad, boxY + rightFieldH*0 + 6, {lineHeightFactor:1.0});
     doc.setFontSize(8.5);
     doc.setFont('helvetica','normal');
   }
-  /* Batch # */
-  doc.text('Batch #:', rightX + labelPad, boxY + rightFieldH*1 + 3);
+  /* Batch # (empujado hacia abajo si el producto tiene 3 líneas) */
+  doc.text('Batch #:', rightX + labelPad, boxY + rightFieldH*1 + 3 + batchYOffset);
   if(data.batch){
     doc.setFont('helvetica','bold');
     doc.setFontSize(10);
-    doc.text(String(data.batch), rightX + labelPad, boxY + rightFieldH*1 + 7);
+    doc.text(String(data.batch), rightX + labelPad, boxY + rightFieldH*1 + 7 + batchYOffset);
     doc.setFontSize(8.5);
     doc.setFont('helvetica','normal');
   }
-  /* Reason */
-  doc.text('Reason:', rightX + labelPad, boxY + rightFieldH*2 + 3);
+  /* Reason (empujado a la mitad; máximo 1 línea si producto es 3 líneas) */
+  doc.text('Reason:', rightX + labelPad, boxY + rightFieldH*2 + 3 + reasonYOffset);
   if(data.reason){
     doc.setFont('helvetica','bold');
     const rzn = doc.splitTextToSize(data.reason, rightW - 2*labelPad);
-    doc.text(rzn.slice(0,2), rightX + labelPad, boxY + rightFieldH*2 + 6.5);
+    doc.text(rzn.slice(0, reasonMaxLines), rightX + labelPad, boxY + rightFieldH*2 + 6.5 + reasonYOffset);
     doc.setFont('helvetica','normal');
   }
 
