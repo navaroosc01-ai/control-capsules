@@ -4716,7 +4716,6 @@ function dibujarSampleLabel(doc, x, y, LW, LH, data){
     doc.text(data.fecha, ix + labelPad + 8, leftFieldsY0 + leftFieldH*1 + leftFieldH*0.35);
     doc.setFont('helvetica','normal');
   }
-  doc.line(ix, leftFieldsY0 + leftFieldH*2, rightX, leftFieldsY0 + leftFieldH*2);
   /* Sampled by */
   doc.text('Sampled by:', ix + labelPad, leftFieldsY0 + leftFieldH*2 + leftFieldH*0.35);
   if(data.sampledBy){
@@ -4743,7 +4742,6 @@ function dibujarSampleLabel(doc, x, y, LW, LH, data){
     doc.setFontSize(8.5);
     doc.setFont('helvetica','normal');
   }
-  doc.line(rightX, boxY + rightFieldH*1, rightX+rightW, boxY + rightFieldH*1);
   /* Batch # */
   doc.text('Batch #:', rightX + labelPad, boxY + rightFieldH*1 + 3);
   if(data.batch){
@@ -4753,7 +4751,6 @@ function dibujarSampleLabel(doc, x, y, LW, LH, data){
     doc.setFontSize(8.5);
     doc.setFont('helvetica','normal');
   }
-  doc.line(rightX, boxY + rightFieldH*2, rightX+rightW, boxY + rightFieldH*2);
   /* Reason */
   doc.text('Reason:', rightX + labelPad, boxY + rightFieldH*2 + 3);
   if(data.reason){
