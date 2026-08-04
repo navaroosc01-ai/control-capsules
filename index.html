@@ -1474,7 +1474,9 @@
       <label data-i18n="pkTargetLbl">Total bottles to produce</label>
       <input id="pkTarget" type="text" inputmode="numeric" pattern="[0-9]*" autocomplete="off">
     </div>
-    <div class="grid g2">
+    <!-- Campos de peso ocultos: la orden se inicia sin rango ni primera muestra.
+         Mantenidos en el DOM para no romper referencias del CSS supervisor. -->
+    <div class="grid g2" style="display:none">
       <div class="row">
         <label data-i18n="pkPesoMinLbl">Min weight per bottle (g)</label>
         <input id="pkPesoMin" type="text" inputmode="decimal" autocomplete="off">
@@ -1484,7 +1486,7 @@
         <input id="pkPesoMax" type="text" inputmode="decimal" autocomplete="off">
       </div>
     </div>
-    <div class="row">
+    <div class="row" style="display:none">
       <label data-i18n="pkPesoFirstLbl">Weight of the first bottle (g)</label>
       <input id="pkPesoFirst" type="text" inputmode="decimal" autocomplete="off">
     </div>
@@ -4231,7 +4233,7 @@ function renderTablePacketing(codigos, datos){
           <div class="oc-room-big"><span class="pk-room-label">${t('pkRoomLabel')}</span>${(o.orden?String(o.orden).replace(/</g,'&lt;'):'—')}
             <span class="pk-room-arrow">→</span><span class="pk-line-chip">${t('pkLineChip')(p.linea||'—')}</span></div>
           <div class="oc-prod">${o.producto?String(o.producto).replace(/</g,'&lt;'):'—'}
-            <span class="pk-range-chip">${t('pkRangeChip')(p.pesoMin,p.pesoMax)}</span></div>
+            ${(p.pesoMin!=null && p.pesoMax!=null)?`<span class="pk-range-chip">${t('pkRangeChip')(p.pesoMin,p.pesoMax)}</span>`:''}</div>
           <div class="oc-code">${cod}</div>
         </div>
       </div>
@@ -5216,7 +5218,7 @@ function renderQcPacketing(codigos){
           <div class="oc-room-big"><span class="pk-room-label">${t('pkRoomLabel')}</span>${(o.orden?String(o.orden).replace(/</g,'&lt;'):'—')}
             <span class="pk-room-arrow">→</span><span class="pk-line-chip">${t('pkLineChip')(p.linea||'—')}</span></div>
           <div class="oc-prod">${o.producto?String(o.producto).replace(/</g,'&lt;'):'—'}
-            <span class="pk-range-chip">${t('pkRangeChip')(p.pesoMin,p.pesoMax)}</span></div>
+            ${(p.pesoMin!=null && p.pesoMax!=null)?`<span class="pk-range-chip">${t('pkRangeChip')(p.pesoMin,p.pesoMax)}</span>`:''}</div>
           <div class="oc-code">${cod}</div>
         </div>
       </div>
@@ -6632,18 +6634,15 @@ function abrirModalPackStart(codFinal, data, batch, producto, lineaNum){
 /* Cerrar el modal iniciar orden (sin guardar) */
 function cerrarModalPackStart(){ $('modalPackStart').classList.remove('show'); _pkCtx=null; }
 
-/* Confirmar creacion de la orden de packeting */
+/* Confirmar creacion de la orden de packeting.
+   Nuevo flujo: solo se pide cantidad de botellas. No hay rango de peso ni
+   primera muestra — el registro de muestras queda vacío y pesoMin/pesoMax=null. */
 async function confirmarPackStart(){
   if(!_pkCtx) return;
   const { codFinal, data } = _pkCtx;
   const al = $('pkStartAlert');
   const target = parseFloat($('pkTarget').value);
-  const pesoMin = parseFloat($('pkPesoMin').value);
-  const pesoMax = parseFloat($('pkPesoMax').value);
-  const pesoFirst = parseFloat($('pkPesoFirst').value);
   if(!(target>0)){ al.textContent=t('pkNeedTarget'); al.classList.add('show'); return; }
-  if(!(pesoMin>0) || !(pesoMax>0) || pesoMin>pesoMax){ al.textContent=t('pkNeedRange'); al.classList.add('show'); return; }
-  if(!(pesoFirst>0)){ al.textContent=t('pkNeedFirst'); al.classList.add('show'); return; }
   const lineaNum = typeof packLinea!=='undefined' ? packLinea : (window.packLinea||null);
   const nowIso = new Date().toISOString();
   const nowTs  = Date.now();
@@ -6651,10 +6650,10 @@ async function confirmarPackStart(){
   data.packeting = {
     linea: lineaNum,
     target: target,
-    pesoMin: pesoMin,
-    pesoMax: pesoMax,
+    pesoMin: null,
+    pesoMax: null,
     startTs: nowTs,
-    registros: [{ ts: nowIso, peso: pesoFirst, primera: true }],
+    registros: [],
     dias: {}
   };
   data.packeting.dias[hoyK] = { closed:false, avance:0, avanceTs:nowIso };
@@ -6668,7 +6667,9 @@ async function confirmarPackStart(){
 
 /* Abrir modal "Nueva muestra de packeting" (QC toma otra muestra de peso).
    Prioriza state cuando el usuario ya está dentro de la orden (QC via URL);
-   si no, hace fetch desde la nube. */
+   si no, hace fetch desde la nube.
+   Nuevo flujo: si la orden se creó sin pesos (pesoMin==null), este flujo ya no aplica —
+   sale silenciosamente para que los links viejos con ?pack-muestra=1 no rompan. */
 async function abrirModalPackSample(codFinal){
   let data, useState = false;
   const codActual = codFinal && codFinal.toUpperCase();
@@ -6678,8 +6679,10 @@ async function abrirModalPackSample(codFinal){
     data = await cargarOrdenParaPacketing(codActual);
   }
   if(!data || !data.packeting){ alert(t('pkNoActiveOrder')); return; }
-  _pkCtx = { codFinal:codActual, data, useState };
   const p = data.packeting;
+  /* Órdenes nuevas sin pesos: el flujo de muestras adicionales ya no aplica */
+  if(p.pesoMin==null && p.pesoMax==null){ return; }
+  _pkCtx = { codFinal:codActual, data, useState };
   $('pkSampleInfo').textContent = `${codActual} · ${t('lineaNombre')(p.linea||'—')} · ${t('pkRangeChip')(p.pesoMin, p.pesoMax)}`;
   $('pkSampleVal').value = '';
   $('pkSampleAlert').classList.remove('show'); $('pkSampleAlert').textContent = '';
@@ -6875,7 +6878,7 @@ async function refrescarSupPk(){
             <div class="oc-room-big"><span class="pk-room-label">${t('pkRoomLabel')}</span>${(o.orden?String(o.orden).replace(/</g,'&lt;'):'—')}
               <span class="pk-room-arrow">→</span><span class="pk-line-chip">${t('pkLineChip')(p.linea||'—')}</span></div>
             <div class="oc-prod">${o.producto?String(o.producto).replace(/</g,'&lt;'):'—'}
-              <span class="pk-range-chip">${t('pkRangeChip')(p.pesoMin,p.pesoMax)}</span></div>
+              ${(p.pesoMin!=null && p.pesoMax!=null)?`<span class="pk-range-chip">${t('pkRangeChip')(p.pesoMin,p.pesoMax)}</span>`:''}</div>
             <div class="oc-code">${cod}</div>
           </div>
         </div>
@@ -7102,9 +7105,12 @@ function renderPkActivas(codigos, cache){
           }).join('')
         }</div>`;
     }
-    /* Botones de acción */
+    /* Botones de acción.
+       hayPrimera: órdenes viejas requerían primera muestra (registros[0]) para habilitar el botón.
+       Nuevo flujo: órdenes iniciadas sin pesos (pesoMin==null) tienen el botón siempre habilitado. */
     const codSafe = String(cod).replace(/'/g,'&#39;');
-    const hayPrimera = (p.registros||[]).length>0;
+    const sinPesos = (p.pesoMin==null && p.pesoMax==null);
+    const hayPrimera = sinPesos || (p.registros||[]).length>0;
     const btnAdv = hayPrimera
       ? `<button class="btn" onclick="abrirModalPackAdvancePk('${codSafe}')">${t('pkUpdateAdv')}</button>`
       : `<button class="btn" disabled title="${t('pkFirstSampleRequired')}">${t('pkUpdateAdv')}</button>`;
@@ -7115,7 +7121,7 @@ function renderPkActivas(codigos, cache){
           <div class="oc-room-big"><span class="pk-room-label">${t('pkRoomLabel')}</span>${(o.orden?String(o.orden).replace(/</g,'&lt;'):'—')}
             <span class="pk-room-arrow">→</span><span class="pk-line-chip">${t('pkLineChip')(p.linea||'—')}</span></div>
           <div class="oc-prod">${o.producto?String(o.producto).replace(/</g,'&lt;'):'—'}
-            <span class="pk-range-chip">${t('pkRangeChip')(p.pesoMin,p.pesoMax)}</span></div>
+            ${!sinPesos?`<span class="pk-range-chip">${t('pkRangeChip')(p.pesoMin,p.pesoMax)}</span>`:''}</div>
           <div class="oc-code">${cod}</div>
         </div>
       </div>
@@ -7201,6 +7207,10 @@ function totalCerrado(data){
 
 /* MANIFIESTO de barriles de una orden: la lista completa esperada con su estado.
    Fuente primaria: barrilesDeclarados (guardados al generar etiquetas).
+   Extensión: si en encapsulación se registran MÁS barriles que labels impresos,
+   se completa la lista con barriles pendientes usando la fórmula lote#N (los uids
+   determinísticos coinciden con los que se asignarían al imprimir esos labels más tarde,
+   evitando duplicados). Así packeting refleja siempre el conteo real de encapsulación.
    Retrocompat: si la orden no tiene declaración, se deriva del total de barriles
    de los días con uids determinísticos lote#1..N.
    Estados: pend (declarado, no escaneado) | rec (recibido) | rep (reportado por packeting)
@@ -7212,12 +7222,28 @@ function manifiestoBarriles(data){
   const porUid={}; scans.forEach(b=>{ if(b && b.uid) porUid[b.uid]=b; });
 
   let declarados=Array.isArray(data.barrilesDeclarados)?data.barrilesDeclarados.slice():[];
-  if(!declarados.length){
-    /* retrocompat: derivar del total de barriles reportado en los días */
-    const tot=totalCerrado(data);
-    const lote=(data.orden&&data.orden.lote)||'';
-    if(tot>0 && lote){
-      for(let i=1;i<=tot;i++) declarados.push({ bn:i, uid:lote+'#'+i, ts:null });
+  const tot=totalCerrado(data);
+  const lote=(data.orden&&data.orden.lote)||'';
+  if(tot > declarados.length && lote){
+    /* Extender con barriles pendientes desde encapsulación. Empezamos desde el bn
+       más alto ya declarado + 1 para preservar la numeración continua de los labels.
+       Deduplicamos por uid por si hay huecos raros en los declarados. */
+    const uidsUsados={};
+    let maxBn=0;
+    declarados.forEach(b=>{
+      if(b && b.uid) uidsUsados[b.uid]=true;
+      if(b && typeof b.bn==='number' && b.bn>maxBn) maxBn=b.bn;
+    });
+    let bn = Math.max(maxBn, declarados.length) + 1;
+    while(declarados.length < tot){
+      const uid = lote + '#' + bn;
+      if(!uidsUsados[uid]){
+        declarados.push({ bn, uid, ts:null });
+        uidsUsados[uid]=true;
+      }
+      bn++;
+      /* seguridad: evitar loop infinito si algo raro pasa con los uids */
+      if(bn > tot + declarados.length + 100) break;
     }
   }
   declarados.sort((a,b)=>(a.bn||0)-(b.bn||0));
