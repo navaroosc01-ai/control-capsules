@@ -4232,8 +4232,7 @@ function renderTablePacketing(codigos, datos){
         <div>
           <div class="oc-room-big"><span class="pk-room-label">${t('pkRoomLabel')}</span>${(o.orden?String(o.orden).replace(/</g,'&lt;'):'—')}
             <span class="pk-room-arrow">→</span><span class="pk-line-chip">${t('pkLineChip')(p.linea||'—')}</span></div>
-          <div class="oc-prod">${o.producto?String(o.producto).replace(/</g,'&lt;'):'—'}
-            ${(p.pesoMin!=null && p.pesoMax!=null)?`<span class="pk-range-chip">${t('pkRangeChip')(p.pesoMin,p.pesoMax)}</span>`:''}</div>
+          <div class="oc-prod">${o.producto?String(o.producto).replace(/</g,'&lt;'):'—'}</div>
           <div class="oc-code">${cod}</div>
         </div>
       </div>
@@ -5217,8 +5216,7 @@ function renderQcPacketing(codigos){
         <div>
           <div class="oc-room-big"><span class="pk-room-label">${t('pkRoomLabel')}</span>${(o.orden?String(o.orden).replace(/</g,'&lt;'):'—')}
             <span class="pk-room-arrow">→</span><span class="pk-line-chip">${t('pkLineChip')(p.linea||'—')}</span></div>
-          <div class="oc-prod">${o.producto?String(o.producto).replace(/</g,'&lt;'):'—'}
-            ${(p.pesoMin!=null && p.pesoMax!=null)?`<span class="pk-range-chip">${t('pkRangeChip')(p.pesoMin,p.pesoMax)}</span>`:''}</div>
+          <div class="oc-prod">${o.producto?String(o.producto).replace(/</g,'&lt;'):'—'}</div>
           <div class="oc-code">${cod}</div>
         </div>
       </div>
@@ -6666,11 +6664,11 @@ async function confirmarPackStart(){
 }
 
 /* Abrir modal "Nueva muestra de packeting" (QC toma otra muestra de peso).
-   Prioriza state cuando el usuario ya está dentro de la orden (QC via URL);
-   si no, hace fetch desde la nube.
-   Nuevo flujo: si la orden se creó sin pesos (pesoMin==null), este flujo ya no aplica —
-   sale silenciosamente para que los links viejos con ?pack-muestra=1 no rompan. */
+   El flujo de muestras adicionales ya no aplica bajo ningún caso — la función se mantiene
+   solo para no romper links viejos (?pack-muestra=1) que puedan seguir en circulación. */
 async function abrirModalPackSample(codFinal){
+  return;
+  /* eslint-disable no-unreachable */
   let data, useState = false;
   const codActual = codFinal && codFinal.toUpperCase();
   if(codigo && codActual===codigo.toUpperCase() && state && state.packeting){
@@ -6680,8 +6678,6 @@ async function abrirModalPackSample(codFinal){
   }
   if(!data || !data.packeting){ alert(t('pkNoActiveOrder')); return; }
   const p = data.packeting;
-  /* Órdenes nuevas sin pesos: el flujo de muestras adicionales ya no aplica */
-  if(p.pesoMin==null && p.pesoMax==null){ return; }
   _pkCtx = { codFinal:codActual, data, useState };
   $('pkSampleInfo').textContent = `${codActual} · ${t('lineaNombre')(p.linea||'—')} · ${t('pkRangeChip')(p.pesoMin, p.pesoMax)}`;
   $('pkSampleVal').value = '';
@@ -6877,8 +6873,7 @@ async function refrescarSupPk(){
           <div>
             <div class="oc-room-big"><span class="pk-room-label">${t('pkRoomLabel')}</span>${(o.orden?String(o.orden).replace(/</g,'&lt;'):'—')}
               <span class="pk-room-arrow">→</span><span class="pk-line-chip">${t('pkLineChip')(p.linea||'—')}</span></div>
-            <div class="oc-prod">${o.producto?String(o.producto).replace(/</g,'&lt;'):'—'}
-              ${(p.pesoMin!=null && p.pesoMax!=null)?`<span class="pk-range-chip">${t('pkRangeChip')(p.pesoMin,p.pesoMax)}</span>`:''}</div>
+            <div class="oc-prod">${o.producto?String(o.producto).replace(/</g,'&lt;'):'—'}</div>
             <div class="oc-code">${cod}</div>
           </div>
         </div>
@@ -7105,23 +7100,17 @@ function renderPkActivas(codigos, cache){
           }).join('')
         }</div>`;
     }
-    /* Botones de acción.
-       hayPrimera: órdenes viejas requerían primera muestra (registros[0]) para habilitar el botón.
-       Nuevo flujo: órdenes iniciadas sin pesos (pesoMin==null) tienen el botón siempre habilitado. */
+    /* Botones de acción. El botón "Actualizar producción" siempre está habilitado
+       (el flujo de "primera muestra" ya no aplica). */
     const codSafe = String(cod).replace(/'/g,'&#39;');
-    const sinPesos = (p.pesoMin==null && p.pesoMax==null);
-    const hayPrimera = sinPesos || (p.registros||[]).length>0;
-    const btnAdv = hayPrimera
-      ? `<button class="btn" onclick="abrirModalPackAdvancePk('${codSafe}')">${t('pkUpdateAdv')}</button>`
-      : `<button class="btn" disabled title="${t('pkFirstSampleRequired')}">${t('pkUpdateAdv')}</button>`;
+    const btnAdv = `<button class="btn" onclick="abrirModalPackAdvancePk('${codSafe}')">${t('pkUpdateAdv')}</button>`;
     const btnClose = `<button class="btn primary" onclick="abrirModalPackFinishPk('${codSafe}')">${t('pkFinishBtn')}</button>`;
     html += `<div class="ord-card">
       <div class="oc-top">
         <div>
           <div class="oc-room-big"><span class="pk-room-label">${t('pkRoomLabel')}</span>${(o.orden?String(o.orden).replace(/</g,'&lt;'):'—')}
             <span class="pk-room-arrow">→</span><span class="pk-line-chip">${t('pkLineChip')(p.linea||'—')}</span></div>
-          <div class="oc-prod">${o.producto?String(o.producto).replace(/</g,'&lt;'):'—'}
-            ${!sinPesos?`<span class="pk-range-chip">${t('pkRangeChip')(p.pesoMin,p.pesoMax)}</span>`:''}</div>
+          <div class="oc-prod">${o.producto?String(o.producto).replace(/</g,'&lt;'):'—'}</div>
           <div class="oc-code">${cod}</div>
         </div>
       </div>
@@ -7207,12 +7196,19 @@ function totalCerrado(data){
 
 /* MANIFIESTO de barriles de una orden: la lista completa esperada con su estado.
    Fuente primaria: barrilesDeclarados (guardados al generar etiquetas).
-   Extensión: si en encapsulación se registran MÁS barriles que labels impresos,
-   se completa la lista con barriles pendientes usando la fórmula lote#N (los uids
-   determinísticos coinciden con los que se asignarían al imprimir esos labels más tarde,
-   evitando duplicados). Así packeting refleja siempre el conteo real de encapsulación.
-   Retrocompat: si la orden no tiene declaración, se deriva del total de barriles
-   de los días con uids determinísticos lote#1..N.
+
+   Reglas de conteo:
+   - Orden de encapsulación ABIERTA (algún día sin cerrar) → se muestran los labels
+     impresos tal cual. Cambios en el conteo de días NO afectan la lista mientras
+     la orden siga corriendo.
+   - Orden de encapsulación CERRADA (todos los días con closed:true) Y el total real
+     de barriles reportado es MENOR que los labels impresos → se recorta la lista al
+     total real (los últimos números — bn más altos — se descartan). Los barriles ya
+     escaneados que caigan fuera del recorte se manejan como "extra" por la lógica
+     de más abajo.
+   - Retrocompat: órdenes viejas sin barrilesDeclarados se derivan del total de días
+     con uids determinísticos lote#1..N (comportamiento original).
+
    Estados: pend (declarado, no escaneado) | rec (recibido) | rep (reportado por packeting)
           | ret (retirado por QC)
    Devuelve { items:[{bn, uid, estado, scan}], declarados, recibidos, reportados, retirados, extra:[...] } */
@@ -7224,26 +7220,22 @@ function manifiestoBarriles(data){
   let declarados=Array.isArray(data.barrilesDeclarados)?data.barrilesDeclarados.slice():[];
   const tot=totalCerrado(data);
   const lote=(data.orden&&data.orden.lote)||'';
-  if(tot > declarados.length && lote){
-    /* Extender con barriles pendientes desde encapsulación. Empezamos desde el bn
-       más alto ya declarado + 1 para preservar la numeración continua de los labels.
-       Deduplicamos por uid por si hay huecos raros en los declarados. */
-    const uidsUsados={};
-    let maxBn=0;
-    declarados.forEach(b=>{
-      if(b && b.uid) uidsUsados[b.uid]=true;
-      if(b && typeof b.bn==='number' && b.bn>maxBn) maxBn=b.bn;
-    });
-    let bn = Math.max(maxBn, declarados.length) + 1;
-    while(declarados.length < tot){
-      const uid = lote + '#' + bn;
-      if(!uidsUsados[uid]){
-        declarados.push({ bn, uid, ts:null });
-        uidsUsados[uid]=true;
-      }
-      bn++;
-      /* seguridad: evitar loop infinito si algo raro pasa con los uids */
-      if(bn > tot + declarados.length + 100) break;
+
+  if(!declarados.length){
+    /* Retrocompat: si nunca hubo labels declarados (órdenes viejas), derivar del total */
+    if(tot>0 && lote){
+      for(let i=1;i<=tot;i++) declarados.push({ bn:i, uid:lote+'#'+i, ts:null });
+    }
+  } else {
+    /* Detectar si la orden de encapsulación está cerrada: todos los días con closed:true */
+    const dias=(data.dias)||{};
+    const clavesDia=Object.keys(dias);
+    const encapCerrada = clavesDia.length>0 && clavesDia.every(k=>dias[k] && dias[k].closed);
+    if(encapCerrada && tot < declarados.length){
+      /* Recortar a total real: descartar los bn más altos.
+         Los escaneados que queden fuera del recorte aparecerán como "extra" al final. */
+      declarados.sort((a,b)=>(a.bn||0)-(b.bn||0));
+      declarados = declarados.slice(0, tot);
     }
   }
   declarados.sort((a,b)=>(a.bn||0)-(b.bn||0));
