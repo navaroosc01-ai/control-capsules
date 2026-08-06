@@ -4229,26 +4229,11 @@ function renderTablePacketing(codigos, datos){
     const d = datos[cod];
     const p = d.packeting;
     const o = d.orden || {};
-    const hoyK = dayKey(new Date());
-    const dHoy = p.dias && p.dias[hoyK];
-    const producidosTotal = pkBotesAcumulados(p);
-    const target = p.target||0;
     const bp = pkBarrilProgreso(d);
-    /* Barra de avance:
-       - Órdenes VIEJAS (target>0): barra de botes producidos / target
-       - Órdenes NUEVAS (target null): barra de barriles escaneados / esperados */
+    /* Barra de avance: siempre modo BARRILES. El modo botes se eliminó. */
     let prog = '';
     let completeBadge = '';
-    if(target>0){
-      const pctReal = producidosTotal/target*100, pct = Math.min(100,pctReal);
-      const color = pctReal<=30?'var(--danger)':(pctReal<=70?'var(--warn)':'var(--accent)');
-      prog = `<div>
-        <div class="oc-prog-top"><span>${t('pkProgress')}</span><b>${pct.toFixed(1)}%</b></div>
-        <div class="bar"><span style="width:${pct}%;background:${color}"></span></div>
-        <div class="oc-prog-top" style="margin-top:5px;margin-bottom:0">
-          <span style="color:var(--muted)">${producidosTotal.toLocaleString(loc)} / ${target.toLocaleString(loc)} ${t('pkUnit')}</span></div>
-      </div>`;
-    } else if(bp.esperados>0){
+    if(bp.esperados>0){
       const pctReal = bp.pct, pct = Math.min(100,pctReal);
       const color = pctReal<=30?'var(--danger)':(pctReal<=70?'var(--warn)':'var(--accent)');
       prog = `<div>
@@ -4260,18 +4245,6 @@ function renderTablePacketing(codigos, datos){
       if(bp.escaneados>=bp.esperados && bp.esperados>0){
         completeBadge = `<span class="pk-complete-badge">${t('pkComplete')}</span>`;
       }
-    } else {
-      prog = `<div class="oc-meta">${t('accumLabel')} <b>${producidosTotal.toLocaleString(loc)}</b> ${t('pkUnit')}</div>`;
-    }
-    /* Avance del día actual (solo relevante para órdenes viejas con producción de botes) */
-    let hoyRow = '';
-    if(target>0){
-      let hoyTxt = '—';
-      if(dHoy && dHoy.avance!=null){
-        const hh = dHoy.avanceTs?` · ${fmtTime(new Date(dHoy.avanceTs))}`:'';
-        hoyTxt = `<b>${Number(dHoy.avance).toLocaleString(loc)}</b> ${t('pkUnit')}${hh}`;
-      }
-      hoyRow = `<div class="oc-avance">${t('pkAvanceHoy')} ${hoyTxt}</div>`;
     }
     html += `<div class="ord-card pk">
       <div class="oc-top">
@@ -4284,7 +4257,6 @@ function renderTablePacketing(codigos, datos){
       </div>
       ${prog}
       ${completeBadge}
-      ${hoyRow}
     </div>`;
   });
   grid.innerHTML = html;
@@ -5229,10 +5201,8 @@ function renderQcPacketing(codigos){
   const activas = (codigos||[]).filter(c=>{
     const dd = qcDatos[c];
     if(!dd || !dd.packeting || dd.packeting.finished) return false;
-    /* Flujo nuevo (target null): mostrar siempre — QC tiene visibilidad de todo lo activo.
-       Flujo viejo (target>0): solo mostrar si ya se tomó la primera muestra. */
-    if(dd.packeting.target==null) return true;
-    return (dd.packeting.registros||[]).length>0;
+    /* Mostrar todas las órdenes de packeting activas — QC tiene visibilidad completa. */
+    return true;
   });
   if(!activas.length){ sec.style.display='none'; grid.innerHTML=''; return; }
   sec.style.display='block';
@@ -5241,24 +5211,11 @@ function renderQcPacketing(codigos){
     const d = qcDatos[cod];
     const p = d.packeting;
     const o = d.orden || {};
-    const hoyK = dayKey(new Date());
-    const dHoy = p.dias && p.dias[hoyK];
-    const producidosTotal = pkBotesAcumulados(p);
-    const target = p.target||0;
     const bp = pkBarrilProgreso(d);
-    /* Barra: botes (viejas) o barriles (nuevas) */
+    /* Barra: siempre modo BARRILES. El modo botes se eliminó. */
     let prog = '';
     let completeBadge = '';
-    if(target>0){
-      const pctReal = producidosTotal/target*100, pct = Math.min(100,pctReal);
-      const color = pctReal<=30?'var(--danger)':(pctReal<=70?'var(--warn)':'var(--accent)');
-      prog = `<div>
-        <div class="oc-prog-top"><span>${t('pkProgress')}</span><b>${pct.toFixed(1)}%</b></div>
-        <div class="bar"><span style="width:${pct}%;background:${color}"></span></div>
-        <div class="oc-prog-top" style="margin-top:5px;margin-bottom:0">
-          <span style="color:var(--muted)">${producidosTotal.toLocaleString(loc)} / ${target.toLocaleString(loc)} ${t('pkUnit')}</span></div>
-      </div>`;
-    } else if(bp.esperados>0){
+    if(bp.esperados>0){
       const pctReal = bp.pct, pct = Math.min(100,pctReal);
       const color = pctReal<=30?'var(--danger)':(pctReal<=70?'var(--warn)':'var(--accent)');
       prog = `<div>
@@ -5271,18 +5228,7 @@ function renderQcPacketing(codigos){
         completeBadge = `<span class="pk-complete-badge">${t('pkComplete')}</span>`;
       }
     }
-    /* Órdenes VIEJAS: QC puede actualizar producción y ver avance del día.
-       Órdenes NUEVAS: solo visibilidad, sin acciones (packeting no traquea botes). */
-    let acciones = '';
-    let hoyRow = '';
-    if(target>0){
-      const abrirUrl = `?rol=qc&clave=${CLAVE_QC}&orden=${encodeURIComponent(cod)}`;
-      acciones = `<div class="qc-actions"><button class="btn primary" onclick="location.href='${abrirUrl}&pack-avance=1'">${t('pkUpdateAdv')}</button></div>`;
-      const hoyTxt = (dHoy && dHoy.avance!=null)
-        ? `<b>${Number(dHoy.avance).toLocaleString(loc)}</b> ${t('pkUnit')}`
-        : `<span style="color:var(--muted)">—</span>`;
-      hoyRow = `<div class="oc-avance">${t('pkAvanceHoy')} ${hoyTxt}</div>`;
-    }
+    /* Sin acciones QC (no hay tracking de botes en modo barriles) */
     html += `<div class="ord-card pk">
       <div class="oc-top">
         <div>
@@ -5294,8 +5240,6 @@ function renderQcPacketing(codigos){
       </div>
       ${prog}
       ${completeBadge}
-      ${hoyRow}
-      ${acciones}
     </div>`;
   });
   grid.innerHTML = html;
@@ -6993,22 +6937,11 @@ async function refrescarSupPk(){
       const d = supPkDatos[cod];
       const p = d.packeting;
       const o = d.orden || {};
-      const producidosTotal = pkBotesAcumulados(p);
-      const target = p.target||0;
       const bp = pkBarrilProgreso(d);
-      /* Barra: botes (viejas) o barriles (nuevas) */
+      /* Barra: siempre modo BARRILES. El modo botes se eliminó. */
       let prog = '';
       let completeBadge = '';
-      if(target>0){
-        const pctReal = producidosTotal/target*100, pct = Math.min(100,pctReal);
-        const color = pctReal<=30?'var(--danger)':(pctReal<=70?'var(--warn)':'var(--accent)');
-        prog = `<div>
-          <div class="oc-prog-top"><span>${t('pkProgress')}</span><b>${pct.toFixed(1)}%</b></div>
-          <div class="bar"><span style="width:${pct}%;background:${color}"></span></div>
-          <div class="oc-prog-top" style="margin-top:5px;margin-bottom:0">
-            <span style="color:var(--muted)">${producidosTotal.toLocaleString(loc)} / ${target.toLocaleString(loc)} ${t('pkUnit')}</span></div>
-        </div>`;
-      } else if(bp.esperados>0){
+      if(bp.esperados>0){
         const pctReal = bp.pct, pct = Math.min(100,pctReal);
         const color = pctReal<=30?'var(--danger)':(pctReal<=70?'var(--warn)':'var(--accent)');
         prog = `<div>
@@ -7054,25 +6987,13 @@ function abrirModalPackFinish(cod){
   if(!data || !data.packeting){ alert(t('pkNoActiveOrder')); return; }
   _pkCtx = { codFinal: cod, data, useState: false };
   const p = data.packeting;
-  const loc = I18N[lang].locale;
-  const esNueva = !(p.target>0);   /* flujo nuevo: sin target de botes */
-  if(esNueva){
-    /* Orden nueva: sin campo de botes. Mostrar progreso de barriles y ocultar input. */
-    const bp = pkBarrilProgreso(data);
-    $('pkFinishInfo').textContent = t('pkFinishDescBarriles')(cod, t('lineaNombre')(p.linea||'—'), bp.escaneados, bp.esperados);
-    $('pkFinishInputRow').style.display = 'none';
-    $('pkFinishHintOnly').style.display = 'block';
-  } else {
-    /* Orden vieja: mantener flujo con input de botes finales */
-    const total = pkBotesAcumulados(p);
-    $('pkFinishInfo').textContent = t('pkFinishDesc')(cod, t('lineaNombre')(p.linea||'—'), total.toLocaleString(loc), (p.target||0).toLocaleString(loc));
-    $('pkFinishVal').value = String(total);
-    $('pkFinishInputRow').style.display = '';
-    $('pkFinishHintOnly').style.display = 'none';
-  }
+  /* Siempre modo barriles: sin input de botes, cierre directo con confirmación de barriles. */
+  const bp = pkBarrilProgreso(data);
+  $('pkFinishInfo').textContent = t('pkFinishDescBarriles')(cod, t('lineaNombre')(p.linea||'—'), bp.escaneados, bp.esperados);
+  $('pkFinishInputRow').style.display = 'none';
+  $('pkFinishHintOnly').style.display = 'block';
   $('pkFinishAlert').classList.remove('show'); $('pkFinishAlert').textContent = '';
   $('modalPackFinish').classList.add('show');
-  if(!esNueva) setTimeout(()=>$('pkFinishVal').focus(),50);
 }
 function cerrarModalPackFinish(){ $('modalPackFinish').classList.remove('show'); _pkCtx=null; }
 
@@ -7081,15 +7002,8 @@ async function guardarPackFinish(){
   const { codFinal, data } = _pkCtx;
   const al = $('pkFinishAlert');
   const p = data.packeting;
-  const esNueva = !(p.target>0);
-  let finalBotes = null;
-  if(!esNueva){
-    /* Órden vieja: exigir input de botes finales */
-    const final = parseFloat($('pkFinishVal').value);
-    if(!(final>=0)){ al.textContent = t('alEnterCaps'); al.classList.add('show'); return; }
-    finalBotes = final;
-  }
-  /* Órden nueva: finishedBotes queda en null (no se traquean botes en este flujo) */
+  /* Siempre modo barriles: finalBotes queda en null (no se traquean botes). */
+  const finalBotes = null;
   p.finished = true;
   p.finishedTs = new Date().toISOString();
   p.finishedBotes = finalBotes;
@@ -7218,24 +7132,11 @@ function renderPkActivas(codigos, cache){
     const d = cache[cod];
     const p = d.packeting;
     const o = d.orden || {};
-    const producidosTotal = pkBotesAcumulados(p);
-    const target = p.target||0;
     const bp = pkBarrilProgreso(d);
-    /* Barra de progreso:
-       - Órdenes VIEJAS (target>0): mantienen barra de botes (retrocompatibilidad).
-       - Órdenes NUEVAS (target null): barra de BARRILES escaneados / esperados. */
+    /* Barra de progreso: siempre modo BARRILES. El modo botes se eliminó. */
     let prog = '';
     let completeBadge = '';
-    if(target>0){
-      const pctReal = producidosTotal/target*100, pct = Math.min(100,pctReal);
-      const color = pctReal<=30?'var(--danger)':(pctReal<=70?'var(--warn)':'var(--accent)');
-      prog = `<div>
-        <div class="oc-prog-top"><span>${t('pkProgress')}</span><b>${pct.toFixed(1)}%</b></div>
-        <div class="bar"><span style="width:${pct}%;background:${color}"></span></div>
-        <div class="oc-prog-top" style="margin-top:5px;margin-bottom:0">
-          <span style="color:var(--muted)">${producidosTotal.toLocaleString(loc)} / ${target.toLocaleString(loc)} ${t('pkUnit')}</span></div>
-      </div>`;
-    } else if(bp.esperados>0){
+    if(bp.esperados>0){
       const pctReal = bp.pct, pct = Math.min(100,pctReal);
       const color = pctReal<=30?'var(--danger)':(pctReal<=70?'var(--warn)':'var(--accent)');
       prog = `<div>
@@ -7291,11 +7192,8 @@ function renderPkActivas(codigos, cache){
           }).join('')
         }</div>`;
     }
-    /* Botones de acción.
-       - Órdenes VIEJAS (target>0): botón "Actualizar producción" + "Cerrar orden"
-       - Órdenes NUEVAS (target null): solo "Cerrar orden" (no hay producción que trackear) */
+    /* Solo botón de cierre — el modo botes se eliminó, no hay "Actualizar producción". */
     const codSafe = String(cod).replace(/'/g,'&#39;');
-    const btnAdv = target>0 ? `<button class="btn" onclick="abrirModalPackAdvancePk('${codSafe}')">${t('pkUpdateAdv')}</button>` : '';
     const btnClose = `<button class="btn primary" onclick="abrirModalPackFinishPk('${codSafe}')">${t('pkFinishBtn')}</button>`;
     html += `<div class="ord-card">
       <div class="oc-top">
@@ -7309,7 +7207,7 @@ function renderPkActivas(codigos, cache){
       ${prog}
       ${completeBadge}
       ${manHtml}
-      <div class="pk-card-actions">${btnAdv}${btnClose}</div>
+      <div class="pk-card-actions">${btnClose}</div>
     </div>`;
   });
   grid.innerHTML = html;
@@ -7362,23 +7260,13 @@ function abrirModalPackFinishPk(cod){
   if(!data || !data.packeting){ alert(t('pkNoActiveOrder')); return; }
   _pkCtx = { codFinal: cod, data, useState: false };
   const p = data.packeting;
-  const loc = I18N[lang].locale;
-  const esNueva = !(p.target>0);
-  if(esNueva){
-    const bp = pkBarrilProgreso(data);
-    $('pkFinishInfo').textContent = t('pkFinishDescBarriles')(cod, t('lineaNombre')(p.linea||'—'), bp.escaneados, bp.esperados);
-    $('pkFinishInputRow').style.display = 'none';
-    $('pkFinishHintOnly').style.display = 'block';
-  } else {
-    const total = pkBotesAcumulados(p);
-    $('pkFinishInfo').textContent = t('pkFinishDesc')(cod, t('lineaNombre')(p.linea||'—'), total.toLocaleString(loc), (p.target||0).toLocaleString(loc));
-    $('pkFinishVal').value = String(total);
-    $('pkFinishInputRow').style.display = '';
-    $('pkFinishHintOnly').style.display = 'none';
-  }
+  /* Siempre modo barriles: sin input de botes, cierre directo con confirmación de barriles. */
+  const bp = pkBarrilProgreso(data);
+  $('pkFinishInfo').textContent = t('pkFinishDescBarriles')(cod, t('lineaNombre')(p.linea||'—'), bp.escaneados, bp.esperados);
+  $('pkFinishInputRow').style.display = 'none';
+  $('pkFinishHintOnly').style.display = 'block';
   $('pkFinishAlert').classList.remove('show'); $('pkFinishAlert').textContent = '';
   $('modalPackFinish').classList.add('show');
-  if(!esNueva) setTimeout(()=>$('pkFinishVal').focus(),50);
 }
 
 function iniciarPkActivas(){
