@@ -2540,6 +2540,10 @@ const I18N = {
     pkStartOk:'✓ Packeting order started',
     pkAlreadyStarted:(l)=>`Packeting order already active on line ${l}.`,
     pkOtherLine:(l)=>`Packeting already running on line ${l} for this order.`,
+    /* Confirmación al escanear el primer barril: pedir OK antes de crear la orden.
+       linea ya viene con la palabra "Line N" (via lineaNombre), no duplicar el prefijo. */
+    pkAskStart:(cod,prod,batch,linea)=>`Start packeting order?\n\nOrder: ${cod}\nProduct: ${prod||'—'}\nBatch: ${batch||'—'}\n${linea}\n\nOn accept, this line becomes responsible for the order.`,
+    pkStartAborted:'Order not started. Scan another barrel to try again.',
     pkNeedTarget:'Enter total bottles.',
     pkNeedRange:'Enter both min and max weight (min ≤ max).',
     pkNeedFirst:'Enter the weight of the first bottle.',
@@ -2915,6 +2919,10 @@ const I18N = {
     pkStartOk:'✓ Orden de packeting iniciada',
     pkAlreadyStarted:(l)=>`Ya hay orden de packeting activa en la línea ${l}.`,
     pkOtherLine:(l)=>`El packeting de esta orden ya corre en la línea ${l}.`,
+    /* Confirmación al escanear el primer barril: pedir OK antes de crear la orden.
+       linea ya viene con la palabra "Línea N" (via lineaNombre), no duplicar el prefijo. */
+    pkAskStart:(cod,prod,batch,linea)=>`¿Iniciar orden de packeting?\n\nOrden: ${cod}\nProducto: ${prod||'—'}\nBatch: ${batch||'—'}\n${linea}\n\nAl aceptar, esta línea queda como responsable de la orden.`,
+    pkStartAborted:'Orden no iniciada. Escanea otro barril para reintentar.',
     pkNeedTarget:'Ingresa la cantidad total de botes.',
     pkNeedRange:'Ingresa peso mínimo y máximo (mín ≤ máx).',
     pkNeedFirst:'Ingresa el peso del primer bote.',
@@ -6658,8 +6666,20 @@ async function procesarBarril(datos){
      el mismo barril se re-escanea (lo maneja el bloque `if(existente){...}` arriba). */
   const lineaNum = typeof packLinea!=='undefined' ? packLinea : (window.packLinea||null);
   if(!qc && lineaNum && !data.packeting){
-    /* auto-crear la orden sin modal. Espera corta para no pisar el beep/mensaje de "added". */
-    setTimeout(()=>iniciarOrdenPacketingAuto(codFinal, data, lineaNum), 250);
+    /* Pedir confirmación antes de crear la orden: da al operador oportunidad de verificar
+       código, producto, batch y línea antes de comprometer esta línea con la orden.
+       - Si acepta: crea la orden con target=null (flujo nuevo, modo barriles).
+       - Si cancela: el barril ya quedó registrado como recibido, pero sin packeting activo.
+         El siguiente escaneo (mismo barril u otro) vuelve a preguntar.
+       Espera corta para no pisar el beep/mensaje de "added". */
+    setTimeout(()=>{
+      const lineaTxt = t('lineaNombre')(lineaNum);
+      if(confirm(t('pkAskStart')(codFinal, producto, batch, lineaTxt))){
+        iniciarOrdenPacketingAuto(codFinal, data, lineaNum);
+      } else {
+        packMostrarMsg(t('pkStartAborted'),'');
+      }
+    }, 250);
   } else if(!qc && lineaNum && data.packeting && !data.packeting.finished && data.packeting.linea && data.packeting.linea!==lineaNum){
     /* orden de packeting ya activa en OTRA linea (y no finalizada): avisar sin bloquear */
     packMostrarMsg(t('pkOtherLine')(data.packeting.linea),'dup');
