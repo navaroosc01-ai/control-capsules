@@ -2590,10 +2590,14 @@ const I18N = {
     /* Active orders panel in packeting view */
     pkActivasSection:'📦 Active orders on your line',
     pkActivasEmpty:'No active orders on this line. Scan a QR to start one.',
-    pkBarrilesPresentes:'Scanned',
+    pkBarrilesPresentes:'Present',
     pkBarrilTitlePresent:'Scanned in line.',
-    pkBarrilTitleAbsent:'Marked absent. Tap to undo.',
-    pkBarrilTitlePending:'Pending. Tap to mark absent.',
+    pkBarrilTitleAbsent:'Marked absent (legacy).',
+    pkBarrilTitlePending:'Pending. Tap to mark present.',
+    pkBarrilTitleReview:'Present. Tap to review (error / send to QC).',
+    pkBarrilManualOk:(bn)=>`✓ Barrel ${bn!=null?('#'+bn):''} marked present manually.`,
+    pkBarrilDesmarcado:'Barrel unmarked.',
+    /* Legacy — kept for backward compatibility with older UI paths */
     pkAskMarcarAusente:"Mark this barrel as absent? It won't be scanned into this order.",
     pkAskDesmarcarAusente:'Unmark this barrel as absent?',
     packBarrilFueraLista:'This barrel is not in the declared list of this order. Rejected.',
@@ -2969,10 +2973,14 @@ const I18N = {
     /* Panel de líneas activas en la vista packeting */
     pkActivasSection:'📦 Órdenes activas en tu línea',
     pkActivasEmpty:'No hay órdenes activas en esta línea. Escanea un QR para iniciar una.',
-    pkBarrilesPresentes:'Escaneados',
+    pkBarrilesPresentes:'Presentes',
     pkBarrilTitlePresent:'Escaneado en línea.',
-    pkBarrilTitleAbsent:'Marcado como ausente. Toca para deshacer.',
-    pkBarrilTitlePending:'Pendiente. Toca para marcar como ausente.',
+    pkBarrilTitleAbsent:'Marcado como ausente (histórico).',
+    pkBarrilTitlePending:'Pendiente. Toca para marcar como presente.',
+    pkBarrilTitleReview:'Presente. Toca para revisar (error / pasar a QC).',
+    pkBarrilManualOk:(bn)=>`✓ Barril ${bn!=null?('#'+bn):''} marcado presente manualmente.`,
+    pkBarrilDesmarcado:'Barril desmarcado.',
+    /* Legacy — se conservan por retrocompatibilidad con vistas antiguas */
     pkAskMarcarAusente:'¿Marcar este barril como ausente? No entrará en esta orden.',
     pkAskDesmarcarAusente:'¿Desmarcar este barril como ausente?',
     packBarrilFueraLista:'Este barril no está en la lista declarada de esta orden. Rechazado.',
@@ -6659,9 +6667,12 @@ function pkBarrilProgreso(data){
   const isNew = (p.target==null || p.target===0);
   const man = manifiestoBarriles(data);
   if(!man || !man.items) return Object.assign(empty, { isNew });
-  const ausentes = new Set(Array.isArray(p.barrilesAusentes) ? p.barrilesAusentes : []);
-  /* denominador: declarados que NO son retirados por QC y NO están marcados ausentes */
-  const items = man.items.filter(x => x.estado!=='ret' && !ausentes.has(x.uid));
+  /* Denominador: declarados que NO son retirados por QC. Los pendientes al cierre se
+     consideran ausentes automáticamente — el estado "ausente manual" ya no se marca.
+     Órdenes viejas con barrilesAusentes: esos barriles quedan como pendientes en la
+     cuenta (peor caso: el operador ve un progreso más bajo que antes; puede
+     resolverlo escaneando o clickeándolos). */
+  const items = man.items.filter(x => x.estado!=='ret');
   const escaneados = items.filter(x => x.estado==='rec' || x.estado==='rep').length;
   const esperados = items.length;
   const pct = esperados>0 ? (escaneados/esperados*100) : 0;
@@ -7150,12 +7161,14 @@ function renderPkActivas(codigos, cache){
         completeBadge = `<span class="pk-complete-badge">${t('pkComplete')}</span>`;
       }
     }
-    /* Manifest de barriles con 3 estados: pendiente, escaneado (verde), ausente (rojo)
-       - Pendiente: declarado, no escaneado, no marcado como ausente → click para marcar ausente
-       - Escaneado: presente en barrilesQR → verde, no clickeable (no permite des-escanear)
-       - Ausente: uid en barrilesAusentes → rojo tachado, click para deshacer */
+    /* Manifest de barriles (flujo unificado clic == escaneo):
+       - Pendiente: declarado, NO en barrilesQR → click marca presente manual (verde).
+       - Escaneado (rec): en barrilesQR → verde, click abre modal Error/QC.
+       - Reportado (rep): reportado a QC → amarillo, NO clickeable (esperando resolución).
+       - Ausente (legacy): uid en barrilesAusentes de órdenes viejas → rojo, no clickeable.
+         Ya no se marcan nuevos ausentes; los pendientes al cierre son ausentes automáticos. */
     const man = manifiestoBarriles(d);
-    const ausentes = new Set(p.barrilesAusentes||[]);
+    const ausentesLegacy = new Set(p.barrilesAusentes||[]);
     let manHtml = '';
     if(man && man.items && man.items.length){
       const items = man.items.filter(x=>x.estado!=='ret'); /* excluir retirados por QC */
@@ -7165,27 +7178,31 @@ function renderPkActivas(codigos, cache){
       manHtml = `<div class="pk-mani-summary">${t('pkBarrilesPresentes')}: <b>${escaneados}</b> / ${items.length}</div>
         <div class="pk-mani-grid">${
           items.map(x=>{
-            const isAbs = ausentes.has(x.uid);
+            const isAbs = ausentesLegacy.has(x.uid);
             const isRep = x.estado==='rep'; /* reportado, esperando QC */
-            const isScan = x.estado==='rec'; /* escaneado en línea */
+            const isScan = x.estado==='rec'; /* presente (escaneado o marcado manual) */
             const etq = x.bn!=null ? ('#'+x.bn) : '•';
             const uidSafe = String(x.uid||'').replace(/'/g,'&#39;').replace(/"/g,'&quot;');
             const codSafe = String(cod).replace(/'/g,'&#39;');
-            /* prioridad visual: reportado > escaneado > ausente > pendiente */
+            /* prioridad visual: reportado > escaneado > ausente(legacy) > pendiente */
             if(isRep){
               return `<span class="pk-mani-chip reported" title="${t('packRepTitleChip')||'Reportado a QC'}">
                 <span class="cb-mark">⚠️</span>${etq}</span>`;
             }
             if(isScan){
-              return `<span class="pk-mani-chip scanned" title="${t('pkBarrilTitlePresent')}">
+              /* Presente: verde y clickeable (abre modal Error/QC). El flag manual va en
+                 los datos (barrilesQR[i].manual) pero visualmente NO se distingue del
+                 escaneado por QR — Oscar pidió mismo aspecto. */
+              return `<span class="pk-mani-chip scanned" title="${t('pkBarrilTitleReview')}"
+                onclick="pkToggleBarril('${codSafe}','${uidSafe}')">
                 <span class="cb-mark">✓</span>${etq}</span>`;
             }
             if(isAbs){
-              return `<span class="pk-mani-chip absent" title="${t('pkBarrilTitleAbsent')}"
-                onclick="pkToggleBarril('${codSafe}','${uidSafe}')">
+              /* Retrocompat: órdenes viejas con ausentes marcados. No clickeable. */
+              return `<span class="pk-mani-chip absent" title="${t('pkBarrilTitleAbsent')}">
                 <span class="cb-mark">☒</span>${etq}</span>`;
             }
-            /* pendiente por default */
+            /* Pendiente: click marca presente manual (nuevo comportamiento). */
             return `<span class="pk-mani-chip" title="${t('pkBarrilTitlePending')}"
               onclick="pkToggleBarril('${codSafe}','${uidSafe}')">
               <span class="cb-mark">☐</span>${etq}</span>`;
@@ -7213,29 +7230,45 @@ function renderPkActivas(codigos, cache){
   grid.innerHTML = html;
 }
 
-/* Toggle presencia de un barril:
-   - Si YA está escaneado en línea (uid en barrilesQR), no hacer nada (no permitir des-escanear).
-   - Si está ausente → confirmar y quitar de ausentes (vuelve a pendiente).
-   - Si está pendiente → confirmar y marcarlo ausente. */
+/* Toggle presencia de un barril (flujo unificado clic == escaneo):
+   - Pendiente (no está en barrilesQR): un clic lo marca PRESENTE manual y lo agrega a
+     barrilesQR con flag manual:true. Sin confirm (igual que al escanear).
+   - Presente (rec o rep): abre modalPackReporte con origen='click' para elegir entre
+     "Error" (deshacer → vuelve a pendiente) o "Problema" (marcar reportado a QC).
+   - Reportado (rep): ya cubierto por el caso "presente" — el modal muestra las mismas
+     opciones; si el operador toca "Problema" sobre uno ya reportado, no pasa nada extra.
+   - El estado "ausente" ya no se marca manualmente: lo que queda pendiente al cerrar
+     la orden se considera ausente automáticamente. */
 async function pkToggleBarril(cod, uid){
   const data = pkActivasCache[cod];
   if(!data || !data.packeting) return;
-  /* Guardia: si el barril está escaneado, no se puede tocar */
-  const escaneado = Array.isArray(data.barrilesQR) &&
-    data.barrilesQR.some(b=>b && b.uid===uid && !b.removed);
-  if(escaneado) return;
-  const p = data.packeting;
-  p.barrilesAusentes = Array.isArray(p.barrilesAusentes) ? p.barrilesAusentes : [];
-  const idx = p.barrilesAusentes.indexOf(uid);
-  if(idx >= 0){
-    if(!confirm(t('pkAskDesmarcarAusente'))) return;
-    p.barrilesAusentes.splice(idx, 1); /* ausente → pendiente */
-  } else {
-    if(!confirm(t('pkAskMarcarAusente'))) return;
-    p.barrilesAusentes.push(uid); /* pendiente → ausente */
+  data.barrilesQR = Array.isArray(data.barrilesQR) ? data.barrilesQR : [];
+
+  /* ¿Ya está registrado como presente? */
+  const b = data.barrilesQR.find(x => x && x.uid===uid && !x.removed);
+  if(b){
+    /* Verde → abrir modal con origen 'click'. Reportado también entra al modal
+       (Error no hace nada útil ahí, pero es simétrico y sin riesgo). */
+    abrirPackReporte(cod, uid, (b.bn!=null?b.bn:null), data, 'click');
+    return;
   }
+
+  /* Pendiente → marcar presente manual. Buscar bn en el manifiesto para preservar el número. */
+  const man = manifiestoBarriles(data);
+  const item = (man && man.items) ? man.items.find(x => x.uid===uid) : null;
+  const bn = item ? item.bn : null;
+  data.barrilesQR.push({ uid, ts:Date.now(), num:null, bn, manual:true });
+
+  /* Si estaba en barrilesAusentes (legacy/retrocompat), removerlo también */
+  const p = data.packeting;
+  if(Array.isArray(p.barrilesAusentes)){
+    const idxAus = p.barrilesAusentes.indexOf(uid);
+    if(idxAus >= 0) p.barrilesAusentes.splice(idxAus, 1);
+  }
+
   const ok = await escribirOrden(cod, data);
   if(!ok){ packMostrarMsg(t('packSaveErr'),'err'); return; }
+  packMostrarMsg(t('pkBarrilManualOk')(bn), 'ok');
   refrescarPkActivas();
 }
 
@@ -7456,15 +7489,48 @@ function nombreMotivo(m){
 let _repCtx=null;   /* { cod, uid, data } */
 const modalPackReporte=$('modalPackReporte');
 
-function abrirPackReporte(cod, uid, bn, data){
-  _repCtx={ cod, uid, data };
+function abrirPackReporte(cod, uid, bn, data, origen){
+  /* origen: 'scan' (re-escaneo de un QR ya registrado, default) o 'click' (clic sobre chip
+     verde del manifiesto). Determina qué hace el botón "Error": en 'scan' no toca el barril
+     (el escaneo duplicado sigue contando); en 'click' deshace la marca (vuelve a pendiente). */
+  _repCtx={ cod, uid, data, origen: (origen==='click' ? 'click' : 'scan') };
   $('packRepSub').textContent = bn!=null ? ('#'+bn) : uid;
   modalPackReporte.classList.add('show');
 }
 function cerrarPackReporte(){ modalPackReporte.classList.remove('show'); _repCtx=null; }
 
-$('packRepError').addEventListener('click',()=>{
-  /* escaneo por error: no pasa nada, el barril sigue contando */
+$('packRepError').addEventListener('click',async()=>{
+  if(!_repCtx){ cerrarPackReporte(); return; }
+  const { cod, uid, data, origen } = _repCtx;
+
+  if(origen === 'click'){
+    /* Clic por error sobre chip verde: DESHACER (quitar de barrilesQR).
+       Solo si NO está reportado — un reportado tiene aviso pendiente en QC y no se
+       puede desmarcar así; el operador tendría que resolverlo por otra vía. */
+    if(!data || !Array.isArray(data.barrilesQR)){ cerrarPackReporte(); return; }
+    const idx = data.barrilesQR.findIndex(x => x && x.uid===uid && !x.removed);
+    if(idx < 0){ cerrarPackReporte(); return; }
+    const b = data.barrilesQR[idx];
+    if(b && b.reportado){
+      /* No se puede deshacer un barril reportado desde el clic. Simplemente cerrar. */
+      cerrarPackReporte();
+      packMostrarMsg(t('packYaReportado'),'dup');
+      return;
+    }
+    data.barrilesQR.splice(idx, 1);
+    const ok = await escribirOrden(cod, data);
+    if(!ok){ packMostrarMsg(t('packSaveErr'),'err'); cerrarPackReporte(); return; }
+    packCache[cod] = data;
+    if(codigo && cod===codigo.toUpperCase()){ state.barrilesQR=data.barrilesQR; render(); }
+    packActual={ cod, batch:packActual?packActual.batch:'—', producto:packActual?packActual.producto:'', count:contarActivos(data.barrilesQR), total:totalCerrado(data), barriles:(data.barrilesQR||[]).slice(), manifiesto:manifiestoBarriles(data), ultimoBarril:null };
+    actualizarPackActual();
+    cerrarPackReporte();
+    packMostrarMsg(t('pkBarrilDesmarcado'),'ok');
+    if(pkActivasOn) refrescarPkActivas();
+    return;
+  }
+
+  /* origen 'scan' (re-escaneo por error): no pasa nada, el barril sigue contando */
   cerrarPackReporte();
   packMostrarMsg(t('packReady'),'');
 });
