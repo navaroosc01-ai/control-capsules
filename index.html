@@ -4747,59 +4747,94 @@ function dibujarSampleLabel(doc, x, y, LW, LH, data){
     doc.text(data.fecha, ix + labelPad + 8, leftFieldsY0 + leftFieldH*1 + leftFieldH*0.35);
     doc.setFont('helvetica','normal');
   }
-  /* Sampled by */
-  doc.text('Sampled by:', ix + labelPad, leftFieldsY0 + leftFieldH*2 + leftFieldH*0.35);
+  /* Sampled by (INLINE): se usan iniciales (ej. "MR", "ON", "BB") — 2-3 chars caben sin problema. */
+  const sampY = leftFieldsY0 + leftFieldH*2 + leftFieldH*0.55;
+  const gap = 1.2; /* separación etiqueta ↔ valor */
+  doc.setFont('helvetica','normal');
+  doc.setFontSize(8.5);
+  const sampLbW = doc.getTextWidth('Sampled by:');
+  doc.text('Sampled by:', ix + labelPad, sampY);
   if(data.sampledBy){
     doc.setFont('helvetica','bold');
-    /* segunda línea con el nombre para que no choque con "Sampled by:" */
-    const nombreCorto = doc.splitTextToSize(data.sampledBy, leftW - 2*labelPad);
-    doc.text(nombreCorto[0]||'', ix + labelPad, leftFieldsY0 + leftFieldH*2 + leftFieldH*0.75);
+    doc.text(String(data.sampledBy), ix + labelPad + sampLbW + gap, sampY);
     doc.setFont('helvetica','normal');
   }
 
-  /* Campos en la zona derecha: Product, Batch #, Reason */
+  /* Campos en la zona derecha: Product, Batch #, Reason — TODOS INLINE.
+     Product hace wrap especial: L1 junto a "Product:", L2/L3 desde el margen izquierdo
+     aprovechando todo el ancho. Batch # y Reason bajan según cuántas líneas ocupe Product. */
   const rightFieldH = boxH / 3;
 
-  /* Adaptativo: calcular cuántas líneas necesita el producto en su tamaño real (8pt).
-     - Producto ≤ 2 líneas: comportamiento normal (Batch y Reason en su posición 1/3).
-     - Producto = 3 líneas: Batch # baja ~3mm, Reason baja ~1.5mm y se limita a 1 línea
-       para no chocar con el borde inferior del recuadro. */
-  doc.setFontSize(8);
-  const prodLines = data.producto ? doc.splitTextToSize(data.producto, rightW - 2*labelPad) : [''];
-  doc.setFontSize(8.5);
-  const numProdLines = Math.min(prodLines.length, 3);
-  const batchYOffset  = Math.max(0, numProdLines - 2) * 3.0;
-  const reasonYOffset = Math.max(0, numProdLines - 2) * 1.5;
-  const reasonMaxLines = numProdLines >= 3 ? 1 : 2;
-
-  /* Product */
+  /* Calcular cuántas líneas ocupa el producto.
+     IMPORTANTE: medir el wrap con el mismo font con el que se renderiza el VALOR
+     (bold 8pt), no con normal — bold es más ancho y el split cambia. Medir la etiqueta
+     con normal 8.5pt (como se dibuja). */
+  let prodLines = [''];
+  let prodLbW = 0;
+  if(data.producto){
+    /* Ancho de "Product:" en normal 8.5pt (font de la etiqueta) */
+    doc.setFont('helvetica','normal');
+    doc.setFontSize(8.5);
+    prodLbW = doc.getTextWidth('Product:');
+    /* Ahora cambiar al font del VALOR (bold 8pt) para medir el wrap con precisión */
+    doc.setFont('helvetica','bold');
+    doc.setFontSize(8);
+    const firstW = rightW - labelPad - prodLbW - gap - labelPad;
+    const restW  = rightW - 2*labelPad;
+    /* Partir: primera línea con firstW (junto a "Product:"), resto con restW (todo el ancho) */
+    const first = doc.splitTextToSize(data.producto, firstW);
+    const primera = first[0] || '';
+    const restoTexto = data.producto.substring(primera.length).trim();
+    const resto = restoTexto ? doc.splitTextToSize(restoTexto, restW) : [];
+    prodLines = [primera, ...resto];
+  }
   doc.setFont('helvetica','normal');
   doc.setFontSize(8.5);
-  doc.text('Product:', rightX + labelPad, boxY + rightFieldH*0 + 3);
+  const numProdLines = Math.min(prodLines.length, 3);
+  /* Cada línea extra (por encima de la primera) empuja Batch # hacia abajo.
+     lineH ~= 2.9mm es el interlineado de 8pt con lineHeightFactor 1.0. */
+  const lineH = 2.9;
+  const extraLines    = Math.max(0, numProdLines - 1);
+  const batchYOffset  = extraLines * lineH;
+  const reasonYOffset = Math.max(0, numProdLines - 2) * (lineH * 0.5);
+  const reasonMaxLines = numProdLines >= 3 ? 1 : 2;
+
+  /* Product (INLINE): etiqueta + primera línea del valor en la MISMA Y.
+     Si el valor no cabe en una línea, líneas 2 y 3 van desde el margen izquierdo. */
+  const prodY = boxY + rightFieldH*0 + 5;
+  doc.text('Product:', rightX + labelPad, prodY);
   if(data.producto){
     doc.setFont('helvetica','bold');
     doc.setFontSize(8);
-    /* lineHeightFactor:1.0 apretamos el interlineado; hasta 3 líneas cuando el
-       producto es largo (numProdLines calculado arriba). */
-    doc.text(prodLines.slice(0, numProdLines), rightX + labelPad, boxY + rightFieldH*0 + 6, {lineHeightFactor:1.0});
+    /* Primera línea junto a "Product:" (usa prodLbW medido con el font correcto) */
+    if(prodLines[0]) doc.text(prodLines[0], rightX + labelPad + prodLbW + gap, prodY);
+    /* Líneas 2 y 3 desde el margen izquierdo, aprovechando todo el ancho */
+    for(let i=1;i<numProdLines;i++){
+      doc.text(prodLines[i], rightX + labelPad, prodY + lineH*i);
+    }
     doc.setFontSize(8.5);
     doc.setFont('helvetica','normal');
   }
-  /* Batch # (empujado hacia abajo si el producto tiene 3 líneas) */
-  doc.text('Batch #:', rightX + labelPad, boxY + rightFieldH*1 + 3 + batchYOffset);
+  /* Batch # (INLINE, empujado si Product ocupa 2+ líneas) */
+  const batchY = boxY + rightFieldH*1 + 5 + batchYOffset;
+  const batchLbW = doc.getTextWidth('Batch #:');
+  doc.text('Batch #:', rightX + labelPad, batchY);
   if(data.batch){
     doc.setFont('helvetica','bold');
     doc.setFontSize(10);
-    doc.text(String(data.batch), rightX + labelPad, boxY + rightFieldH*1 + 7 + batchYOffset);
+    doc.text(String(data.batch), rightX + labelPad + batchLbW + gap, batchY);
     doc.setFontSize(8.5);
     doc.setFont('helvetica','normal');
   }
-  /* Reason (empujado a la mitad; máximo 1 línea si producto es 3 líneas) */
-  doc.text('Reason:', rightX + labelPad, boxY + rightFieldH*2 + 3 + reasonYOffset);
+  /* Reason (INLINE, empujado a la mitad; máximo 1 línea si producto es 3 líneas) */
+  const reasonY = boxY + rightFieldH*2 + 5 + reasonYOffset;
+  const reasonLbW = doc.getTextWidth('Reason:');
+  doc.text('Reason:', rightX + labelPad, reasonY);
   if(data.reason){
     doc.setFont('helvetica','bold');
-    const rzn = doc.splitTextToSize(data.reason, rightW - 2*labelPad);
-    doc.text(rzn.slice(0, reasonMaxLines), rightX + labelPad, boxY + rightFieldH*2 + 6.5 + reasonYOffset);
+    const availW = rightW - labelPad - reasonLbW - gap - labelPad;
+    const rzn = doc.splitTextToSize(data.reason, availW);
+    doc.text(rzn.slice(0, reasonMaxLines), rightX + labelPad + reasonLbW + gap, reasonY);
     doc.setFont('helvetica','normal');
   }
 
