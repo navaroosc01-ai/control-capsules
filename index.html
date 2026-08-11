@@ -5013,9 +5013,14 @@ function dibujarSampledLabel(doc, x, y, LW, LH){
   const ix = x + pad, iy = y + pad, iw = LW - 2*pad;
   const headerH = 8;
 
-  /* Header (logo + nombre) — mismo que LB0005-2 para consistencia visual */
-  doc.setFillColor(0,0,0);
-  doc.circle(ix + 3, iy + 3.5, 3, 'F');
+  /* Header (logo + nombre) — mismo que LB0005-2 para consistencia visual.
+     Logo Sabinsa real (PNG embebido en LOGO_SABINSA_B64), con fallback a círculo. */
+  try{
+    doc.addImage(LOGO_SABINSA_B64, 'PNG', ix, iy-0.5, 6, 7.3);
+  }catch(e){
+    doc.setFillColor(0,0,0);
+    doc.circle(ix + 3, iy + 3.5, 3, 'F');
+  }
   doc.setFont('helvetica','bold');
   doc.setFontSize(11);
   doc.setTextColor(0,0,0);
