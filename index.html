@@ -925,6 +925,7 @@
       <div class="qc-toolbar-actions">
         <button class="btn" id="qcGoPack"><span data-i18n="qcGoPack">📦 Packeting scanner</span><span id="qcGoPackBadge" class="qc-pack-badge" style="display:none">🛢️ 0</span></button>
         <button class="btn" id="qcSampleLbls" data-i18n="qcSampleLblsBtn">🏷️ Sample labels</button>
+        <button class="btn" id="qcSampledLbls" data-i18n="qcSampledLblsBtn">📋 Sampled labels</button>
         <span class="hint" style="margin:0" data-i18n="qcHint">The active orders (in process or change over) are shown automatically. The board refreshes every 5 seconds.</span>
       </div>
     </div>
@@ -1260,6 +1261,32 @@
     </div>
     <div class="actions">
       <button class="btn primary" id="slblGen" data-i18n="lblGenerateBtn">🖨️ Generate PDF</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: sampled labels en blanco (LB0032-1) para llenar a mano -->
+<div class="modal-bg" id="modalSampledLbls">
+  <div class="modal" style="max-width:520px">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:4px">
+      <h3 style="margin:0" data-i18n="qcSampledLblsTitle">📋 Sampled labels</h3>
+      <button class="btn" id="sampledLblCerrar" style="padding:6px 12px" data-i18n="close">Close</button>
+    </div>
+    <p class="sub" data-i18n="qcSampledLblsSub">Blank container labels (LB0032-1). Filled by hand in the plant. 10 labels per US Letter sheet (2×5).</p>
+    <div class="row">
+      <label data-i18n="lblQty">Number of labels</label>
+      <input id="sldQty" type="text" inputmode="numeric" value="10" style="max-width:120px">
+    </div>
+    <div class="row" id="sldPosRow">
+      <div class="slbl-pos-head">
+        <span data-i18n="lblPositions">Positions on sheet</span>
+        <span><span class="slbl-pos-mode" id="sldPosMode" data-i18n="lblPosAuto">Auto</span><button type="button" class="slbl-pos-reset" id="sldPosReset" style="display:none" data-i18n="lblPosReset">reset</button></span>
+      </div>
+      <div class="slbl-pos-grid" id="sldPosGrid"></div>
+      <div class="hint" style="margin-top:6px" data-i18n="lblPosHint">Click a cell to select specific positions (single sheet only).</div>
+    </div>
+    <div class="actions">
+      <button class="btn primary" id="sldGen" data-i18n="lblGenerateBtn">🖨️ Generate PDF</button>
     </div>
   </div>
 </div>
@@ -2408,6 +2435,9 @@ const I18N = {
     qcSampleLblsBtn:'🏷️ Sample labels',
     qcSampleLblsTitle:'🏷️ Sample labels',
     qcSampleLblsSub:'Fill in the fields, choose how many labels you need, and print. 10 labels per US Letter sheet (2×5).',
+    qcSampledLblsBtn:'📋 Sampled labels',
+    qcSampledLblsTitle:'📋 Sampled labels',
+    qcSampledLblsSub:'Blank container labels (LB0032-1). Filled by hand in the plant. 10 labels per US Letter sheet (2×5).',
     lblProduct:'Product', lblBatch:'Batch #', lblSampledBy:'Sampled by',
     lblDate:'Date', lblReason:'Reason', lblQty:'Number of labels',
     lblGenerateBtn:'🖨️ Generate PDF',
@@ -2792,6 +2822,9 @@ const I18N = {
     qcSampleLblsBtn:'🏷️ Sample labels',
     qcSampleLblsTitle:'🏷️ Sample labels',
     qcSampleLblsSub:'Llena los campos, elige cuántas etiquetas necesitas e imprime. 10 etiquetas por hoja US Letter (2×5).',
+    qcSampledLblsBtn:'📋 Sampled labels',
+    qcSampledLblsTitle:'📋 Sampled labels',
+    qcSampledLblsSub:'Etiquetas de contenedor en blanco (LB0032-1). Se llenan a mano en planta. 10 etiquetas por hoja US Letter (2×5).',
     lblProduct:'Producto', lblBatch:'Batch #', lblSampledBy:'Sampled by',
     lblDate:'Fecha', lblReason:'Reason', lblQty:'Cantidad de etiquetas',
     lblGenerateBtn:'🖨️ Generar PDF',
@@ -4846,6 +4879,187 @@ function dibujarSampleLabel(doc, x, y, LW, LH, data){
 }
 
 if($('slblGen')) $('slblGen').addEventListener('click', generarSampleLabelsPDF);
+/* ========================================================================== */
+
+/* ==========================================================================
+   MODAL "SAMPLED LABELS" (LB0032-1) — etiquetas de contenedor EN BLANCO.
+   El operador de QC imprime hojas de 10 etiquetas para llenar a mano en planta.
+   No hay campos de datos, sólo cantidad y posiciones en la hoja.
+   Comparte el mismo estilo/CSS que el modal LB0005-2 (clases .slbl-*), pero usa
+   IDs con prefijo "sld" para no colisionar con el otro selector.
+   ========================================================================== */
+const modalSampledLbls = $('modalSampledLbls');
+const SLD_PER_PAGE = 10;
+let sldManual = false;
+let sldSelected = new Set(); /* posiciones 1..10 */
+
+function sldSincronizarAuto(){
+  sldSelected = new Set();
+  const qty = Math.max(0, parseInt($('sldQty').value)||0);
+  const n = Math.min(qty, SLD_PER_PAGE);
+  for(let i=1;i<=n;i++) sldSelected.add(i);
+}
+function sldRenderGrid(){
+  const grid = $('sldPosGrid');
+  if(!grid) return;
+  const qty = Math.max(0, parseInt($('sldQty').value)||0);
+  const multiSheet = qty > SLD_PER_PAGE;
+  if(!sldManual) sldSincronizarAuto();
+  grid.innerHTML = '';
+  for(let i=1;i<=SLD_PER_PAGE;i++){
+    const cell = document.createElement('div');
+    let cls = 'slbl-pos-cell';
+    if(sldSelected.has(i) && !multiSheet) cls += ' on';
+    if(multiSheet) cls += ' disabled';
+    cell.className = cls;
+    cell.textContent = i;
+    cell.dataset.pos = i;
+    if(!multiSheet){
+      cell.addEventListener('click', ()=>{
+        sldManual = true;
+        if(sldSelected.has(i)) sldSelected.delete(i);
+        else sldSelected.add(i);
+        $('sldQty').value = String(sldSelected.size);
+        sldRenderGrid();
+      });
+    }
+    grid.appendChild(cell);
+  }
+  sldActualizarModo();
+}
+function sldActualizarModo(){
+  const modeEl = $('sldPosMode');
+  const resetEl = $('sldPosReset');
+  if(!modeEl || !resetEl) return;
+  const qty = Math.max(0, parseInt($('sldQty').value)||0);
+  if(qty > SLD_PER_PAGE){
+    const sheets = Math.ceil(qty/SLD_PER_PAGE);
+    const tpl = t('lblPosMultiSheet') || 'Auto · {n} sheets';
+    modeEl.textContent = tpl.replace('{n}', sheets);
+    resetEl.style.display = 'none';
+  } else if(sldManual){
+    modeEl.textContent = t('lblPosManual') || 'Manual';
+    resetEl.style.display = '';
+  } else {
+    modeEl.textContent = t('lblPosAuto') || 'Auto';
+    resetEl.style.display = 'none';
+  }
+}
+
+function abrirSampledLbls(){
+  if(!$('sldQty').value) $('sldQty').value = '10';
+  sldManual = false;
+  sldRenderGrid();
+  modalSampledLbls.classList.add('show');
+}
+function cerrarSampledLbls(){ modalSampledLbls.classList.remove('show'); }
+if($('qcSampledLbls'))    $('qcSampledLbls').addEventListener('click', abrirSampledLbls);
+if($('sampledLblCerrar')) $('sampledLblCerrar').addEventListener('click', cerrarSampledLbls);
+if(modalSampledLbls) modalSampledLbls.addEventListener('click', e=>{ if(e.target===modalSampledLbls) cerrarSampledLbls(); });
+
+if($('sldQty')) $('sldQty').addEventListener('input', ()=>{ sldManual = false; sldRenderGrid(); });
+if($('sldPosReset')) $('sldPosReset').addEventListener('click', ()=>{ sldManual = false; sldRenderGrid(); });
+
+async function generarSampledLabelsPDF(){
+  const cantidad = Math.max(0, Math.min(200, parseInt($('sldQty').value)||0));
+  if(!cantidad){ alert(t('slblNeedQty')); return; }
+  const { jsPDF } = window.jspdf;
+  /* Mismas dimensiones que LB0005-2 para usar la misma hoja US Letter 2×5 */
+  const PAGE_W=215.9, PAGE_H=279.4;
+  const COLS=2, ROWS=5, PER_PAGE=COLS*ROWS;
+  const MX=10, MY=12, GAP_X=6, GAP_Y=4;
+  const LW=(PAGE_W-2*MX-GAP_X)/COLS;
+  const LH=(PAGE_H-2*MY-(ROWS-1)*GAP_Y)/ROWS;
+  const doc = new jsPDF({unit:'mm', format:[PAGE_W,PAGE_H]});
+
+  /* Construir slots absolutos (0-idx) según cantidad y modo (auto vs manual).
+     Misma lógica que generarSampleLabelsPDF — si el usuario picó posiciones específicas
+     y cantidad ≤ 10, se respetan; de lo contrario secuencial 0..cantidad-1. */
+  let slots = [];
+  if(cantidad > PER_PAGE || !sldManual){
+    for(let i=0;i<cantidad;i++) slots.push(i);
+  } else {
+    slots = Array.from(sldSelected).sort((a,b)=>a-b).map(p=>p-1);
+    if(!slots.length){ alert(t('slblNeedPositions')); return; }
+  }
+
+  let paginaActual = 0;
+  for(let i=0;i<slots.length;i++){
+    const slot = slots[i];
+    const pagina = Math.floor(slot/PER_PAGE);
+    const idxEnPagina = slot % PER_PAGE;
+    if(i===0){
+      for(let p=0;p<pagina;p++) doc.addPage([PAGE_W,PAGE_H]);
+      paginaActual = pagina;
+    } else if(pagina !== paginaActual){
+      for(let p=paginaActual;p<pagina;p++) doc.addPage([PAGE_W,PAGE_H]);
+      paginaActual = pagina;
+    }
+    const col = idxEnPagina%COLS, row = Math.floor(idxEnPagina/COLS);
+    const x = MX + col*(LW+GAP_X), y = MY + row*(LH+GAP_Y);
+    dibujarSampledLabel(doc, x, y, LW, LH);
+  }
+  doc.save('sampled_labels_blank.pdf');
+  cerrarSampledLbls();
+}
+
+/* Dibuja UN sampled label (LB0032-1) en blanco.
+   Layout: header con logo + Sabinsa Manufacturing, caja principal 2 columnas.
+   Zona izq: header "SAMPLED" arriba, campo Date: abajo (sin línea, se escribe a mano).
+   Zona der: Sampled by:, Quantity taken:, Container #: — solo etiquetas, sin líneas.
+   Footer: código LB0032-1. */
+function dibujarSampledLabel(doc, x, y, LW, LH){
+  const pad = 3;
+  const ix = x + pad, iy = y + pad, iw = LW - 2*pad;
+  const headerH = 8;
+
+  /* Header (logo + nombre) — mismo que LB0005-2 para consistencia visual */
+  doc.setFillColor(0,0,0);
+  doc.circle(ix + 3, iy + 3.5, 3, 'F');
+  doc.setFont('helvetica','bold');
+  doc.setFontSize(11);
+  doc.setTextColor(0,0,0);
+  doc.text('Sabinsa Manufacturing', ix + 8, iy + 5);
+
+  /* Caja principal + divisoria vertical */
+  const boxY = iy + headerH + 1;
+  const boxH = LH - headerH - pad*2 - 3;
+  const leftW = iw * 0.36;
+  const rightX = ix + leftW;
+  const rightW = iw - leftW;
+  doc.setDrawColor(0,0,0);
+  doc.setLineWidth(0.35);
+  doc.rect(ix, boxY, iw, boxH);
+  doc.line(rightX, boxY, rightX, boxY + boxH);
+
+  /* Zona izquierda — header "SAMPLED" con divisoria horizontal */
+  const sampledHdrH = boxH * 0.30;
+  doc.line(ix, boxY + sampledHdrH, rightX, boxY + sampledHdrH);
+  doc.setFont('helvetica','bold');
+  doc.setFontSize(11);
+  doc.text('SAMPLED', ix + leftW/2, boxY + sampledHdrH/2 + 1.4, {align:'center'});
+
+  /* Campo Date: solo etiqueta, espacio en blanco al lado para escribir a mano */
+  const labelPad = 1.5;
+  const dateY = boxY + sampledHdrH + (boxH - sampledHdrH)/2 + 1;
+  doc.setFont('helvetica','normal');
+  doc.setFontSize(9);
+  doc.text('Date:', ix + labelPad, dateY);
+
+  /* Zona derecha — 3 campos (Sampled by, Quantity taken, Container #), solo etiquetas */
+  const rightFieldH = boxH / 3;
+  doc.text('Sampled by:',     rightX + labelPad, boxY + rightFieldH*0 + rightFieldH*0.55);
+  doc.text('Quantity taken:', rightX + labelPad, boxY + rightFieldH*1 + rightFieldH*0.55);
+  doc.text('Container #:',    rightX + labelPad, boxY + rightFieldH*2 + rightFieldH*0.55);
+
+  /* Footer con el código del documento */
+  doc.setFont('helvetica','normal');
+  doc.setFontSize(9);
+  doc.setTextColor(0,0,0);
+  doc.text('LB0032-1', ix, y + LH - 1);
+}
+
+if($('sldGen')) $('sldGen').addEventListener('click', generarSampledLabelsPDF);
 /* ========================================================================== */
 
 /* ===================================================================== */
