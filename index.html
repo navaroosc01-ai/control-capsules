@@ -183,7 +183,7 @@
   body.supervisor .parcial-row .px,
   body.supervisor tbody .btn.danger{display:none !important}
   /* El supervisor VE los datos de la orden pero no puede editarlos */
-  body.supervisor input:not(#fCodigo):not(#tabCodigos):not(#incEditFecha):not(#incEditHora):not(#lblBatch):not(#lblNeto):not(#lblCant):not(#lblNumerar):not(#reprintBatch):not(#reprintNeto):not(#reprintNumerar):not(#pkFinishVal):not(.qr-room-cb){pointer-events:none;opacity:.85;background:var(--panel)}
+  body.supervisor input:not(#fCodigo):not(#tabCodigos):not(#incEditFecha):not(#incEditHora):not(#lblBatch):not(#lblNeto):not(#lblCant):not(#lblNumerar):not(#reprintBatch):not(#reprintNeto):not(#reprintNumerar):not(#pkFinishVal):not(#repFecha):not(.qr-room-cb){pointer-events:none;opacity:.85;background:var(--panel)}
   body.supervisor #incEditFecha,
   body.supervisor #incEditHora{pointer-events:auto;opacity:1;background:var(--panel2)}
   body.supervisor #fCodigo{pointer-events:auto;opacity:1}
@@ -313,7 +313,21 @@
       font-size:10px; text-transform:uppercase; letter-spacing:.5px; margin-right:4px }
     /* Ocultar el borde inferior original de cada td */
     .rep-table td{ border-bottom:none !important }
+    /* En reporte de un día pasado, la etiqueta móvil "Today:" pasa a "Day:" */
+    .rep-table.rep-past td:nth-child(4)::before{ content:'Day: ' }
   }
+
+  /* ===== Navegador de fecha del reporte diario =====
+     Fila con ◀ [selector fecha] ▶ y botón "Hoy" para saltar al día actual. */
+  .rep-datenav{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin:8px 0 2px }
+  .rep-datenav input[type=date]{
+    background:var(--panel2); border:1px solid var(--line); color:var(--ink);
+    border-radius:8px; padding:7px 10px; font-size:13px; font-family:inherit;
+    color-scheme:dark; flex:0 1 auto; min-width:0 }
+  .rep-datenav .rep-nav-arrow{ padding:7px 13px; font-size:15px; line-height:1 }
+  .rep-datenav .btn:disabled{ opacity:.4; cursor:not-allowed }
+  .rep-datenav .btn:disabled:hover{ border-color:var(--line) }
+  .rep-datenav .rep-today-btn{ margin-left:auto }
 
   /* ===== Impresión del reporte diario =====
      El tema oscuro no imprime bien: el navegador quita fondos por default y los textos
@@ -335,8 +349,10 @@
       background:#fff !important; color:#000 !important; border:none !important;
       border-radius:0 !important; box-shadow:none !important;
       max-height:none !important; overflow:visible !important; padding:0 !important }
-    /* Ocultar botones que no deben ir a papel */
+    /* Ocultar botones y navegador de fecha que no deben ir a papel */
     #modalReporte #repCerrar,
+    #modalReporte #repDateNav,
+    #modalReporte .rep-rotate-hint,
     #modalReporte .actions{ display:none !important }
     /* Forzar que backgrounds e íconos coloreados sí se impriman */
     #modalReporte *{ -webkit-print-color-adjust:exact !important; print-color-adjust:exact !important }
@@ -1207,6 +1223,12 @@
       <button class="btn" id="repCerrar" style="padding:6px 12px" data-i18n="close">Close</button>
     </div>
     <div class="sub" id="repSub">—</div>
+    <div class="rep-datenav" id="repDateNav">
+      <button class="btn rep-nav-arrow" id="repPrev" data-i18n-title="repPrevDay" title="Previous day" aria-label="Previous day">◀</button>
+      <input id="repFecha" type="date">
+      <button class="btn rep-nav-arrow" id="repNext" data-i18n-title="repNextDay" title="Next day" aria-label="Next day">▶</button>
+      <button class="btn rep-today-btn" id="repHoy" data-i18n="repTodayBtn">Today</button>
+    </div>
     <div class="rep-rotate-hint" data-i18n="repRotateHint">🔄 Rotate your phone horizontally to see the report in full.</div>
     <div id="repBody"></div>
   </div>
@@ -2431,6 +2453,8 @@ const I18N = {
     dayReportBtn:'📋 Daily report', dayReportTitle:'Daily production report', close:'Close',
     autoInProcess:'auto', autoInProcessHint:'Shown automatically because it is in process.',
     dayReportSub:'Final production of the day for all open orders.',
+    dayReportSubSel:'Production for the selected day.',
+    repTodayBtn:'Today', repPrevDay:'Previous day', repNextDay:'Next day',
     repRotateHint:'🔄 Rotate your phone horizontally to see the report in full.',
     qcSampleLblsBtn:'🏷️ Sample labels',
     qcSampleLblsTitle:'🏷️ Sample labels',
@@ -2450,11 +2474,11 @@ const I18N = {
     slblNeedReason:'Enter a reason.',
     slblNeedQty:'Enter a valid number of labels (1 to 200).',
     slblNeedPositions:'Select at least one position on the sheet.',
-    repColRoom:'Room', repColOrder:'Order', repColProduct:'Product', repColToday:'Today', repColTotal:'Accum.', repColStatus:'Status',
-    repNoData:'No data for the orders on the list.', repTotalDay:'Total produced today:', repPrint:'🖨️ Print',
+    repColRoom:'Room', repColOrder:'Order', repColProduct:'Product', repColToday:'Today', repColDay:'Day', repColTotal:'Accum.', repColStatus:'Status',
+    repNoData:'No data for the orders on the list.', repTotalDay:'Total produced today:', repTotalDaySel:'Total produced:', repPrint:'🖨️ Print',
     repCapsSectionTitle:'💊 Encapsulation', repPkSectionTitle:'📦 Packeting',
-    repPkColLine:'Line', repPkColOrder:'Order', repPkColProduct:'Product', repPkColToday:'Today', repPkColTotal:'Accum.', repPkColStatus:'Status',
-    repPkTotalDay:'Total bottles today:', repPkFinishedTag:'FINISHED', repPkActiveTag:'ACTIVE',
+    repPkColLine:'Line', repPkColOrder:'Order', repPkColProduct:'Product', repPkColToday:'Today', repPkColDay:'Day', repPkColTotal:'Accum.', repPkColStatus:'Status',
+    repPkTotalDay:'Total bottles today:', repPkTotalDaySel:'Total bottles:', repPkFinishedTag:'FINISHED', repPkActiveTag:'ACTIVE',
     dayClosedTag:'(day closed)', prodProgressLabel:'Production progress',
     accumLabel:'Accum. production:', noTargetSet:'(no target set)', batchLabel:'Batch:', roomLabel:'Room:',
     sampleCount:'sample(s)', advance:'Progress:', capsLabel:'Caps:', barrelsLabel:'Barrels:', partialLabel:'Partial:',
@@ -2818,6 +2842,8 @@ const I18N = {
     dayReportBtn:'📋 Reporte del día', dayReportTitle:'Reporte de producción del día', close:'Cerrar',
     autoInProcess:'auto', autoInProcessHint:'Se muestra automáticamente porque está en proceso.',
     dayReportSub:'Producción final del día de todas las órdenes abiertas.',
+    dayReportSubSel:'Producción del día seleccionado.',
+    repTodayBtn:'Hoy', repPrevDay:'Día anterior', repNextDay:'Día siguiente',
     repRotateHint:'🔄 Gira tu teléfono horizontalmente para ver el reporte completo.',
     qcSampleLblsBtn:'🏷️ Sample labels',
     qcSampleLblsTitle:'🏷️ Sample labels',
@@ -2837,11 +2863,11 @@ const I18N = {
     slblNeedReason:'Ingresa un reason.',
     slblNeedQty:'Ingresa una cantidad válida (1 a 200).',
     slblNeedPositions:'Selecciona al menos una posición en la hoja.',
-    repColRoom:'Room', repColOrder:'Orden', repColProduct:'Producto', repColToday:'Hoy', repColTotal:'Acum.', repColStatus:'Estado',
-    repNoData:'Sin datos para las órdenes de la lista.', repTotalDay:'Total producido hoy:', repPrint:'🖨️ Imprimir',
+    repColRoom:'Room', repColOrder:'Orden', repColProduct:'Producto', repColToday:'Hoy', repColDay:'Del día', repColTotal:'Acum.', repColStatus:'Estado',
+    repNoData:'Sin datos para las órdenes de la lista.', repTotalDay:'Total producido hoy:', repTotalDaySel:'Total producido:', repPrint:'🖨️ Imprimir',
     repCapsSectionTitle:'💊 Encapsulación', repPkSectionTitle:'📦 Packeting',
-    repPkColLine:'Línea', repPkColOrder:'Orden', repPkColProduct:'Producto', repPkColToday:'Hoy', repPkColTotal:'Acum.', repPkColStatus:'Estado',
-    repPkTotalDay:'Total botes hoy:', repPkFinishedTag:'FINALIZADO', repPkActiveTag:'ACTIVO',
+    repPkColLine:'Línea', repPkColOrder:'Orden', repPkColProduct:'Producto', repPkColToday:'Hoy', repPkColDay:'Del día', repPkColTotal:'Acum.', repPkColStatus:'Estado',
+    repPkTotalDay:'Total botes hoy:', repPkTotalDaySel:'Total botes:', repPkFinishedTag:'FINALIZADO', repPkActiveTag:'ACTIVO',
     dayClosedTag:'(día cerrado)', prodProgressLabel:'Avance de producción',
     accumLabel:'Producción acum.:', noTargetSet:'(sin objetivo definido)', batchLabel:'Batch:', roomLabel:'Room:',
     sampleCount:'muestra(s)', advance:'Avance:', capsLabel:'Cáps:', barrelsLabel:'Barriles:', partialLabel:'Parcial:',
@@ -3047,6 +3073,7 @@ function aplicarIdioma(){
   document.title=t('appTitle')+' — GVIP';
   document.querySelectorAll('[data-i18n]').forEach(el=>{ el.textContent=t(el.getAttribute('data-i18n')); });
   document.querySelectorAll('[data-i18n-ph]').forEach(el=>{ el.setAttribute('placeholder', t(el.getAttribute('data-i18n-ph'))); });
+  document.querySelectorAll('[data-i18n-title]').forEach(el=>{ const v=t(el.getAttribute('data-i18n-title')); el.setAttribute('title', v); el.setAttribute('aria-label', v); });
   /* en modo Manager Mecánico el encabezado cambia a Solicitudes de Mantenimiento */
   if(mecanico){
     const h=document.querySelector('.brand h1'); if(h) h.textContent=t('mechAppTitle');
@@ -3093,6 +3120,22 @@ function prodAcumulada(dias, incluirAvance){
   if(incluirAvance===undefined) incluirAvance=true;
   dias=dias||{};
   return Object.values(dias).reduce((s,d)=>{
+    if(!d) return s;
+    if(d.closed) return s + (d.prod ? d.prod : 0);
+    if(incluirAvance && d.avance!=null) return s + d.avance;
+    return s;
+  },0);
+}
+
+/* Producción acumulada de encapsulado HASTA una fecha inclusive (foto histórica del día).
+   Idéntica a prodAcumulada pero ignorando los días cuya clave YYYY-MM-DD es posterior a fechaKey.
+   La comparación de strings YYYY-MM-DD respeta el orden cronológico. */
+function prodAcumuladaHasta(dias, fechaKey, incluirAvance){
+  if(incluirAvance===undefined) incluirAvance=true;
+  dias=dias||{};
+  return Object.keys(dias).reduce((s,k)=>{
+    if(k > fechaKey) return s;
+    const d=dias[k];
     if(!d) return s;
     if(d.closed) return s + (d.prod ? d.prod : 0);
     if(incluirAvance && d.avance!=null) return s + d.avance;
@@ -4328,14 +4371,14 @@ function iniciarCronometrosCO(){
 /* ===== Reporte de producción del día (todas las órdenes abiertas) ===== */
 const modalReporte=$('modalReporte');
 
-/* Trae desde la nube TODAS las órdenes que tienen algo que reportar hoy:
-   - órdenes con encapsulado en proceso o change over activo (aunque hoy=0)
-   - órdenes con packeting activo (aunque hoy=0)
-   - órdenes cerradas que tuvieron producción hoy (encapsulado o packeting)
-   Se usa para el reporte diario para no depender de tabEfectivos, ya que las órdenes
-   totalmente cerradas hoy ya no aparecen en codigosEnProceso() y por tanto no están
-   en el tablero, pero SÍ deben aparecer en el reporte del día. */
-async function cargarOrdenesReporteDia(hoyKey){
+/* Trae desde la nube las órdenes que tienen algo que reportar en la fecha dada.
+   - Para HOY (esHoy=true): incluye órdenes activas (encapsulado en proceso, change over
+     activo o packeting activo) aunque hoy vayan en 0, además de las que produjeron hoy.
+     Así el supervisor ve en vivo los cuartos activos. (Comportamiento original.)
+   - Para un DÍA PASADO (esHoy=false): incluye solo las órdenes con registro ese día
+     (encapsulado o packeting) o que produjeron ese día. No usa los estados actuales de
+     actividad, porque esos son del momento presente y no reflejan lo que pasó ese día. */
+async function cargarOrdenesReporteDia(fechaKey, esHoy){
   if(!CONFIGURED) return {};
   const url = REST + '?select=codigo,data';
   const r = await fetch(url,{ headers: HEADERS });
@@ -4346,39 +4389,77 @@ async function cargarOrdenesReporteDia(hoyKey){
     const cod=(row.codigo||'').toUpperCase();
     if(!cod) return;
     const dd = normalizar(row.data||{});
-    /* Producción de hoy en encapsulado */
-    const dhCaps = dd.dias && dd.dias[hoyKey];
+    /* Producción del día en encapsulado */
+    const dhCaps = dd.dias && dd.dias[fechaKey];
     let hoyCaps = 0;
     if(dhCaps){
       if(dhCaps.closed && dhCaps.prod!=null) hoyCaps=Number(dhCaps.prod);
       else if(dhCaps.avance!=null) hoyCaps=Number(dhCaps.avance);
     }
-    /* Producción de hoy en packeting */
-    const dhPk = dd.packeting && dd.packeting.dias && dd.packeting.dias[hoyKey];
+    /* Producción del día en packeting */
+    const dhPk = dd.packeting && dd.packeting.dias && dd.packeting.dias[fechaKey];
     const hoyPk = dhPk && dhPk.avance!=null ? Number(dhPk.avance) : 0;
-    /* Estados de actividad */
-    const coActivo = dd.changeOverFrom && dd.changeOverFrom.startTs && !dd.changeOverFrom.endTs;
-    const encAbierto = estatusOrden(dd, true) === tEN('inProcess');
-    const pkActivo = dd.packeting && dd.packeting.linea && !dd.packeting.finished;
-    if(coActivo || encAbierto || pkActivo || hoyCaps > 0 || hoyPk > 0){
-      out[cod] = dd;
+    if(esHoy){
+      /* Estados de actividad (solo relevantes para el día de hoy) */
+      const coActivo = dd.changeOverFrom && dd.changeOverFrom.startTs && !dd.changeOverFrom.endTs;
+      const encAbierto = estatusOrden(dd, true) === tEN('inProcess');
+      const pkActivo = dd.packeting && dd.packeting.linea && !dd.packeting.finished;
+      if(coActivo || encAbierto || pkActivo || hoyCaps > 0 || hoyPk > 0){
+        out[cod] = dd;
+      }
+    } else {
+      /* Día pasado: hubo registro ese día en encapsulado o packeting */
+      const tieneDiaEnc = !!dhCaps;
+      const tieneDiaPk  = !!dhPk;
+      if(tieneDiaEnc || tieneDiaPk || hoyCaps > 0 || hoyPk > 0){
+        out[cod] = dd;
+      }
     }
   });
   return out;
 }
 
+let repFechaSel = null;  /* día actualmente mostrado en el reporte (clave YYYY-MM-DD) */
+
 async function abrirReporteDia(){
+  /* Siempre abre en el día de hoy; desde ahí el supervisor puede navegar a otros días. */
+  repFechaSel = dayKey(new Date());
+  const inp = $('repFecha');
+  if(inp){ inp.max = repFechaSel; inp.value = repFechaSel; }
+  modalReporte.classList.add('show');
+  await renderReporteDia(repFechaSel);
+}
+
+/* Cambiar el día mostrado sumando/restando días, sin pasar de hoy. */
+function repShiftDia(delta){
+  if(!repFechaSel) return;
+  const d = new Date(repFechaSel + 'T12:00:00');
+  d.setDate(d.getDate() + (delta||0));
+  const hoyKey = dayKey(new Date());
+  let nk = dayKey(d);
+  if(nk > hoyKey) nk = hoyKey;   /* nunca al futuro */
+  repFechaSel = nk;
+  renderReporteDia(repFechaSel);
+}
+
+async function renderReporteDia(fechaKey){
   const loc=I18N[lang].locale;
   const hoyKey=dayKey(new Date());
+  const esHoy = (fechaKey === hoyKey);
+  const fechaObj = new Date(fechaKey + 'T12:00:00');
 
-  /* Abrir el modal de inmediato con un estado de "cargando" para dar feedback rápido */
-  $('repSub').textContent = `${t('dayReportSub')} · ${fmtDate(new Date())}`;
+  /* Subtítulo, sincronización del selector y estado de botones */
+  $('repSub').textContent = `${esHoy ? t('dayReportSub') : t('dayReportSubSel')} · ${fmtDate(fechaObj)}`;
+  const inp = $('repFecha');
+  if(inp){ inp.max = hoyKey; inp.value = fechaKey; }
+  const btnNext = $('repNext'); if(btnNext) btnNext.disabled = esHoy;
+
+  /* Estado de "cargando" para dar feedback rápido */
   $('repBody').innerHTML = `<div class="tab-empty" style="margin-top:14px">${t('updating')}…</div>`;
-  modalReporte.classList.add('show');
 
   /* Cargar directamente desde la nube (fuente fresca de verdad). */
   let ordenes = {};
-  try { ordenes = await cargarOrdenesReporteDia(hoyKey); }
+  try { ordenes = await cargarOrdenesReporteDia(fechaKey, esHoy); }
   catch(e){
     $('repBody').innerHTML = `<div class="tab-empty" style="margin-top:14px">${t('updateErr')}</div>`;
     return;
@@ -4393,13 +4474,14 @@ async function abrirReporteDia(){
     if(!d) return;
     const o=d.orden||{}, dias=d.dias||{};
     const est=estatusOrden(d);
-    /* producción de hoy: avance del día de hoy (o su cierre si ya se cerró el día) */
-    let hoy=0; const dh=dias[hoyKey];
+    /* producción del día: avance del día (o su cierre si ese día ya se cerró) */
+    let hoy=0; const dh=dias[fechaKey];
     if(dh){ if(dh.closed && dh.prod!=null) hoy=Number(dh.prod); else if(dh.avance!=null) hoy=Number(dh.avance); }
-    /* Incluir: órdenes abiertas siempre; órdenes cerradas solo si tuvieron producción hoy
-       (para reflejar producción de órdenes cerradas durante el día en el reporte). */
-    if(est===t('closedOrder') && !hoy) return;
-    const total=prodAcumulada(dias, true);
+    /* HOY: órdenes abiertas siempre; cerradas solo si produjeron hoy.
+       DÍA PASADO: solo filas con producción ese día (foto fiel del día). */
+    if(esHoy){ if(est===t('closedOrder') && !hoy) return; }
+    else { if(!hoy) return; }
+    const total=prodAcumuladaHasta(dias, fechaKey, true);
     totalHoy+=hoy;
     let estCls='sin';
     if(est===t('inProcess')) estCls='proc';
@@ -4422,12 +4504,14 @@ async function abrirReporteDia(){
        de producción diario. Este reporte es específico de botes producidos. */
     if(!(p.target>0)) return;
     const o=d.orden||{};
-    const dh = p.dias && p.dias[hoyKey];
+    const dh = p.dias && p.dias[fechaKey];
     let hoy=0;
     if(dh && dh.avance!=null) hoy=Number(dh.avance);
-    /* si está finalizado y no tuvo producción hoy, omitir */
-    if(p.finished && !hoy) return;
-    const total=pkBotesAcumulados(p);
+    /* HOY: activo se muestra aunque sea 0; finalizado solo si produjo hoy.
+       DÍA PASADO: solo filas con producción ese día. */
+    if(esHoy){ if(p.finished && !hoy) return; }
+    else { if(!hoy) return; }
+    const total=pkBotesAcumuladosHasta(p, fechaKey);
     totalPkHoy+=hoy;
     const pkEstTxt = p.finished ? t('repPkFinishedTag') : t('repPkActiveTag');
     const pkEstCls = p.finished ? 'cerr' : 'proc';
@@ -4456,20 +4540,20 @@ async function abrirReporteDia(){
       secCaps=`
         <h4 style="margin:14px 0 6px 0;font-size:13px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px">${t('repCapsSectionTitle')}</h4>
         <div style="overflow-x:auto">
-          <table class="rep-table">
+          <table class="rep-table${esHoy?'':' rep-past'}">
             <colgroup>
               <col style="width:9%"><col style="width:19%"><col style="width:24%">
               <col style="width:13%"><col style="width:13%"><col style="width:22%">
             </colgroup>
             <thead><tr>
               <th>${t('repColRoom')}</th><th>${t('repColOrder')}</th><th>${t('repColProduct')}</th>
-              <th style="text-align:right">${t('repColToday')}</th><th style="text-align:right">${t('repColTotal')}</th>
+              <th style="text-align:right">${esHoy?t('repColToday'):t('repColDay')}</th><th style="text-align:right">${t('repColTotal')}</th>
               <th style="text-align:center">${t('repColStatus')}</th>
             </tr></thead>
             <tbody>${rows}</tbody>
           </table>
         </div>
-        <div class="rep-total"><span>${t('repTotalDay')}</span> <b>${totalHoy.toLocaleString(loc)}</b> ${t('capsUnit')}</div>`;
+        <div class="rep-total"><span>${esHoy?t('repTotalDay'):t('repTotalDaySel')}</span> <b>${totalHoy.toLocaleString(loc)}</b> ${t('capsUnit')}</div>`;
     }
 
     /* --- Sección Packeting --- */
@@ -4494,20 +4578,20 @@ async function abrirReporteDia(){
       secPk=`
         <h4 style="margin:18px 0 6px 0;font-size:13px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px">${t('repPkSectionTitle')}</h4>
         <div style="overflow-x:auto">
-          <table class="rep-table">
+          <table class="rep-table${esHoy?'':' rep-past'}">
             <colgroup>
               <col style="width:9%"><col style="width:19%"><col style="width:24%">
               <col style="width:13%"><col style="width:13%"><col style="width:22%">
             </colgroup>
             <thead><tr>
               <th>${t('repPkColLine')}</th><th>${t('repPkColOrder')}</th><th>${t('repPkColProduct')}</th>
-              <th style="text-align:right">${t('repPkColToday')}</th><th style="text-align:right">${t('repPkColTotal')}</th>
+              <th style="text-align:right">${esHoy?t('repPkColToday'):t('repPkColDay')}</th><th style="text-align:right">${t('repPkColTotal')}</th>
               <th style="text-align:center">${t('repPkColStatus')}</th>
             </tr></thead>
             <tbody>${rowsPk}</tbody>
           </table>
         </div>
-        <div class="rep-total"><span>${t('repPkTotalDay')}</span> <b>${totalPkHoy.toLocaleString(loc)}</b> ${t('pkUnit')}</div>`;
+        <div class="rep-total"><span>${esHoy?t('repPkTotalDay'):t('repPkTotalDaySel')}</span> <b>${totalPkHoy.toLocaleString(loc)}</b> ${t('pkUnit')}</div>`;
     }
 
     body.innerHTML=`
@@ -4521,6 +4605,15 @@ async function abrirReporteDia(){
 function cerrarReporte(){ modalReporte.classList.remove('show'); }
 if($('btnReporteDia')) $('btnReporteDia').addEventListener('click',abrirReporteDia);
 if($('repCerrar')) $('repCerrar').addEventListener('click',cerrarReporte);
+if($('repFecha')) $('repFecha').addEventListener('change',()=>{
+  const v=$('repFecha').value; if(!v) return;
+  const hoyKey=dayKey(new Date());
+  repFechaSel = (v > hoyKey) ? hoyKey : v;   /* clamp a hoy */
+  renderReporteDia(repFechaSel);
+});
+if($('repPrev')) $('repPrev').addEventListener('click',()=>repShiftDia(-1));
+if($('repNext')) $('repNext').addEventListener('click',()=>repShiftDia(1));
+if($('repHoy')) $('repHoy').addEventListener('click',()=>{ repFechaSel=dayKey(new Date()); renderReporteDia(repFechaSel); });
 modalReporte.addEventListener('click',e=>{ if(e.target===modalReporte) cerrarReporte(); });
 
 /* Logo Sabinsa (PNG base64) — se embebe una sola vez y se reutiliza en los sample labels */
@@ -7140,6 +7233,12 @@ async function cargarOrdenParaPacketing(codFinal){
 function pkBotesAcumulados(pk){
   if(!pk || !pk.dias) return 0;
   return Object.values(pk.dias).reduce((s,d)=> s + (d && d.avance ? Number(d.avance) : 0), 0);
+}
+
+/* Total acumulado de botes HASTA una fecha inclusive (foto histórica del día). */
+function pkBotesAcumuladosHasta(pk, fechaKey){
+  if(!pk || !pk.dias) return 0;
+  return Object.keys(pk.dias).reduce((s,k)=> (k > fechaKey ? s : s + (pk.dias[k] && pk.dias[k].avance ? Number(pk.dias[k].avance) : 0)), 0);
 }
 
 /* Wiring de los botones de los modales de packeting production */
