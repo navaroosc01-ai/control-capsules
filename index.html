@@ -1435,6 +1435,18 @@
         <span data-i18n="lblNumber">Number the labels (1, 2, 3…)</span>
       </label>
     </div>
+    <div class="row">
+      <label style="display:flex;align-items:center;gap:8px;text-transform:none;letter-spacing:0;cursor:pointer">
+        <input id="lblConQR" type="checkbox" checked style="width:16px;height:16px;flex:0 0 auto">
+        <span data-i18n="lblWithQR">Include QR code on the labels</span>
+      </label>
+    </div>
+    <div class="row">
+      <label style="display:flex;align-items:center;gap:8px;text-transform:none;letter-spacing:0;cursor:pointer">
+        <input id="lblResumen" type="checkbox" checked style="width:16px;height:16px;flex:0 0 auto">
+        <span data-i18n="lblSummary">Print summary sheet (numbers + QR)</span>
+      </label>
+    </div>
     <!-- Acceso a "Corregir etiquetas emitidas" (solo supervisor).
          Se muestra/oculta desde abrirLabels() según el rol. -->
     <div id="lblReprintRow" style="display:none;margin-bottom:12px">
@@ -2519,6 +2531,7 @@ const I18N = {
     printPreview:'Print preview', printBtn:'🖨️ Print', closeBtn:'Close',
     lblBtn:'Labels', lblBtnFull:'🏷️ Print labels', lblTitle:'Generate labels', lblBatchLbl:'Batch number (Lot Number)',
     lblNetLbl:'Net weight (kg)', lblQtyLbl:'How many labels?', lblNumber:'Print barrel number (1, 2, 3…)',
+    lblWithQR:'Include QR code on the labels', lblSummary:'Print summary sheet (numbers + QR)', lblSummaryTitle:'Summary of printed labels',
     lblGenerate:'Generate PDF', lblSheets:(n)=>`${n} ${n===1?'sheet':'sheets'} (6 labels per sheet)`,
     lblNeedBatch:'Enter the batch number (Lot Number).', lblNeedNet:'Enter the net weight (kg).',
     lblNeedQty:'Enter a valid number of labels.',
@@ -2907,6 +2920,7 @@ const I18N = {
     printPreview:'Vista previa de impresión', printBtn:'🖨️ Imprimir', closeBtn:'Cerrar',
     lblBtn:'Labels', lblBtnFull:'🏷️ Imprimir labels', lblTitle:'Generar labels', lblBatchLbl:'Número de batch (Lot Number)',
     lblNetLbl:'Kilos neto (kg)', lblQtyLbl:'¿Cuántos labels?', lblNumber:'Imprimir número de barril (1, 2, 3…)',
+    lblWithQR:'Incluir código QR en las etiquetas', lblSummary:'Imprimir hoja resumen (números + QR)', lblSummaryTitle:'Resumen de etiquetas impresas',
     lblGenerate:'Generar PDF', lblSheets:(n)=>`${n} ${n===1?'hoja':'hojas'} (6 labels por hoja)`,
     lblNeedBatch:'Ingresa el número de batch (Lot Number).', lblNeedNet:'Ingresa los kilos neto (kg).',
     lblNeedQty:'Ingresa una cantidad válida de labels.',
@@ -6071,6 +6085,9 @@ async function generarLabelsPDF(){
   const neto  = $('lblNeto').value.trim();
   const cantidad = Math.max(1, parseInt($('lblCant').value)||0);
   const numerar = $('lblNumerar').checked;
+  const conQR   = $('lblConQR').checked;      /* QR visible en cada etiqueta */
+  const resumen = $('lblResumen').checked;    /* hoja resumen al final */
+  const needQR  = conQR || resumen;           /* generar QR si lo pide alguno */
 
   if(!batch){ alert(t('lblNeedBatch')); return; }
   if(!neto){ alert(t('lblNeedNet')); return; }
@@ -6095,6 +6112,7 @@ async function generarLabelsPDF(){
   if(!Array.isArray(state.barrilesDeclarados)) state.barrilesDeclarados=[];
   const ultimoBn = state.barrilesDeclarados.reduce((mx,b)=> (b&&b.bn>mx)?b.bn:mx, 0);
   const nuevos=[];
+  const resumenItems=[];
 
   for(let i=0;i<cantidad;i++){
     const idx=i%PER_PAGE;
@@ -6112,9 +6130,17 @@ async function generarLabelsPDF(){
        parsearQRBarril() ya acepta este formato liviano y también las etiquetas viejas. */
     const uid = batch + '#' + barrilNo;
     const payload=JSON.stringify({ c:cod, b:batch, bn:barrilNo });
-    const qr=await lblQrDataURL(payload);
-    dibujarLabel(doc, x, y, LW, LH, { producto, batch, neto, cuarto, num, barrilNo, qr, printNum:numerar });
+    const qr = needQR ? await lblQrDataURL(payload) : null;
+    /* qr:null en la etiqueta si el usuario desactivó "Incluir QR" */
+    dibujarLabel(doc, x, y, LW, LH, { producto, batch, neto, cuarto, num, barrilNo, qr: conQR ? qr : null, printNum:numerar });
     nuevos.push({ bn:barrilNo, uid, ts });
+    if(resumen) resumenItems.push({ num:barrilNo, qr });
+  }
+
+  /* HOJA RESUMEN (opcional): número + QR de cada etiqueta impresa, aunque las
+     etiquetas se hayan impreso SIN QR. Se añade como página(s) al final. */
+  if(resumen && resumenItems.length){
+    dibujarHojaResumen(doc, resumenItems, { batch, producto });
   }
 
   /* DECLARACIÓN (manifiesto): registrar en la orden qué etiquetas se emitieron.
@@ -6134,23 +6160,29 @@ function dibujarLabel(doc, x, y, LW, LH, data){
   const pad=4, ix=x+pad, iw=LW-2*pad, lineX2=ix+iw;
   let cy=y+pad;
 
-  /* Logo placeholder (círculo negro). Reemplazable por logo real con doc.addImage(...) */
-  doc.setFillColor(0,0,0);
-  doc.circle(ix+3, cy+3.2, 3.2, 'F');
+  /* Logo Sabinsa real (PNG embebido en LOGO_SABINSA_B64), con fallback a círculo. */
+  try{
+    doc.addImage(LOGO_SABINSA_B64, 'PNG', ix, cy-0.5, 6, 7.3);
+  }catch(e){
+    doc.setFillColor(0,0,0);
+    doc.circle(ix+3, cy+3.2, 3.2, 'F');
+  }
 
   doc.setFont('helvetica','bold'); doc.setFontSize(13); doc.setTextColor(0,0,0);
   doc.text('Sabinsa Manufacturing', ix+8, cy+4.5);
   doc.setFont('helvetica','bold'); doc.setFontSize(9.5);
   doc.text('In Process Material', x+LW/2, cy+9.5, {align:'center'});
 
-  /* QR esquina superior derecha */
+  /* QR esquina superior derecha (opcional) */
   const qrSize=15, qrX=x+LW-pad-qrSize, qrY=y+pad;
   if(data.qr) doc.addImage(data.qr, 'PNG', qrX, qrY, qrSize, qrSize);
 
-  /* Número de barril a la izquierda del QR, destacado (si está activado el numerado) */
+  /* Número de barril destacado. Si hay QR va a su izquierda; si no, a la esquina. */
   if(data.printNum && data.barrilNo!=null){
     doc.setFont('helvetica','bold'); doc.setFontSize(20); doc.setTextColor(0,0,0);
-    doc.text(String(data.barrilNo), qrX-2, qrY+qrSize/2+2, {align:'right'});
+    const nx = data.qr ? qrX-2 : x+LW-pad;
+    const ny = data.qr ? qrY+qrSize/2+2 : y+pad+7;
+    doc.text(String(data.barrilNo), nx, ny, {align:'right'});
   }
 
   /* Cuerpo: rótulos en negritas, valores en normal */
@@ -6178,6 +6210,39 @@ function dibujarLabel(doc, x, y, LW, LH, data){
 
   doc.setFont('helvetica','bold'); doc.setFontSize(8);
   doc.text('LB0015-1', ix, y+LH-2);
+}
+
+/* Hoja(s) resumen: cuadrícula compacta con el número de cada etiqueta impresa
+   y su código QR. Se genera aunque las etiquetas se hayan impreso sin QR,
+   para tener siempre una referencia escaneable de la tanda. */
+function dibujarHojaResumen(doc, items, meta){
+  const PAGE_W=215.9, PAGE_H=279.4;
+  const COLS=5, ROWS=6, PER=COLS*ROWS;   /* 30 por hoja */
+  const MX=12, TOP=26, BOT=12;
+  const cellW=(PAGE_W-2*MX)/COLS;
+  const cellH=(PAGE_H-TOP-BOT)/ROWS;
+  const qrS=Math.min(cellW-8, cellH-13);
+  items.forEach((it,i)=>{
+    const idx=i%PER;
+    if(idx===0){
+      doc.addPage([PAGE_W,PAGE_H]);
+      doc.setFont('helvetica','bold'); doc.setFontSize(14); doc.setTextColor(0,0,0);
+      doc.text(t('lblSummaryTitle'), PAGE_W/2, 14, {align:'center'});
+      doc.setFont('helvetica','normal'); doc.setFontSize(9);
+      const sub='Lot: '+(meta.batch||'')+'   ·   '+(meta.producto||'');
+      doc.text(sub, PAGE_W/2, 20, {align:'center'});
+    }
+    const col=idx%COLS, row=Math.floor(idx/COLS);
+    const cx=MX+col*cellW, cy=TOP+row*cellH;
+    doc.setDrawColor(210,210,210); doc.setLineWidth(0.2);
+    doc.rect(cx+1, cy+1, cellW-2, cellH-2);
+    doc.setFont('helvetica','bold'); doc.setFontSize(13); doc.setTextColor(0,0,0);
+    doc.text(String(it.num), cx+cellW/2, cy+7, {align:'center'});
+    if(it.qr){
+      const qx=cx+(cellW-qrS)/2, qy=cy+9;
+      try{ doc.addImage(it.qr,'PNG',qx,qy,qrS,qrS); }catch(e){}
+    }
+  });
 }
 
 /* listeners del modal de labels */
