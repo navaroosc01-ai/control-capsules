@@ -183,7 +183,7 @@
   body.supervisor .parcial-row .px,
   body.supervisor tbody .btn.danger{display:none !important}
   /* El supervisor VE los datos de la orden pero no puede editarlos */
-  body.supervisor input:not(#fCodigo):not(#tabCodigos):not(#incEditFecha):not(#incEditHora):not(#lblBatch):not(#lblNeto):not(#lblCant):not(#lblNumerar):not(#reprintBatch):not(#reprintNeto):not(#reprintNumerar):not(#pkFinishVal):not(#repFecha):not(.qr-room-cb){pointer-events:none;opacity:.85;background:var(--panel)}
+  body.supervisor input:not(#fCodigo):not(#tabCodigos):not(#incEditFecha):not(#incEditHora):not(#lblBatch):not(#lblNeto):not(#lblCant):not(#lblNumerar):not(#reprintBatch):not(#reprintNeto):not(#reprintNumerar):not(#pkFinishVal):not(#repFecha):not(.qr-room-cb):not(.qr-opt-cb){pointer-events:none;opacity:.85;background:var(--panel)}
   body.supervisor #incEditFecha,
   body.supervisor #incEditHora{pointer-events:auto;opacity:1;background:var(--panel2)}
   body.supervisor #fCodigo{pointer-events:auto;opacity:1}
@@ -196,7 +196,8 @@
   body.supervisor #pkFinishVal{pointer-events:auto;opacity:1;background:var(--panel2)}
   body.supervisor #lblNumerar,
   body.supervisor #reprintNumerar,
-  body.supervisor .qr-room-cb{pointer-events:auto;opacity:1}
+  body.supervisor .qr-room-cb,
+  body.supervisor .qr-opt-cb{pointer-events:auto;opacity:1}
   /* Imprimir, CSV y Limpiar: solo visibles para el supervisor (y NO en el tablero) */
   #btnImprimir, #btnCSV, #btnGrafica, #btnLimpiar, #btnRespaldo, #btnLabels, #btnQrCuartos{display:none}
   body.supervisor:not(.tablero) #btnImprimir, body.supervisor:not(.tablero) #btnCSV, body.supervisor:not(.tablero) #btnGrafica, body.supervisor:not(.tablero) #btnLimpiar, body.supervisor:not(.tablero) #btnRespaldo, body.supervisor:not(.tablero) #btnLabels, body.supervisor:not(.tablero) #btnQrCuartos{display:inline-block !important}
@@ -1437,13 +1438,13 @@
     </div>
     <div class="row">
       <label style="display:flex;align-items:center;gap:8px;text-transform:none;letter-spacing:0;cursor:pointer">
-        <input id="lblConQR" type="checkbox" checked style="width:16px;height:16px;flex:0 0 auto">
+        <input id="lblConQR" class="qr-opt-cb" type="checkbox" checked style="width:16px;height:16px;flex:0 0 auto">
         <span data-i18n="lblWithQR">Include QR code on the labels</span>
       </label>
     </div>
     <div class="row">
       <label style="display:flex;align-items:center;gap:8px;text-transform:none;letter-spacing:0;cursor:pointer">
-        <input id="lblResumen" type="checkbox" checked style="width:16px;height:16px;flex:0 0 auto">
+        <input id="lblResumen" class="qr-opt-cb" type="checkbox" checked style="width:16px;height:16px;flex:0 0 auto">
         <span data-i18n="lblSummary">Print summary sheet (numbers + QR)</span>
       </label>
     </div>
@@ -1498,6 +1499,13 @@
       <label style="display:flex;align-items:center;gap:8px;text-transform:none;letter-spacing:0;cursor:pointer">
         <input id="reprintNumerar" type="checkbox" checked style="width:16px;height:16px;flex:0 0 auto">
         <span data-i18n="lblNumber">Number the labels (1, 2, 3…)</span>
+      </label>
+    </div>
+
+    <div class="row">
+      <label style="display:flex;align-items:center;gap:8px;text-transform:none;letter-spacing:0;cursor:pointer">
+        <input id="reprintConQR" class="qr-opt-cb" type="checkbox" checked style="width:16px;height:16px;flex:0 0 auto">
+        <span data-i18n="lblWithQR">Include QR code on the labels</span>
       </label>
     </div>
 
@@ -6212,36 +6220,51 @@ function dibujarLabel(doc, x, y, LW, LH, data){
   doc.text('LB0015-1', ix, y+LH-2);
 }
 
-/* Hoja(s) resumen: cuadrícula compacta con el número de cada etiqueta impresa
-   y su código QR. Se genera aunque las etiquetas se hayan impreso sin QR,
-   para tener siempre una referencia escaneable de la tanda. */
+/* Hoja(s) resumen para revisión: cuadrícula MUY densa donde cada celda lleva
+   número de barril, código QR, nombre del producto y batch. Se genera aunque
+   las etiquetas se hayan impreso sin QR (siempre tiene QR escaneable). */
 function dibujarHojaResumen(doc, items, meta){
   const PAGE_W=215.9, PAGE_H=279.4;
-  const COLS=5, ROWS=6, PER=COLS*ROWS;   /* 30 por hoja */
-  const MX=12, TOP=26, BOT=12;
+  const COLS=6, ROWS=8, PER=COLS*ROWS;   /* 48 por hoja */
+  const MX=8, TOP=15, BOT=8;
   const cellW=(PAGE_W-2*MX)/COLS;
   const cellH=(PAGE_H-TOP-BOT)/ROWS;
-  const qrS=Math.min(cellW-8, cellH-13);
+  const qrS=Math.min(cellW-5, cellH-14);
+  const prod=meta.producto||'', bat=meta.batch||'';
+  /* recorta un texto para que quepa en maxW a un tamaño de fuente dado */
+  const fit=(txt,maxW,size)=>{
+    doc.setFontSize(size);
+    let s=String(txt||'');
+    if(doc.getTextWidth(s)<=maxW) return s;
+    while(s.length>1 && doc.getTextWidth(s+'…')>maxW) s=s.slice(0,-1);
+    return s+'…';
+  };
   items.forEach((it,i)=>{
     const idx=i%PER;
     if(idx===0){
       doc.addPage([PAGE_W,PAGE_H]);
-      doc.setFont('helvetica','bold'); doc.setFontSize(14); doc.setTextColor(0,0,0);
-      doc.text(t('lblSummaryTitle'), PAGE_W/2, 14, {align:'center'});
-      doc.setFont('helvetica','normal'); doc.setFontSize(9);
-      const sub='Lot: '+(meta.batch||'')+'   ·   '+(meta.producto||'');
-      doc.text(sub, PAGE_W/2, 20, {align:'center'});
+      doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.setTextColor(0,0,0);
+      doc.text(t('lblSummaryTitle'), PAGE_W/2, 10, {align:'center'});
     }
     const col=idx%COLS, row=Math.floor(idx/COLS);
-    const cx=MX+col*cellW, cy=TOP+row*cellH;
+    const cx=MX+col*cellW, cy=TOP+row*cellH, midX=cx+cellW/2;
+    /* borde suave de la celda */
     doc.setDrawColor(210,210,210); doc.setLineWidth(0.2);
-    doc.rect(cx+1, cy+1, cellW-2, cellH-2);
-    doc.setFont('helvetica','bold'); doc.setFontSize(13); doc.setTextColor(0,0,0);
-    doc.text(String(it.num), cx+cellW/2, cy+7, {align:'center'});
+    doc.rect(cx+0.6, cy+0.6, cellW-1.2, cellH-1.2);
+    /* número de barril */
+    doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor(0,0,0);
+    doc.text('#'+it.num, midX, cy+4, {align:'center'});
+    /* QR centrado */
     if(it.qr){
-      const qx=cx+(cellW-qrS)/2, qy=cy+9;
+      const qx=midX-qrS/2, qy=cy+5;
       try{ doc.addImage(it.qr,'PNG',qx,qy,qrS,qrS); }catch(e){}
     }
+    /* producto y batch (pequeños, recortados si no caben) */
+    const ty=cy+5+qrS+2.6;
+    doc.setFont('helvetica','normal'); doc.setFontSize(6); doc.setTextColor(40,40,40);
+    doc.text(fit(prod, cellW-3, 6), midX, ty, {align:'center'});
+    doc.setFont('helvetica','bold'); doc.setFontSize(6); doc.setTextColor(0,0,0);
+    doc.text(fit(bat, cellW-3, 6), midX, ty+2.9, {align:'center'});
   });
 }
 
@@ -6589,6 +6612,7 @@ async function reimprimirLabelsPDF(){
   const cuarto   = _rpOrden.cuarto || '';
   const cod      = _rpOrden.cod || '';
   const numerar  = $('reprintNumerar').checked;
+  const conQR    = $('reprintConQR').checked;
 
   if(!batch){ alert(t('lblNeedBatch')); return; }
   if(!neto){  alert(t('lblNeedNet'));   return; }
@@ -6614,7 +6638,7 @@ async function reimprimirLabelsPDF(){
     const x = MX + col*(LW+GAP_X), y = MY + row*(LH+GAP_Y);
     const num = numerar ? barrilNo : null;
     const payload = JSON.stringify({ c:cod, b:batch, bn:barrilNo });
-    const qr = await lblQrDataURL(payload);
+    const qr = conQR ? await lblQrDataURL(payload) : null;
     dibujarLabel(doc, x, y, LW, LH, { producto, batch, neto, cuarto, num, barrilNo, qr, printNum:numerar });
   }
 
