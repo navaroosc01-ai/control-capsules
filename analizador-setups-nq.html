@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Analizador de setups · Sistema A · NQ/MNQ</title>
+<style>
+  :root{
+    --bg:#0d1117; --panel:#141a22; --panel2:#0f151d; --bd:#232c38; --bd2:#2f3a49;
+    --tx:#e6ebf2; --mut:#8b97a7; --dim:#616d7d;
+    --long:#31c07a; --long-d:#123024; --short:#f0616d; --short-d:#341318;
+    --gex:#e0a13a; --gex-d:#332614; --ema:#5b9bf0; --neu:#7d8998;
+    --live:#f2f4f8; --accent:#6ea8fe;
+    --mono:'SFMono-Regular',ui-monospace,'JetBrains Mono',Menlo,Consolas,monospace;
+    --sans:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--tx);font-family:var(--sans);font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:1120px;margin:0 auto;padding:20px 18px 48px}
+  header h1{font-size:18px;font-weight:600;margin:0 0 2px;letter-spacing:.2px}
+  header p{margin:0;color:var(--mut);font-size:12.5px}
+  .toolbar{display:flex;gap:8px;flex-wrap:wrap;margin:14px 0 16px}
+  button.act{background:var(--panel);color:var(--tx);border:1px solid var(--bd2);border-radius:7px;padding:7px 12px;font-size:12.5px;cursor:pointer;font-family:var(--sans)}
+  button.act:hover{border-color:var(--accent);color:#fff}
+  .grid{display:grid;grid-template-columns:340px 1fr;gap:16px;align-items:start}
+  @media(max-width:800px){.grid{grid-template-columns:1fr}}
+  .card{background:var(--panel);border:1px solid var(--bd);border-radius:12px;padding:14px 15px}
+  .card h2{font-size:12px;text-transform:none;letter-spacing:.3px;color:var(--mut);margin:0 0 12px;font-weight:600}
+  .lgrid{display:grid;grid-template-columns:1fr 1fr;gap:9px 12px}
+  .fld{display:flex;flex-direction:column;gap:3px}
+  .fld label{font-size:11px;color:var(--mut)}
+  .fld input,.fld select{background:var(--panel2);border:1px solid var(--bd2);border-radius:6px;color:var(--tx);padding:6px 8px;font-size:13px;font-family:var(--mono);width:100%}
+  .fld select{font-family:var(--sans);font-size:12.5px}
+  .fld input:focus,.fld select:focus{outline:none;border-color:var(--accent)}
+  .sub{margin-top:16px}
+  .seg{display:flex;border:1px solid var(--bd2);border-radius:6px;overflow:hidden}
+  .seg button{flex:1;background:var(--panel2);border:0;color:var(--mut);padding:6px 4px;font-size:11.5px;cursor:pointer;font-family:var(--sans);border-right:1px solid var(--bd2)}
+  .seg button:last-child{border-right:0}
+  .seg button.on{background:var(--bd2);color:#fff}
+  .seg button.on.sh{background:var(--short);color:#2a0d10}
+  .seg button.on.lo{background:var(--long);color:#08251a}
+  .chips{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px}
+  .chip{font-size:11px;padding:4px 9px;border-radius:20px;border:1px solid var(--bd2);color:var(--mut);background:var(--panel2)}
+  .chip b{color:var(--tx);font-weight:600;font-family:var(--mono)}
+  .chip.pos{border-color:var(--gex);color:var(--gex)} .chip.pos b{color:var(--gex)}
+  .chip.neg{border-color:var(--short);color:var(--short)} .chip.neg b{color:var(--short)}
+  .signal{border-radius:10px;padding:12px 14px;margin-bottom:14px;border:1px solid var(--bd2);display:flex;align-items:center;gap:12px}
+  .signal .badge{font-size:12px;font-weight:700;padding:5px 11px;border-radius:6px;white-space:nowrap;letter-spacing:.4px}
+  .signal.wait{background:#171b12;border-color:#3d3a1c} .signal.wait .badge{background:var(--gex);color:#241a06}
+  .signal.go-lo{background:var(--long-d);border-color:#1c5a3d} .signal.go-lo .badge{background:var(--long);color:#08251a}
+  .signal.go-sh{background:var(--short-d);border-color:#5a1c22} .signal.go-sh .badge{background:var(--short);color:#2a0d10}
+  .signal .txt{font-size:12.5px;color:var(--tx)} .signal .txt small{color:var(--mut);display:block;margin-top:1px}
+  .tabs{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:12px}
+  .tab{background:var(--panel2);border:1px solid var(--bd2);border-radius:8px;padding:7px 11px;cursor:pointer;font-size:12px;color:var(--mut);display:flex;align-items:center;gap:7px}
+  .tab.sel{border-color:var(--accent);color:#fff;background:var(--panel)}
+  .tab .dir{width:0;height:0;border-left:5px solid transparent;border-right:5px solid transparent}
+  .tab .dir.up{border-bottom:7px solid var(--long)} .tab .dir.dn{border-top:7px solid var(--short)}
+  .tab .tier{font-family:var(--mono);font-size:10.5px;font-weight:700;padding:1px 5px;border-radius:4px;background:var(--bd2);color:var(--tx)}
+  .tab .st{font-size:10px;padding:1px 6px;border-radius:10px}
+  .st.listo{background:var(--long-d);color:var(--long)} .st.vigilar{background:var(--gex-d);color:var(--gex)}
+  svg{display:block;width:100%;height:auto}
+  .metrics{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin:12px 0}
+  @media(max-width:520px){.metrics{grid-template-columns:repeat(3,1fr)}}
+  .met{background:var(--panel2);border-radius:8px;padding:8px 9px}
+  .met .k{font-size:10.5px;color:var(--mut)} .met .v{font-size:15px;font-family:var(--mono);font-weight:600;margin-top:2px}
+  .met .v.sh{color:var(--short)} .met .v.lo{color:var(--long)} .met .v.warn{color:var(--gex)}
+  .checks{margin-top:6px}
+  .chk{display:flex;gap:9px;padding:7px 2px;border-top:1px solid var(--bd)}
+  .chk:first-child{border-top:0}
+  .chk .ic{width:17px;height:17px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;margin-top:1px}
+  .chk .ic.ok{background:var(--long-d);color:var(--long)} .chk .ic.no{background:var(--short-d);color:var(--short)}
+  .chk .step{font-size:10px;color:var(--dim);text-transform:uppercase;letter-spacing:.5px}
+  .chk .lab{font-size:13px;color:var(--tx);font-weight:500}
+  .chk .det{font-size:11.5px;color:var(--mut)}
+  .empty{color:var(--mut);font-size:13px;text-align:center;padding:30px 10px}
+  footer{color:var(--dim);font-size:11px;margin-top:20px;line-height:1.6}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Analizador de setups · Sistema A</h1>
+    <p>NQ/MNQ · entorno (GEX) → ubicación (nivel) → confirmación (flujo) → ejecución</p>
+  </header>
+
+  <div class="toolbar">
+    <button class="act" id="btnEjemplo">Cargar ejemplo (gráfico actual)</button>
+    <button class="act" id="btnReset">Vaciar campos</button>
+  </div>
+
+  <div class="grid">
+    <!-- INPUTS -->
+    <div class="card">
+      <h2>Niveles (puntos NQ)</h2>
+      <div class="lgrid" id="niveles"></div>
+
+      <div class="sub"></div>
+      <h2>Tablero</h2>
+      <div id="tablero"></div>
+    </div>
+
+    <!-- OUTPUT -->
+    <div class="card">
+      <div class="chips" id="chips"></div>
+      <div class="signal wait" id="signal"><span class="badge">—</span><span class="txt">—</span></div>
+      <div class="tabs" id="tabs"></div>
+      <div id="chartWrap"></div>
+      <div class="metrics" id="metrics"></div>
+      <div class="checks" id="checks"></div>
+    </div>
+  </div>
+
+  <footer>
+    Herramienta de apoyo a la decisión, no una recomendación. La "ubicación" usa una tolerancia de ±<span id="tolTxt">12</span> pts y una ventana de vigilancia de 90 pts.
+    El régimen se deriva del precio vs GEX Flip; el bias, del precio vs EMA200. Ajusta los niveles cada mañana con tus datos.
+  </footer>
+</div>
+
+<script>
+const TOL=12, WATCH=90, STOPB=18;
+const nivDefs=[
+  ['precio','Precio actual'],['callWall','Call Wall'],['gammaFlip','GEX Flip'],['putWall','Put Wall'],
+  ['pdh','PDH'],['pdl','PDL'],['onh','ONH'],['onl','ONL'],
+  ['poc','POC (ayer)'],['vah','VAH (ayer)'],['val','VAL (ayer)'],['ema20','EMA20'],['ema200','EMA200']
+];
+const ejemplo={precio:29545,callWall:29700,gammaFlip:29475,putWall:29000,pdh:29585,pdl:29199,
+  onh:29293,onl:29075,poc:29522,vah:'',val:29315,ema20:29522,ema200:29420,
+  sesion:'fuera',delta:-2251,divRSI:'bajista',divPV:'bajista',flow:'short',vol:1.38,toque:'no',patron:'bull'};
+const vacio={sesion:'fuera',delta:0,divRSI:'ninguna',divPV:'ninguna',flow:'ninguno',vol:1,toque:'no',patron:'ninguno'};
+
+let S={}, selected=null;
+
+// ---- build inputs ----
+const nivEl=document.getElementById('niveles');
+nivDefs.forEach(([k,l])=>{
+  const d=document.createElement('div');d.className='fld';
+  d.innerHTML=`<label>${l}</label><input type="number" step="0.25" id="n_${k}">`;
+  nivEl.appendChild(d);
+});
+document.getElementById('tablero').innerHTML=`
+  <div class="fld"><label>Sesión NY</label>
+    <div class="seg" data-k="sesion">
+      <button data-v="dentro">Dentro</button><button data-v="fuera">Fuera</button></div></div>
+  <div class="lgrid" style="margin-top:12px">
+    <div class="fld"><label>Delta acumulado (Σ)</label><input type="number" id="t_delta"></div>
+    <div class="fld"><label>Volumen (x media)</label><input type="number" step="0.01" id="t_vol"></div>
+    <div class="fld"><label>Div RSI</label><select id="t_divRSI"><option value="ninguna">Ninguna</option><option value="bajista">Bajista ▼</option><option value="alcista">Alcista ▲</option></select></div>
+    <div class="fld"><label>Div Precio/Vol</label><select id="t_divPV"><option value="ninguna">Ninguna</option><option value="bajista">Bajista ▼</option><option value="alcista">Alcista ▲</option></select></div>
+    <div class="fld"><label>Order Flow</label><select id="t_flow"><option value="ninguno">Ninguno</option><option value="short">Inicio SHORT</option><option value="long">Inicio LONG</option></select></div>
+    <div class="fld"><label>Patrón (1m)</label><select id="t_patron"><option value="ninguno">Ninguno</option><option value="bull">Bull</option><option value="bear">Bear</option></select></div>
+  </div>
+  <div class="fld" style="margin-top:12px"><label>Toque EMA20</label>
+    <div class="seg" data-k="toque"><button data-v="si">Sí</button><button data-v="no">No</button></div></div>`;
+
+function readState(){
+  const s={};
+  nivDefs.forEach(([k])=>{const v=document.getElementById('n_'+k).value;s[k]=v===''?null:parseFloat(v);});
+  s.sesion=document.querySelector('[data-k=sesion] .on')?.dataset.v||'fuera';
+  s.toque=document.querySelector('[data-k=toque] .on')?.dataset.v||'no';
+  s.delta=parseFloat(document.getElementById('t_delta').value)||0;
+  s.vol=parseFloat(document.getElementById('t_vol').value)||1;
+  s.divRSI=document.getElementById('t_divRSI').value;
+  s.divPV=document.getElementById('t_divPV').value;
+  s.flow=document.getElementById('t_flow').value;
+  s.patron=document.getElementById('t_patron').value;
+  return s;
+}
+function writeState(o){
+  nivDefs.forEach(([k])=>{document.getElementById('n_'+k).value=(o[k]??'');});
+  document.getElementById('t_delta').value=o.delta;
+  document.getElementById('t_vol').value=o.vol;
+  document.getElementById('t_divRSI').value=o.divRSI;
+  document.getElementById('t_divPV').value=o.divPV;
+  document.getElementById('t_flow').value=o.flow;
+  document.getElementById('t_patron').value=o.patron;
+  setSeg('sesion',o.sesion);setSeg('toque',o.toque);
+}
+function setSeg(k,v){document.querySelectorAll(`[data-k=${k}] button`).forEach(b=>{
+  b.classList.toggle('on',b.dataset.v===v);
+  b.classList.toggle('sh',k==='sesion'&&v==='fuera'&&b.dataset.v===v?false:false);
+});}
+document.querySelectorAll('.seg button').forEach(b=>b.addEventListener('click',()=>{
+  b.parentElement.querySelectorAll('button').forEach(x=>x.classList.remove('on'));
+  b.classList.add('on');compute();
+}));
+document.querySelectorAll('input,select').forEach(e=>e.addEventListener('input',compute));
+document.getElementById('btnEjemplo').onclick=()=>{writeState(ejemplo);selected=null;compute();};
+document.getElementById('btnReset').onclick=()=>{writeState({...vacio});selected=null;compute();};
+
+// ---- setup engine ----
+const RES=['callWall','pdh','onh','vah'], SUP=['putWall','pdl','onl','val'];
+function nearestOf(keys,price){
+  let best=null;
+  keys.forEach(k=>{if(S[k]==null)return;const d=Math.abs(S[k]-price);if(!best||d<best.d)best={k,p:S[k],d};});
+  return best;
+}
+function getTargets(entry,dir){
+  const cand=[];
+  ['callWall','pdh','onh','vah','poc','val','onl','pdl','putWall','gammaFlip'].forEach(k=>{
+    if(S[k]==null)return;
+    if(dir==='short'&&S[k]<entry-4)cand.push({k,p:S[k]});
+    if(dir==='long'&&S[k]>entry+4)cand.push({k,p:S[k]});
+  });
+  cand.sort((a,b)=>dir==='short'?b.p-a.p:a.p-b.p);
+  return cand.slice(0,2);
+}
+const NAMES={callWall:'Call Wall',pdh:'PDH',onh:'ONH',vah:'VAH',poc:'POC',val:'VAL',onl:'ONL',pdl:'PDL',putWall:'Put Wall',gammaFlip:'GEX Flip',ema20:'EMA20',ema200:'EMA200'};
+
+function buildSetups(){
+  const p=S.precio, out=[];
+  const regimen = (S.gammaFlip!=null && p!=null) ? (p>S.gammaFlip?'POS·fade':'NEG·trend') : '—';
+  const bias = (S.ema200!=null && p!=null) ? (p>S.ema200?'LONG':'SHORT') : '—';
+  const bear=(S.divRSI==='bajista')+(S.divPV==='bajista')+(S.delta<0?1:0)+(S.flow==='short'?1:0);
+  const bull=(S.divRSI==='alcista')+(S.divPV==='alcista')+(S.delta>0?1:0)+(S.flow==='long'?1:0);
+
+  function mk(dir,name,entry,entryLbl,stop,signals,entorno,ubicOk,gatillo,status,note){
+    const t=getTargets(entry,dir);
+    const t1=t[0], t2=t[1];
+    const risk=Math.abs(entry-stop);
+    const rr1=t1?+(Math.abs(t1.p-entry)/risk).toFixed(1):null;
+    const rr2=t2?+(Math.abs(t2.p-entry)/risk).toFixed(1):null;
+    let score=(entorno?1:0)+(ubicOk?1:0)+(signals>=2?1:0)+(gatillo?1:0);
+    const tier=score>=4?'A+':score>=3?'A':score>=2?'B':'—';
+    return {dir,name,entry,entryLbl,stop,t1,t2,rr1,rr2,score,tier,status,note,
+      checks:[
+        {step:'Entorno',lab:regimen,ok:entorno,det:entorno?'régimen a favor del setup':'régimen no favorece este setup'},
+        {step:'Ubicación',lab:entryLbl,ok:ubicOk,det:ubicOk?'precio en el nivel (±'+TOL+' pts)':'aún no en el nivel'},
+        {step:'Confirmación',lab:(dir==='short'?bear:bull)+'/4 señales '+(dir==='short'?'bajistas':'alcistas'),ok:signals>=2,det:'div RSI · div P/Vol · delta · order flow'},
+        {step:'Ejecución',lab:gatillo?'gatillo presente':'sin gatillo',ok:gatillo,det:note}
+      ]};
+  }
+
+  if(p!=null){
+    // FADE SHORT
+    const tRes=nearestOf(RES,p), wRes=(()=>{let b=null;RES.forEach(k=>{if(S[k]==null)return;const g=S[k]-p;if(g>0&&g<=WATCH&&(!b||g<b.g))b={k,p:S[k],g};});return b;})();
+    if(regimen==='POS·fade' && (tRes&&tRes.d<=TOL || wRes)){
+      const at=(tRes&&tRes.d<=TOL); const lvl=at?tRes:wRes;
+      const entry=lvl.p, stop=entry+STOPB;
+      const gat=(S.flow==='short'); const ubic=at;
+      const status=(at&&bear>=2&&gat)?'listo':'vigilar';
+      out.push(mk('short','Fade corto', entry, NAMES[lvl.k]+' '+entry, stop, bear, true, ubic, gat, status,
+        at?'falla de continuación + giro de delta en el nivel':'esperar retest de '+NAMES[lvl.k]+' y la falla'));
+    }
+    // FADE LONG
+    const tSup=nearestOf(SUP,p), wSup=(()=>{let b=null;SUP.forEach(k=>{if(S[k]==null)return;const g=p-S[k];if(g>0&&g<=WATCH&&(!b||g<b.g))b={k,p:S[k],g};});return b;})();
+    if(regimen==='POS·fade' && (tSup&&tSup.d<=TOL || wSup)){
+      const at=(tSup&&tSup.d<=TOL); const lvl=at?tSup:wSup;
+      const entry=lvl.p, stop=entry-STOPB;
+      const gat=(S.flow==='long'); const ubic=at;
+      const status=(at&&bull>=2&&gat)?'listo':'vigilar';
+      out.push(mk('long','Fade largo', entry, NAMES[lvl.k]+' '+entry, stop, bull, true, ubic, gat, status,
+        at?'falla de continuación + giro de delta en el nivel':'esperar retest de '+NAMES[lvl.k]+' y la falla'));
+    }
+    // CONT LONG
+    if(bias==='LONG' && S.ema20!=null){
+      const entry=S.ema20, stop=entry-STOPB;
+      const ubic=(S.toque==='si'); const gat=(S.toque==='si'&&S.patron==='bull'&&S.vol>=1.3);
+      const ent=(regimen==='NEG·trend'); // continuación alineada solo si tendencia
+      const status=(ubic&&gat&&bull>=2)?'listo':'vigilar';
+      out.push(mk('long','Continuación largo', entry, 'EMA20 '+entry, stop, bull, ent, ubic, gat, status,
+        ubic?'rechazo alcista en EMA20 (pin/envolvente + vol ≥1.3)':'necesita pullback y toque de EMA20'+(regimen==='POS·fade'?' · va contra el fade':'')));
+    }
+    // CONT SHORT
+    if(bias==='SHORT' && S.ema20!=null){
+      const entry=S.ema20, stop=entry+STOPB;
+      const ubic=(S.toque==='si'); const gat=(S.toque==='si'&&S.patron==='bear'&&S.vol>=1.3);
+      const ent=(regimen==='NEG·trend');
+      const status=(ubic&&gat&&bear>=2)?'listo':'vigilar';
+      out.push(mk('short','Continuación corto', entry, 'EMA20 '+entry, stop, bear, ent, ubic, gat, status,
+        ubic?'rechazo bajista en EMA20 (pin/envolvente + vol ≥1.3)':'necesita pullback y toque de EMA20'));
+    }
+  }
+  const rank=s=>(s.status==='listo'?100:0)+s.score*10+(s.rr1||0);
+  out.sort((a,b)=>rank(b)-rank(a));
+  return {out,regimen,bias};
+}
+
+// ---- render ----
+function n(x){return x==null?'—':(Math.round(x*100)/100).toLocaleString('en-US');}
+function compute(){
+  S=readState();
+  const {out,regimen,bias}=buildSetups();
+  const sep=(S.ema20!=null&&S.ema200!=null)?Math.abs(S.ema20-S.ema200).toFixed(1):'—';
+  // chips
+  document.getElementById('chips').innerHTML=
+    `<span class="chip ${regimen==='POS·fade'?'pos':regimen==='NEG·trend'?'neg':''}">Régimen <b>${regimen}</b></span>`+
+    `<span class="chip">Bias 15m <b>${bias}</b></span>`+
+    `<span class="chip">Sep. EMAs <b>${sep} pts</b></span>`+
+    `<span class="chip">Sesión NY <b>${S.sesion==='dentro'?'Dentro':'Fuera'}</b></span>`+
+    `<span class="chip">Delta Σ <b>${n(S.delta)}</b></span>`;
+
+  // signal
+  const top=out[0];
+  const sig=document.getElementById('signal');
+  const listo=out.find(s=>s.status==='listo'&&s.tier!=='—'&&s.tier!=='B');
+  if(listo && S.sesion==='dentro'){
+    sig.className='signal '+(listo.dir==='short'?'go-sh':'go-lo');
+    sig.innerHTML=`<span class="badge">LISTO · ${listo.dir==='short'?'CORTO':'LARGO'}</span><span class="txt">${listo.name} tier ${listo.tier} · R:R ${listo.rr1??'—'} al objetivo 1<small>Entrada ${n(listo.entry)} · stop ${n(listo.stop)}</small></span>`;
+  } else {
+    sig.className='signal wait';
+    let motivo;
+    if(!top) motivo='Sin niveles cargados o sin setup en juego.';
+    else if(S.sesion!=='dentro') motivo='Fuera de la ventana de apertura NY — el mejor setup es '+top.name.toLowerCase()+'.';
+    else if(top.status==='vigilar') motivo=top.note.charAt(0).toUpperCase()+top.note.slice(1)+'.';
+    else motivo='Confluencia insuficiente todavía ('+top.name.toLowerCase()+', tier '+top.tier+').';
+    sig.innerHTML=`<span class="badge">ESPERAR</span><span class="txt">${motivo}<small>${top?('Mejor candidato: '+top.name+' · '+top.status+' · tier '+top.tier):''}</small></span>`;
+  }
+
+  // tabs
+  const tabs=document.getElementById('tabs');
+  if(!out.length){tabs.innerHTML='';selected=null;}
+  else{
+    if(selected==null||!out.find(s=>s.name===selected))selected=out[0].name;
+    tabs.innerHTML=out.map(s=>`<div class="tab ${s.name===selected?'sel':''}" data-n="${s.name}">
+      <span class="dir ${s.dir==='long'?'up':'dn'}"></span>${s.name}
+      <span class="tier">${s.tier}</span><span class="st ${s.status}">${s.status}</span></div>`).join('');
+    tabs.querySelectorAll('.tab').forEach(t=>t.onclick=()=>{selected=t.dataset.n;compute();});
+  }
+
+  const cur=out.find(s=>s.name===selected)||null;
+  document.getElementById('chartWrap').innerHTML=cur?drawChart(cur):'<div class="empty">Carga los niveles y el tablero para ver los setups.<br>Pulsa "Cargar ejemplo" para empezar.</div>';
+  document.getElementById('metrics').innerHTML=cur?metrics(cur):'';
+  document.getElementById('checks').innerHTML=cur?checks(cur):'';
+}
+
+function metrics(s){
+  const dc=s.dir==='short'?'sh':'lo';
+  const rrCls=s.rr1==null?'':(s.rr1>=1.5?'lo':(s.rr1>=1?'warn':'sh'));
+  return `
+    <div class="met"><div class="k">Entrada</div><div class="v ${dc}">${n(s.entry)}</div></div>
+    <div class="met"><div class="k">Stop</div><div class="v sh">${n(s.stop)}</div></div>
+    <div class="met"><div class="k">Objetivo 1</div><div class="v lo">${s.t1?n(s.t1.p):'—'}</div></div>
+    <div class="met"><div class="k">Objetivo 2</div><div class="v lo">${s.t2?n(s.t2.p):'—'}</div></div>
+    <div class="met"><div class="k">R:R (obj 1)</div><div class="v ${rrCls}">${s.rr1??'—'}</div></div>`;
+}
+function checks(s){
+  return s.checks.map(c=>`<div class="chk">
+    <div class="ic ${c.ok?'ok':'no'}">${c.ok?'✓':'✕'}</div>
+    <div><div class="step">${c.step}</div><div class="lab">${c.lab}</div><div class="det">${c.det}</div></div>
+  </div>`).join('');
+}
+
+function drawChart(s){
+  const W=620,H=344,pt=22,pb=300,px0=12,px1=430,lx=440;
+  const col={callWall:'#e0a13a',putWall:'#e0a13a',gammaFlip:'#e0a13a',pdh:'#f0616d',onh:'#f0616d',vah:'#f0616d',
+    pdl:'#31c07a',onl:'#31c07a',val:'#31c07a',poc:'#8b97a7',ema20:'#5b9bf0',ema200:'#5b9bf0',precio:'#f2f4f8'};
+  const dirCol=s.dir==='short'?'#f0616d':'#31c07a';
+  // price window
+  const focus=[s.entry,s.stop,S.precio];
+  if(s.t1)focus.push(s.t1.p); if(s.t2)focus.push(s.t2.p);
+  let lo=Math.min(...focus), hi=Math.max(...focus);
+  const pad=Math.max((hi-lo)*0.16,8); lo-=pad; hi+=pad;
+  const y=v=>pt+(hi-v)/(hi-lo)*(pb-pt);
+  // gather level labels within window
+  let items=[];
+  Object.keys(NAMES).forEach(k=>{if(S[k]==null||k==='precio')return;const v=S[k];if(v<lo||v>hi)return;
+    items.push({y:y(v),v,label:NAMES[k],c:col[k]||'#8b97a7',key:k});});
+  // setup lines
+  const setL=[{y:y(s.entry),v:s.entry,label:'Entrada',c:dirCol,em:1},
+              {y:y(s.stop),v:s.stop,label:'Stop',c:'#f0616d',em:1}];
+  if(s.t1)setL.push({y:y(s.t1.p),v:s.t1.p,label:'Obj 1',c:'#31c07a',em:1});
+  if(s.t2)setL.push({y:y(s.t2.p),v:s.t2.p,label:'Obj 2',c:'#31c07a',em:1});
+  // labels collision on right (all)
+  let labs=[...items.map(i=>({...i,em:0})),...setL].sort((a,b)=>a.y-b.y);
+  for(let i=1;i<labs.length;i++)if(labs[i].y-labs[i-1].ly<13)labs[i].ly=labs[i-1].ly+13;else labs[i].ly=labs[i].y;
+  if(labs.length)labs[0].ly=labs[0].y;
+  // stop band
+  const yStop=y(s.stop), yEntry=y(s.entry);
+  const bandY=s.dir==='short'?yStop:yEntry, bandH=Math.abs(yStop-yEntry);
+  // projected path points
+  const ex=150, t1x=300, t2x=412;
+  let path=`M${ex},${yEntry}`;
+  if(s.t1)path+=` L${t1x},${y(s.t1.p)}`;
+  if(s.t2)path+=` L${t2x},${y(s.t2.p)}`;
+
+  let svg=`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Esquema del setup ${s.name}">
+    <defs><marker id="ah" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M1 1L8 5L1 9" fill="none" stroke="${dirCol}" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></marker></defs>`;
+  // stop invalidation band
+  svg+=`<rect x="${px0}" y="${s.dir==='short'?y(s.stop):y(s.entry)}" width="${px1-px0}" height="${Math.abs(y(s.stop)-y(s.entry))}" fill="#f0616d" opacity="0.07"/>`;
+  // context level lines
+  items.forEach(i=>{svg+=`<line x1="${px0}" y1="${i.y}" x2="${px1}" y2="${i.y}" stroke="${i.c}" stroke-width="1" stroke-dasharray="2 5" opacity="0.55"/>`;});
+  // setup lines (solid, brighter)
+  setL.forEach(i=>{svg+=`<line x1="${px0}" y1="${i.y}" x2="${px1}" y2="${i.y}" stroke="${i.c}" stroke-width="1.4" ${i.label==='Stop'?'stroke-dasharray="6 4"':''}/>`;});
+  // current price
+  const yp=y(S.precio);
+  svg+=`<line x1="${px0}" y1="${yp}" x2="${px1}" y2="${yp}" stroke="#f2f4f8" stroke-width="1" opacity="0.8"/>
+    <circle cx="${ex}" cy="${yp}" r="3.5" fill="#f2f4f8"/>
+    <text x="${ex-8}" y="${yp-6}" fill="#f2f4f8" font-size="10.5" text-anchor="end" font-family="var(--mono)">ahora ${n(S.precio)}</text>`;
+  // projected path
+  svg+=`<path d="${path}" fill="none" stroke="${dirCol}" stroke-width="1.6" stroke-dasharray="6 5" marker-end="url(#ah)"/>`;
+  svg+=`<circle cx="${ex}" cy="${yEntry}" r="4" fill="${dirCol}"/>`;
+  if(s.t1)svg+=`<circle cx="${t1x}" cy="${y(s.t1.p)}" r="3" fill="#31c07a"/>`;
+  // right labels
+  labs.forEach(i=>{
+    const bright=i.em?1:0.7;
+    if(Math.abs(i.ly-i.y)>1.5)svg+=`<line x1="${px1}" y1="${i.y}" x2="${lx-4}" y2="${i.ly}" stroke="${i.c}" stroke-width="0.5" opacity="0.4"/>`;
+    svg+=`<text x="${lx}" y="${i.ly+3.5}" fill="${i.c}" opacity="${bright}" font-size="11" font-family="var(--sans)">${i.label} <tspan font-family="var(--mono)" font-size="10.5">${n(i.v)}</tspan></text>`;
+  });
+  svg+=`</svg>`;
+  return svg;
+}
+
+// init
+writeState(ejemplo);
+compute();
+</script>
+</body>
+</html>
