@@ -59,7 +59,7 @@
   .tab .st{font-size:10px;padding:1px 6px;border-radius:10px}
   .st.listo{background:var(--long-d);color:var(--long)} .st.vigilar{background:var(--gex-d);color:var(--gex)}
   svg{display:block;width:100%;height:auto}
-  .metrics{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin:12px 0}
+  .metrics{display:grid;grid-template-columns:repeat(6,1fr);gap:8px;margin:12px 0}
   @media(max-width:520px){.metrics{grid-template-columns:repeat(3,1fr)}}
   .met{background:var(--panel2);border-radius:8px;padding:8px 9px}
   .met .k{font-size:10.5px;color:var(--mut)} .met .v{font-size:15px;font-family:var(--mono);font-weight:600;margin-top:2px}
@@ -326,7 +326,9 @@ function compute(){
 function metrics(s){
   const dc=s.dir==='short'?'sh':'lo';
   const rrCls=s.rr1==null?'':(s.rr1>=1.5?'lo':(s.rr1>=1?'warn':'sh'));
+  const dist=+(s.entry-S.precio).toFixed(2);
   return `
+    <div class="met"><div class="k">A la entrada</div><div class="v">${dist>0?'+':''}${n(dist)}</div></div>
     <div class="met"><div class="k">Entrada</div><div class="v ${dc}">${n(s.entry)}</div></div>
     <div class="met"><div class="k">Stop</div><div class="v sh">${n(s.stop)}</div></div>
     <div class="met"><div class="k">Objetivo 1</div><div class="v lo">${s.t1?n(s.t1.p):'—'}</div></div>
@@ -367,30 +369,40 @@ function drawChart(s){
   // stop band
   const yStop=y(s.stop), yEntry=y(s.entry);
   const bandY=s.dir==='short'?yStop:yEntry, bandH=Math.abs(yStop-yEntry);
-  // projected path points
-  const ex=150, t1x=300, t2x=412;
-  let path=`M${ex},${yEntry}`;
+  // projected path points: current -> entry (approach) -> targets (trade)
+  const curX=88, entX=218, t1x=338, t2x=430;
+  const yp=y(S.precio);
+  let path=`M${entX},${yEntry}`;
   if(s.t1)path+=` L${t1x},${y(s.t1.p)}`;
   if(s.t2)path+=` L${t2x},${y(s.t2.p)}`;
 
   let svg=`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Esquema del setup ${s.name}">
     <defs><marker id="ah" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
-      <path d="M1 1L8 5L1 9" fill="none" stroke="${dirCol}" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></marker></defs>`;
+      <path d="M1 1L8 5L1 9" fill="none" stroke="${dirCol}" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></marker>
+    <marker id="ag" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M1 1L8 5L1 9" fill="none" stroke="#8b97a7" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></marker></defs>`;
   // stop invalidation band
   svg+=`<rect x="${px0}" y="${s.dir==='short'?y(s.stop):y(s.entry)}" width="${px1-px0}" height="${Math.abs(y(s.stop)-y(s.entry))}" fill="#f0616d" opacity="0.07"/>`;
   // context level lines
   items.forEach(i=>{svg+=`<line x1="${px0}" y1="${i.y}" x2="${px1}" y2="${i.y}" stroke="${i.c}" stroke-width="1" stroke-dasharray="2 5" opacity="0.55"/>`;});
   // setup lines (solid, brighter)
   setL.forEach(i=>{svg+=`<line x1="${px0}" y1="${i.y}" x2="${px1}" y2="${i.y}" stroke="${i.c}" stroke-width="1.4" ${i.label==='Stop'?'stroke-dasharray="6 4"':''}/>`;});
-  // current price
-  const yp=y(S.precio);
+  // current price line + marker
   svg+=`<line x1="${px0}" y1="${yp}" x2="${px1}" y2="${yp}" stroke="#f2f4f8" stroke-width="1" opacity="0.8"/>
-    <circle cx="${ex}" cy="${yp}" r="3.5" fill="#f2f4f8"/>
-    <text x="${ex-8}" y="${yp-6}" fill="#f2f4f8" font-size="10.5" text-anchor="end" font-family="var(--mono)">ahora ${n(S.precio)}</text>`;
-  // projected path
-  svg+=`<path d="${path}" fill="none" stroke="${dirCol}" stroke-width="1.6" stroke-dasharray="6 5" marker-end="url(#ah)"/>`;
-  svg+=`<circle cx="${ex}" cy="${yEntry}" r="4" fill="${dirCol}"/>`;
+    <circle cx="${curX}" cy="${yp}" r="3.5" fill="#f2f4f8"/>
+    <text x="${curX+7}" y="${yp-7}" fill="#f2f4f8" font-size="10.5" text-anchor="start" font-family="var(--mono)">ahora ${n(S.precio)}</text>`;
+  // approach leg: current price -> entry (only if there's a gap to travel)
+  const distEntry=+(s.entry-S.precio).toFixed(2);
+  if(Math.abs(distEntry)>=2){
+    svg+=`<path d="M${curX},${yp} L${entX},${yEntry}" fill="none" stroke="#8b97a7" stroke-width="1.3" stroke-dasharray="1.5 4" marker-end="url(#ag)"/>`;
+    const mx=(curX+entX)/2, my=(yp+yEntry)/2;
+    svg+=`<text x="${mx}" y="${my-6}" fill="#8b97a7" font-size="10" text-anchor="middle" font-family="var(--mono)">${distEntry>0?'+':''}${distEntry} pts a la entrada</text>`;
+  }
+  // trade leg: entry -> targets
+  svg+=`<path d="${path}" fill="none" stroke="${dirCol}" stroke-width="1.7" stroke-dasharray="6 5" marker-end="url(#ah)"/>`;
+  svg+=`<circle cx="${entX}" cy="${yEntry}" r="4.5" fill="${dirCol}"/>`;
   if(s.t1)svg+=`<circle cx="${t1x}" cy="${y(s.t1.p)}" r="3" fill="#31c07a"/>`;
+  if(s.t2)svg+=`<circle cx="${t2x}" cy="${y(s.t2.p)}" r="3" fill="#31c07a"/>`;
   // right labels
   labs.forEach(i=>{
     const bright=i.em?1:0.7;
