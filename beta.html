@@ -199,8 +199,8 @@
   body.supervisor .qr-room-cb,
   body.supervisor .qr-opt-cb{pointer-events:auto;opacity:1}
   /* Imprimir, CSV y Limpiar: solo visibles para el supervisor (y NO en el tablero) */
-  #btnImprimir, #btnCSV, #btnGrafica, #btnLimpiar, #btnRespaldo, #btnLabels, #btnQrCuartos{display:none}
-  body.supervisor:not(.tablero) #btnImprimir, body.supervisor:not(.tablero) #btnCSV, body.supervisor:not(.tablero) #btnGrafica, body.supervisor:not(.tablero) #btnLimpiar, body.supervisor:not(.tablero) #btnRespaldo, body.supervisor:not(.tablero) #btnLabels, body.supervisor:not(.tablero) #btnQrCuartos{display:inline-block !important}
+  #btnImprimir, #btnCSV, #btnGrafica, #btnLimpiar, #btnRespaldo, #btnLabels, #btnQrCuartos, #btnIrAdmin2{display:none}
+  body.supervisor:not(.tablero) #btnImprimir, body.supervisor:not(.tablero) #btnCSV, body.supervisor:not(.tablero) #btnGrafica, body.supervisor:not(.tablero) #btnLimpiar, body.supervisor:not(.tablero) #btnRespaldo, body.supervisor:not(.tablero) #btnLabels, body.supervisor:not(.tablero) #btnQrCuartos, body.supervisor:not(.tablero):not(.admin) #btnIrAdmin2{display:inline-block !important}
   /* Vista supervisor simplificada: ocultar rango/objetivo, tarjetas de stats y pill de rango */
   body.supervisor #filaRango,
   body.supervisor .stats,
@@ -905,7 +905,8 @@
       <button class="btn adm-tab" data-tab="prod" data-i18n="admTabProducts">Product catalog</button>
       <button class="btn adm-tab" data-tab="batch" data-i18n="admTabBatches">Batches</button>
       <button class="btn adm-tab" data-tab="claves" data-i18n="admTabKeys">Keys &amp; settings</button>
-      <button class="btn" id="admIrTablero" style="margin-left:auto" data-i18n="admGoBoard">📊 Board</button>
+      <button class="btn" id="admIrSup" style="margin-left:auto" data-i18n="admGoSup">⬅ Supervisor</button>
+      <button class="btn" id="admIrTablero" data-i18n="admGoBoard">📊 Board</button>
       <div class="dot" id="admDot"><i></i><span id="admTxt">—</span></div>
     </div>
 
@@ -1270,6 +1271,7 @@
       <button class="btn primary" id="btnImprimir" data-i18n="printSheet">🖨️ Print order sheet</button>
       <button class="btn primary" id="btnGrafica" data-i18n="printControlChart">🖨️ Print control chart (Sam's Club)</button>
       <button class="btn" id="btnLabels" data-i18n="lblBtnFull">🏷️ Print labels</button>
+      <button class="btn" id="btnIrAdmin2" data-i18n="adminBtn">⚙️ Products &amp; batches</button>
       <button class="btn" id="btnQrCuartos" data-i18n="qrRoomsBtn">📱 Print room QR codes</button>
       <button class="btn" id="btnCSV" data-i18n="exportCsv">📥 Export CSV (Excel)</button>
       <button class="btn" id="btnRespaldo" data-i18n="backupJson">💾 Backup (JSON)</button>
@@ -2784,7 +2786,7 @@ const I18N = {
     qrRoomsErr:'Could not load orders. Check your connection and try again.',
     /* ===== BETA: órdenes por batch ===== */
     adminBtn:'⚙️ Products & batches',
-    admTabProducts:'Product catalog', admTabBatches:'Batches', admTabKeys:'Keys & settings', admGoBoard:'📊 Board',
+    admTabProducts:'Product catalog', admTabBatches:'Batches', admTabKeys:'Keys & settings', admGoBoard:'📊 Board', admGoSup:'⬅ Supervisor',
     admProductsTitle:'Product catalog', admMinMg:'Min (mg)', admMaxMg:'Max (mg)', admAvgMg:'BMR average (mg)',
     admWeightsHint:'Min/Max = full capsule weight (checked against samples). BMR average = fill powder (used to compute the target).',
     admAddProduct:'Add product', admEditProduct:'Edit product', admProductName:'Product name',
@@ -3214,7 +3216,7 @@ const I18N = {
     qrRoomsErr:'No se pudieron cargar las órdenes. Verifique su conexión e intente de nuevo.',
     /* ===== BETA: órdenes por batch ===== */
     adminBtn:'⚙️ Productos y batches',
-    admTabProducts:'Catálogo de productos', admTabBatches:'Batches', admTabKeys:'Claves y ajustes', admGoBoard:'📊 Tablero',
+    admTabProducts:'Catálogo de productos', admTabBatches:'Batches', admTabKeys:'Claves y ajustes', admGoBoard:'📊 Tablero', admGoSup:'⬅ Supervisor',
     admProductsTitle:'Catálogo de productos', admMinMg:'Mín (mg)', admMaxMg:'Máx (mg)', admAvgMg:'Average BMR (mg)',
     admWeightsHint:'Mín/Máx = peso de la cápsula completa (se valida contra las muestras). Average BMR = polvo de llenado (se usa para calcular el objetivo).',
     admAddProduct:'Agregar producto', admEditProduct:'Editar producto', admProductName:'Nombre del producto',
@@ -6607,6 +6609,7 @@ function iniciarAdmin(){
   document.querySelectorAll('.adm-tab').forEach(b=>b.addEventListener('click',()=>admTab(b.dataset.tab)));
   let tab='batch'; try{ tab=localStorage.getItem('gvip_adm_tab')||'batch'; }catch(e){}
   admTab(tab);
+  $('admIrSup').addEventListener('click',()=>{ location.href=`?rol=sup&clave=${CLAVE_SUPERVISOR}`; });
   $('admIrTablero').addEventListener('click',()=>{ location.href=`?rol=sup&clave=${CLAVE_SUPERVISOR}&tablero=1`; });
   $('admPSave').addEventListener('click', admGuardarProducto);
   $('admPCancel').addEventListener('click', admLimpiarProducto);
@@ -6868,7 +6871,7 @@ async function admGuardarUmbral(){
   }catch(e){ setAdmConn('bad', t('admSaveErr')); }
 }
 
-if($('btnIrAdmin')) $('btnIrAdmin').addEventListener('click',()=>{ location.href=`?rol=sup&clave=${CLAVE_SUPERVISOR}&admin=1`; });
+['btnIrAdmin','btnIrAdmin2'].forEach(id=>{ if($(id)) $(id).addEventListener('click',()=>{ location.href=`?rol=sup&clave=${CLAVE_SUPERVISOR}&admin=1`; }); });
 /* ======================= FIN BETA — ÓRDENES POR BATCH ======================= */
 
 function refrescarRol(){
