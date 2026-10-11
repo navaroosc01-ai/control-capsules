@@ -885,7 +885,6 @@
         </div>
         <button class="btn primary" id="tabCargar" data-i18n="show">Show</button>
         <button class="btn" id="btnReporteDia" data-i18n="dayReportBtn">📋 Daily report</button>
-        <button class="btn" id="btnIrAdmin" data-i18n="adminBtn">⚙️ Products &amp; batches</button>
         <div class="dot" id="tabDot"><i></i><span id="tabTxt">—</span></div>
       </div>
       <div class="hint" style="margin-top:8px" data-i18n="tabHint">The board refreshes automatically every 5 seconds. The list is remembered on this device.</div>
@@ -6871,7 +6870,7 @@ async function admGuardarUmbral(){
   }catch(e){ setAdmConn('bad', t('admSaveErr')); }
 }
 
-['btnIrAdmin','btnIrAdmin2'].forEach(id=>{ if($(id)) $(id).addEventListener('click',()=>{ location.href=`?rol=sup&clave=${CLAVE_SUPERVISOR}&admin=1`; }); });
+['btnIrAdmin2'].forEach(id=>{ if($(id)) $(id).addEventListener('click',()=>{ location.href=`?rol=sup&clave=${CLAVE_SUPERVISOR}&admin=1`; }); });
 /* ======================= FIN BETA — ÓRDENES POR BATCH ======================= */
 
 function refrescarRol(){
