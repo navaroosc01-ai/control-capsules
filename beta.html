@@ -850,6 +850,27 @@
   .rl-form input{font-size:20px;letter-spacing:5px}
   .rl-btns{display:flex;gap:10px;width:100%;max-width:380px}
   .rl-btns .btn{flex:1;min-height:48px;font-size:15px}
+
+  /* ===== Tipos de producción: tabletas y blending =====
+     Solo llevan producción (sin muestras de peso, rango, barriles ni gráfica de control). */
+  body.prod-tableta #btnNuevo, body.prod-blending #btnNuevo,
+  body.prod-tableta #diaCerradoAviso, body.prod-blending #diaCerradoAviso,
+  body.prod-tableta #btnRecoleccion, body.prod-blending #btnRecoleccion,
+  body.prod-tableta #filaRango, body.prod-blending #filaRango,
+  body.prod-tableta #rangePillWrap, body.prod-blending #rangePillWrap,
+  body.prod-tableta .st-cap, body.prod-blending .st-cap,
+  body.prod-tableta .muestras-wrap, body.prod-blending .muestras-wrap,
+  body.prod-tableta .day-head .n-muestras, body.prod-blending .day-head .n-muestras,
+  body.prod-tableta #btnGrafica, body.prod-blending #btnGrafica,
+  body.prod-tableta #btnLabels, body.prod-blending #btnLabels{display:none !important}
+  .tp-pill{display:inline-block;font-size:10px;font-weight:700;padding:3px 9px;border-radius:20px;
+    text-transform:uppercase;letter-spacing:.4px;white-space:nowrap}
+  .tp-pill.tp-capsula{background:rgba(52,224,176,.15);color:var(--accent)}
+  .tp-pill.tp-tableta{background:rgba(160,140,255,.18);color:#b9a8ff}
+  .tp-pill.tp-blending{background:rgba(255,160,90,.18);color:#ffb27a}
+  .ord-card.tp-tableta{border-left:3px solid #b9a8ff}
+  .ord-card.tp-blending{border-left:3px solid #ffb27a}
+  .adm-hide{display:none !important}
 </style>
 </head>
 <body>
@@ -889,8 +910,17 @@
       </div>
       <div class="hint" style="margin-top:8px" data-i18n="tabHint">The board refreshes automatically every 5 seconds. The list is remembered on this device.</div>
     </div>
+    <h4 id="tabCapTitle" class="pk-section-title" style="display:none" data-i18n="secCaps">💊 Encapsulation</h4>
     <div id="tabGrid" class="tab-grid"></div>
     <div id="tabEmpty" class="tab-empty" data-i18n="tabEmpty">Type one or more order codes and press "Show" to see their live progress.</div>
+    <div id="tabTabSection" class="pk-section" style="display:none">
+      <h4 class="pk-section-title" data-i18n="secTabs">🔷 Tablets</h4>
+      <div id="tabTabGrid" class="tab-grid"></div>
+    </div>
+    <div id="tabBlSection" class="pk-section" style="display:none">
+      <h4 class="pk-section-title" data-i18n="secBlend">⚗️ Blending</h4>
+      <div id="tabBlGrid" class="tab-grid"></div>
+    </div>
     <div id="tabPkSection" class="pk-section" style="display:none">
       <h4 class="pk-section-title" data-i18n="pkSection">📦 Packeting</h4>
       <div id="tabPkGrid" class="tab-grid"></div>
@@ -917,6 +947,7 @@
           <div class="adm-scroll"><table class="adm-table">
             <thead><tr>
               <th data-i18n="product">Product</th>
+              <th data-i18n="admType">Type</th>
               <th data-i18n="admMinMg">Min (mg)</th>
               <th data-i18n="admMaxMg">Max (mg)</th>
               <th data-i18n="admAvgMg">BMR average (mg)</th>
@@ -929,13 +960,22 @@
         <div class="card adm-side">
           <h2 id="admProdFormTitle" data-i18n="admAddProduct">Add product</h2>
           <div class="alert" id="admProdAlert"></div>
-          <div class="row"><label for="admPNombre" data-i18n="admProductName">Product name</label><input id="admPNombre" maxlength="120"></div>
+          <div class="row"><label for="admPTipo" data-i18n="admType">Type</label>
+            <select id="admPTipo">
+              <option value="capsula" data-i18n="tpCapsule">Capsules</option>
+              <option value="tableta" data-i18n="tpTablet">Tablets</option>
+              <option value="blending" data-i18n="tpBlend">Blending</option>
+            </select></div>
+          <div class="row" style="margin-top:10px"><label for="admPNombre" data-i18n="admProductName">Product name</label><input id="admPNombre" maxlength="120"></div>
+          <div id="admPMgBox">
           <div class="grid g2" style="margin-top:10px">
             <div><label for="admPMin" data-i18n="admMinCap">Min per capsule (mg)</label><input id="admPMin" type="number" step="0.1" inputmode="decimal"></div>
             <div><label for="admPMax" data-i18n="admMaxCap">Max per capsule (mg)</label><input id="admPMax" type="number" step="0.1" inputmode="decimal"></div>
           </div>
           <div style="margin-top:10px"><label for="admPAvg" data-i18n="admAvgFill">BMR average · fill (mg)</label><input id="admPAvg" type="number" step="0.1" inputmode="decimal">
             <div class="hint" data-i18n="admAvgFillHint">Only the powder inside the capsule.</div></div>
+          </div>
+          <div class="hint" id="admPTipoHint" style="margin-top:10px;display:none" data-i18n="admOnlyNameHint">Tablets and blending only need the name: the target is set on each batch.</div>
           <div class="btn-row" style="margin-top:14px">
             <button class="btn" id="admPCancel" style="display:none" data-i18n="cancel">Cancel</button>
             <button class="btn primary" id="admPSave" style="flex:1" data-i18n="admSaveProduct">Save product</button>
@@ -952,8 +992,9 @@
           <div class="alert" id="admBatchAlert"></div>
           <div class="row"><label for="admBProd" data-i18n="admBatchProduct">Product (from catalog)</label><select id="admBProd"></select></div>
           <div style="margin-top:10px"><label for="admBBatch" data-i18n="admBatchCode">Batch (order code)</label><input id="admBBatch" maxlength="40" style="text-transform:uppercase"></div>
-          <div style="margin-top:10px"><label for="admBKilos" data-i18n="admBatchKilos">Powder kilos</label><input id="admBKilos" type="number" step="0.01" inputmode="decimal"></div>
-          <div class="calc" style="margin:14px 0 4px;flex-direction:column;align-items:flex-start;gap:2px">
+          <div style="margin-top:10px" id="admBKilosRow"><label for="admBKilos" id="admBKilosLbl" data-i18n="admBatchKilos">Powder kilos</label><input id="admBKilos" type="number" step="0.01" inputmode="decimal"></div>
+          <div style="margin-top:10px;display:none" id="admBObjRow"><label for="admBObj" data-i18n="admTabTarget">Target (tablets)</label><input id="admBObj" type="number" step="1" inputmode="numeric"></div>
+          <div class="calc" id="admBCalcBox" style="margin:14px 0 4px;flex-direction:column;align-items:flex-start;gap:2px">
             <span style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;font-weight:600" data-i18n="admCalcTarget">Computed target</span>
             <b id="admBObjetivo" style="font-size:22px;color:var(--accent)">—</b>
             <span class="hint" id="admBFormula" style="margin:0">—</span>
@@ -969,6 +1010,7 @@
             <thead><tr>
               <th data-i18n="batch">Batch</th>
               <th data-i18n="product">Product</th>
+              <th data-i18n="admType">Type</th>
               <th data-i18n="admKilos">Kilos</th>
               <th data-i18n="admTarget">Target</th>
               <th data-i18n="repColStatus">Status</th>
@@ -990,6 +1032,7 @@
           <div class="adm-scroll"><table class="adm-table">
             <thead><tr>
               <th data-i18n="admAccess">Access</th>
+              <th data-i18n="admType">Type</th>
               <th data-i18n="admKey">Key</th>
               <th data-i18n="admLastChange">Last change</th>
               <th></th>
@@ -1002,7 +1045,14 @@
             <h2 data-i18n="admSetKey">Set room key</h2>
             <div class="alert" id="admKAlert"></div>
             <div class="row"><label for="admKCuarto" data-i18n="admRoom">Room</label><input id="admKCuarto" maxlength="20" placeholder="3"></div>
-            <div style="margin-top:10px"><label for="admKClave" data-i18n="admNewKey">New key</label><input id="admKClave" type="password" autocomplete="new-password" maxlength="20"></div>
+            <div style="margin-top:10px"><label for="admKTipo" data-i18n="admRoomType">Room production</label>
+              <select id="admKTipo">
+                <option value="capsula" data-i18n="tpCapsule">Capsules</option>
+                <option value="tableta" data-i18n="tpTablet">Tablets</option>
+                <option value="blending" data-i18n="tpBlend">Blending</option>
+              </select></div>
+            <div style="margin-top:10px"><label for="admKClave" data-i18n="admNewKey">New key</label><input id="admKClave" type="password" autocomplete="new-password" maxlength="20">
+              <div class="hint" data-i18n="admKeyKeepHint">Existing room: leave empty to change only the type.</div></div>
             <button class="btn primary" id="admKSave" style="width:100%;margin-top:14px" data-i18n="save">Save</button>
           </div>
           <div class="card" style="margin:0">
@@ -1209,11 +1259,11 @@
   <div class="card">
     <h2><span class="ic">📊</span> <span data-i18n="orderSummary">Order summary</span></h2>
     <div class="stats">
-      <div class="stat"><div class="v" id="sCount">0</div><div class="l" data-i18n="samples">Samples</div></div>
-      <div class="stat"><div class="v" id="sProm">—</div><div class="l" data-i18n="avgCap">Avg. capsule (mg)</div></div>
-      <div class="stat"><div class="v" id="sFuera">0</div><div class="l" data-i18n="outOfRange">Out of range</div></div>
-      <div class="stat"><div class="v" id="sProd">0</div><div class="l" data-i18n="accumProd">Accum. production (caps)</div></div>
-      <div class="stat"><div class="v" id="sBarriles" style="color:var(--accent)">0</div><div class="l" data-i18n="barrelsQR">Barrels scanned (QR)</div></div>
+      <div class="stat st-cap"><div class="v" id="sCount">0</div><div class="l" data-i18n="samples">Samples</div></div>
+      <div class="stat st-cap"><div class="v" id="sProm">—</div><div class="l" data-i18n="avgCap">Avg. capsule (mg)</div></div>
+      <div class="stat st-cap"><div class="v" id="sFuera">0</div><div class="l" data-i18n="outOfRange">Out of range</div></div>
+      <div class="stat"><div class="v" id="sProd">0</div><div class="l" id="sProdLbl" data-i18n="accumProd">Accum. production (caps)</div></div>
+      <div class="stat st-cap"><div class="v" id="sBarriles" style="color:var(--accent)">0</div><div class="l" data-i18n="barrelsQR">Barrels scanned (QR)</div></div>
     </div>
     <div style="margin-top:12px" id="rangePillWrap"><span class="range-pill" id="rangePill" data-i18n="rangeUndef">Range: set min/max in order data</span></div>
     <div class="progress-wrap" id="progWrap" style="display:none">
@@ -1492,7 +1542,7 @@
     <div class="sub" id="pStamp">—</div>
     <div class="alert" id="pAlert"></div>
     <div class="row">
-      <label data-i18n="capsProducedSoFar">Capsules produced so far</label>
+      <label id="pProdLbl" data-i18n="capsProducedSoFar">Capsules produced so far</label>
       <input id="pProd" type="number" step="1" inputmode="numeric" placeholder="Ex. 24500">
       <div class="hint" data-i18n="progressHint">Replaces the previous value. Update it as many times as you want during the day.</div>
     </div>
@@ -1515,10 +1565,10 @@
     <div class="sub" id="tmSub">—</div>
     <div class="alert" id="tmAlert"></div>
     <div class="row">
-      <label data-i18n="totalCapsDay">Total capsules for the day</label>
+      <label id="tmProdLbl">Total capsules for the day</label>
       <input id="tmProd" type="number" step="1" inputmode="numeric" placeholder="Ex. 84500">
     </div>
-    <div class="grid g2">
+    <div class="grid g2" id="tmBarrRow">
       <div class="row">
         <label data-i18n="fullBarrels">Full barrels</label>
         <input id="tmBarriles" type="number" step="1" inputmode="numeric" placeholder="Ex. 19">
@@ -1529,7 +1579,17 @@
         <div class="hint" data-i18n="partialHint">Leave empty if there is no partial.</div>
       </div>
     </div>
+    <!-- Solo blending: kilos de salida del blend final -> merma y rendimiento -->
+    <div class="row" id="tmSalidaRow" style="display:none">
+      <label data-i18n="blKgSalida">Output kilos (final blend)</label>
+      <input id="tmSalida" type="number" step="0.01" inputmode="decimal" placeholder="Ex. 1176">
+    </div>
     <div class="calc"><span data-i18n="btOrderTotal">Order total</span><b id="tmTotal">—</b></div>
+    <div class="calc" id="tmYieldRow" style="display:none;flex-direction:column;align-items:stretch;gap:4px">
+      <div style="display:flex;justify-content:space-between"><span data-i18n="blKgRecibidos">Kilos received</span><b id="tmRecib">—</b></div>
+      <div style="display:flex;justify-content:space-between"><span data-i18n="blMerma">Loss</span><b id="tmMerma" style="color:var(--danger)">—</b></div>
+      <div style="display:flex;justify-content:space-between"><span data-i18n="blRend">Yield</span><b id="tmRend" style="color:var(--accent)">—</b></div>
+    </div>
     <div class="row" id="tmClaveRow">
       <label data-i18n="btRoomKey">Room key</label>
       <input id="tmClave" type="password" inputmode="numeric" autocomplete="off" style="font-size:18px;letter-spacing:4px">
@@ -2824,6 +2884,17 @@ const I18N = {
     btNeedProd:'Enter the production for the day.', btFinishing:'Finishing…', btDone:'Order finished',
     btDoneSub:'The room is free for the next batch.', btErr:'Could not finish the order. Try again.',
     btSupBelow:(p,u)=>`Progress is ${p}% (below ${u}%). Finish anyway?`,
+    /* ===== Tipos de producción: tabletas y blending ===== */
+    tabsUnit:'tabs', tpCapsule:'Capsules', tpTablet:'Tablets', tpBlend:'Blending',
+    rlPickMetaTab:(obj)=>`target ${obj} tabs`, rlPickMetaBl:(kg)=>`${kg} kg received`,
+    blKgRecibidos:'Kilos received', blKgSalida:'Output kilos (final blend)', blMerma:'Loss', blRend:'Yield',
+    blKgHoy:'Kilos processed today', tabProdHoy:'Tablets produced today',
+    blNeedSalida:'Enter the output kilos of the final blend.',
+    roomKioskoSavedSubU:(n,u)=>`${n} ${u} registered`, accumProdU:(u)=>`Accum. production (${u})`,
+    secCaps:'💊 Encapsulation', secTabs:'🔷 Tablets', secBlend:'⚗️ Blending',
+    admType:'Type', admOnlyNameHint:'Tablets and blending only need the name: the target is set on each batch.',
+    admTabTarget:'Target (tablets)', admRoomType:'Room production', admKeyKeepHint:'Existing room: leave empty to change only the type.',
+    admTypeLocked:'This product already has batches; its type cannot be changed.', admNeedTabTarget:'Enter the tablet target.',
     barrelsQR:'Barrels scanned (QR)',
     packTitle:'Packeting — barrel scanning', packStart:'▶️ Start scanner', packStop:'⏹️ Stop scanner',
     packLastBatch:'Current batch', packBarrels:'barrels', packLog:'Recent scans', packRemovedList:'Removed',
@@ -3254,6 +3325,17 @@ const I18N = {
     btNeedProd:'Escribe la producción del día.', btFinishing:'Terminando…', btDone:'Orden terminada',
     btDoneSub:'El cuarto queda libre para el siguiente batch.', btErr:'No se pudo terminar la orden. Intenta de nuevo.',
     btSupBelow:(p,u)=>`El avance es ${p}% (menor a ${u}%). ¿Terminar de todos modos?`,
+    /* ===== Tipos de producción: tabletas y blending ===== */
+    tabsUnit:'tabs', tpCapsule:'Cápsulas', tpTablet:'Tabletas', tpBlend:'Blending',
+    rlPickMetaTab:(obj)=>`objetivo ${obj} tabs`, rlPickMetaBl:(kg)=>`${kg} kg recibidos`,
+    blKgRecibidos:'Kilos recibidos', blKgSalida:'Kilos de salida (blend final)', blMerma:'Merma', blRend:'Rendimiento',
+    blKgHoy:'Kilos procesados hoy', tabProdHoy:'Tabletas producidas hoy',
+    blNeedSalida:'Escribe los kilos de salida del blend final.',
+    roomKioskoSavedSubU:(n,u)=>`${n} ${u} registrados`, accumProdU:(u)=>`Producción acum. (${u})`,
+    secCaps:'💊 Encapsulación', secTabs:'🔷 Tabletas', secBlend:'⚗️ Blending',
+    admType:'Tipo', admOnlyNameHint:'Tabletas y blending solo necesitan el nombre: el objetivo se pone en cada batch.',
+    admTabTarget:'Objetivo (tabletas)', admRoomType:'Producción del cuarto', admKeyKeepHint:'Cuarto existente: déjala vacía para cambiar solo el tipo.',
+    admTypeLocked:'Este producto ya tiene batches; no se puede cambiar su tipo.', admNeedTabTarget:'Escribe el objetivo de tabletas.',
     barrelsQR:'Barriles leídos (QR)',
     packTitle:'Packeting — escaneo de barriles', packStart:'▶️ Iniciar escáner', packStop:'⏹️ Detener escáner',
     packLastBatch:'Batch actual', packBarrels:'barriles', packLog:'Escaneos recientes', packRemovedList:'Retirados',
@@ -3577,6 +3659,11 @@ function openParcialModal(key){
   const n=new Date();
   $('pStamp').textContent=`${fmtDate(new Date(key+'T12:00:00'))} · ${fmtTime(n)}`;
   $('pProd').value = (info && info.avance!=null) ? info.avance : '';
+  /* etiqueta y paso según el tipo: cápsulas / tabletas (piezas) / blending (kg con decimales) */
+  const tpP=tipoProdDe(state);
+  $('pProdLbl').textContent = tpP==='tableta' ? t('tabProdHoy') : (tpP==='blending' ? t('blKgHoy') : t('capsProducedSoFar'));
+  $('pProd').step = tpP==='blending' ? '0.01' : '1';
+  $('pProd').setAttribute('inputmode', tpP==='blending' ? 'decimal' : 'numeric');
   $('pAlert').classList.remove('show'); $('pAlert').textContent='';
   modalParcial.classList.add('show'); setTimeout(()=>$('pProd').focus(),50);
 }
@@ -3680,6 +3767,8 @@ function reopenDay(key){
 
 /* ---- render ---- */
 function render(){
+  aplicarClaseTipo();
+  const tpR=tipoProdDe(state), uR=unidadTipo(tpR);
   renderIncidencias();
   renderMP();
   renderParos();
@@ -3737,7 +3826,8 @@ function render(){
     : t('rangeUndef');
 
   const prodTotal=prodAcumulada(state.dias, true);
-  $('sProd').textContent=prodTotal.toLocaleString(I18N[lang].locale);
+  $('sProd').textContent=fmtCant(prodTotal,tpR);
+  const lblProd=$('sProdLbl'); if(lblProd) lblProd.textContent = tpR==='capsula' ? t('accumProd') : t('accumProdU')(uR);
 
   /* barriles escaneados por QR (packeting) — solo activos (no retirados) */
   const nBarriles=(state.barrilesQR||[]).filter(b=>b && !b.removed).length;
@@ -3754,7 +3844,7 @@ function render(){
     else if(pctReal<=70) color='var(--warn)';
     else color='var(--accent)';
     barra.style.background=color;
-    $('progTxt').textContent=`${prodTotal.toLocaleString(I18N[lang].locale)} / ${meta.toLocaleString(I18N[lang].locale)} ${t('capsUnit')} · ${pct.toFixed(1)}%`;
+    $('progTxt').textContent=`${fmtCant(prodTotal,tpR)} / ${fmtCant(meta,tpR)} ${uR} · ${pct.toFixed(1)}%`;
   }else $('progWrap').style.display='none';
 
   const box=$('records');
@@ -3784,8 +3874,8 @@ function render(){
     html+=`<div class="day-group"><div class="day-head${closed?' closed':''}">
       <span>${fmtDate(d)} ${closed?`<span class="lock-tag">${t('closedTag')}</span>`:`<span class="lock-tag" style="background:rgba(240,180,41,.15);color:var(--warn)">${t('openTag')}</span>`}</span>
       <span class="meta">
-        <span>${list.length} ${t('sampleCount')}</span>
-        ${mostrarAvance?`<span>${t('advance')} <b>${Number(dinfo.avance).toLocaleString(loc)}</b> ${t('capsUnit')}${dinfo.avanceTs?` <span style="color:var(--muted)">(${fmtTime(new Date(dinfo.avanceTs))})</span>`:''}</span>`:''}
+        <span class="n-muestras">${list.length} ${t('sampleCount')}</span>
+        ${mostrarAvance?`<span>${t('advance')} <b>${Number(dinfo.avance).toLocaleString(loc)}</b> ${uR}${dinfo.avanceTs?` <span style="color:var(--muted)">(${fmtTime(new Date(dinfo.avanceTs))})</span>`:''}</span>`:''}
         ${dinfo.prod!=null?`<span>${t('capsLabel')} <b>${Number(dinfo.prod).toLocaleString(loc)}</b></span>`:''}
         ${dinfo.barriles!=null?`<span>${t('barrelsLabel')} <b>${dinfo.barriles}</b></span>`:''}
         ${dinfo.parcial!=null?`<span>${t('partialLabel')} <b>${dinfo.parcial} ${t('kg')}</b></span>`:''}
@@ -3796,11 +3886,11 @@ function render(){
     if(mostrarAvance){
       html+=`<div class="parciales-box"><div class="parcial-row" style="border:none;padding:2px 0">
           <span class="ph">${t('advanceInProgress')}</span>
-          <span class="pc"><b style="font-size:15px">${Number(dinfo.avance).toLocaleString(loc)}</b> ${t('capsUnit')}${dinfo.avanceTs?` <span class="ph-time">· ${t('updatedShort')} ${fmtTime(new Date(dinfo.avanceTs))}</span>`:''}</span>
+          <span class="pc"><b style="font-size:15px">${Number(dinfo.avance).toLocaleString(loc)}</b> ${uR}${dinfo.avanceTs?` <span class="ph-time">· ${t('updatedShort')} ${fmtTime(new Date(dinfo.avanceTs))}</span>`:''}</span>
         </div></div>`;
     }
 
-    html+=`<table><thead><tr><th>${t('thTime')}</th><th>${t('thW10')}</th><th>${t('thWcap')}</th><th>${t('thStatus')}</th><th>${t('thOperator')}</th><th></th></tr></thead><tbody>`;
+    html+=`<div class="muestras-wrap"><table><thead><tr><th>${t('thTime')}</th><th>${t('thW10')}</th><th>${t('thWcap')}</th><th>${t('thStatus')}</th><th>${t('thOperator')}</th><th></th></tr></thead><tbody>`;
     if(!list.length){ html+=`<tr><td colspan="6" class="empty">${t('noSamplesDay')}</td></tr>`; }
     /* mostrar solo las últimas TOPE_MUESTRAS tomas salvo que el día esté expandido */
     const expandido=!!diasExpandidos[k];
@@ -3821,7 +3911,7 @@ function render(){
         <button class="mini-btn" onclick="toggleDia('${k}')">${expandido?t('showOnly3'):`${t('showAll')} (${list.length})`}</button>
       </div>`;
     }
-    html+='</div>';
+    html+='</div></div>';
   });
   box.innerHTML=html;
   /* Refrescar el banner de "packeting finalizada" para supervisor */
@@ -4510,15 +4600,18 @@ async function refrescarTablero(){
   });
   if(!codigosCuarto.length){
     grid.innerHTML='';
+    pintarSeccionesTipo({capsula:'',tableta:'',blending:''});
     empty.style.display='block';
     renderTablePacketing(tabEfectivos, tabDatos);
     return;
   }
   empty.style.display='none';
+  const htmlBy={capsula:'',tableta:'',blending:''};
   codigosCuarto.forEach(cod=>{
     const d=datos[cod];
+    const tpC=tipoProdDe(d), uC=unidadTipo(tpC);
     if(!d){
-      html+=`<div class="ord-card miss">
+      htmlBy.capsula+=`<div class="ord-card miss">
         <div class="oc-top"><div><div class="oc-code">${cod}</div>
           <div class="oc-prod">${t('orderNotFound')}</div></div>
           <button class="oc-rm" onclick="quitarTab('${cod}')" title="${t('cancel')}">✕</button></div>
@@ -4539,7 +4632,7 @@ async function refrescarTablero(){
       const k=clavesAbiertas[clavesAbiertas.length-1];
       const a=dias[k].avance;
       const hh=dias[k].avanceTs?` · ${fmtTime(new Date(dias[k].avanceTs))}`:'';
-      avanceTxt=`<b>${Number(a).toLocaleString(loc)}</b> ${t('capsUnit')}${hh}`;
+      avanceTxt=`<b>${fmtCant(a,tpC)}</b> ${uC}${hh}`;
     }
 
     /* producción del cierre del día anterior: último día CERRADO con total */
@@ -4547,7 +4640,7 @@ async function refrescarTablero(){
     const clavesCerradas=Object.keys(dias).filter(k=>dias[k] && dias[k].closed && dias[k].prod!=null).sort();
     if(clavesCerradas.length){
       const kc=clavesCerradas[clavesCerradas.length-1];
-      cierreAntTxt=`<b>${Number(dias[kc].prod).toLocaleString(loc)}</b> ${t('capsUnit')}`;
+      cierreAntTxt=`<b>${fmtCant(dias[kc].prod,tpC)}</b> ${uC}`;
       cierreAntFecha=` <span style="color:var(--muted)">(${kc})</span>`;
     }
 
@@ -4557,9 +4650,9 @@ async function refrescarTablero(){
     const dHoy=dias[hoyKey];
     if(dHoy && !dHoy.closed && dHoy.avance!=null){
       const hh=dHoy.avanceTs?` · ${fmtTime(new Date(dHoy.avanceTs))}`:'';
-      parcialHoyTxt=`<b>${Number(dHoy.avance).toLocaleString(loc)}</b> ${t('capsUnit')}${hh}`;
+      parcialHoyTxt=`<b>${fmtCant(dHoy.avance,tpC)}</b> ${uC}${hh}`;
     } else if(dHoy && dHoy.closed && dHoy.prod!=null){
-      parcialHoyTxt=`<b>${Number(dHoy.prod).toLocaleString(loc)}</b> ${t('capsUnit')} <span style="color:var(--accent)">${t('dayClosedTag')}</span>`;
+      parcialHoyTxt=`<b>${fmtCant(dHoy.prod,tpC)}</b> ${uC} <span style="color:var(--accent)">${t('dayClosedTag')}</span>`;
     }
 
     let prog='';
@@ -4571,10 +4664,10 @@ async function refrescarTablero(){
           <b>${pct.toFixed(1)}%</b></div>
         <div class="bar"><span style="width:${pct}%;background:${color}"></span></div>
         <div class="oc-prog-top" style="margin-top:5px;margin-bottom:0">
-          <span style="color:var(--muted)">${prodTotal.toLocaleString(loc)} / ${meta.toLocaleString(loc)} ${t('capsUnit')}</span></div>
+          <span style="color:var(--muted)">${fmtCant(prodTotal,tpC)} / ${fmtCant(meta,tpC)} ${uC}</span></div>
       </div>`;
     } else {
-      prog=`<div class="oc-meta">${t('accumLabel')} <b>${prodTotal.toLocaleString(loc)}</b> ${t('capsUnit')} ${t('noTargetSet')}</div>`;
+      prog=`<div class="oc-meta">${t('accumLabel')} <b>${fmtCant(prodTotal,tpC)}</b> ${uC} ${t('noTargetSet')}</div>`;
     }
 
     /* indicador discreto de solicitudes de mantenimiento abiertas */
@@ -4628,7 +4721,7 @@ async function refrescarTablero(){
       </div>`;
     }
 
-    html+=`<div class="ord-card${extraCard}">
+    htmlBy[tpC]+=`<div class="ord-card${extraCard}${tpC!=='capsula'?' tp-'+tpC:''}">
       ${coBanner}
       <div class="oc-top">
         <div>
@@ -4646,8 +4739,20 @@ async function refrescarTablero(){
       <div class="oc-avance">${t('todayPartial')} ${parcialHoyTxt}</div>
     </div>`;
   });
-  grid.innerHTML=html;
+  grid.innerHTML=htmlBy.capsula;
+  pintarSeccionesTipo(htmlBy);
   renderTablePacketing(tabEfectivos, tabDatos);
+}
+
+/* Secciones del tablero por tipo de producción: Encapsulación (grid principal) · Tabletas · Blending.
+   El título de Encapsulación solo aparece cuando hay otras secciones visibles. */
+function pintarSeccionesTipo(htmlBy){
+  const hayTab=!!htmlBy.tableta, hayBl=!!htmlBy.blending;
+  $('tabTabSection').style.display = hayTab ? 'block' : 'none';
+  $('tabTabGrid').innerHTML = htmlBy.tableta;
+  $('tabBlSection').style.display = hayBl ? 'block' : 'none';
+  $('tabBlGrid').innerHTML = htmlBy.blending;
+  $('tabCapTitle').style.display = (htmlBy.capsula && (hayTab||hayBl)) ? 'flex' : 'none';
 }
 
 /* Sección Packeting del tablero supervisor: cards read-only con barra de avance del día acumulado */
@@ -4835,7 +4940,7 @@ async function renderReporteDia(fechaKey){
     let estCls='sin';
     if(est===t('inProcess')) estCls='proc';
     else if(est===t('closedOrder')) estCls='cerr';
-    filas.push({room:o.orden||'—', cod, prod:o.producto||'—', hoy, total, est, estCls});
+    filas.push({room:o.orden||'—', cod, prod:o.producto||'—', hoy, total, est, estCls, tipo:tipoProdDe(d)});
   });
 
   /* ===== PACKETING =====
@@ -4871,23 +4976,27 @@ async function renderReporteDia(fechaKey){
   if(!filas.length && !filasPk.length){
     body.innerHTML=`<div class="tab-empty" style="margin-top:14px">${t('repNoData')}</div>`;
   } else {
-    /* --- Sección Encapsulación --- */
+    /* --- Secciones por tipo de producción: Encapsulación · Tabletas · Blending --- */
     let secCaps='';
-    if(filas.length){
-      filas.sort((a,b)=>String(a.room).localeCompare(String(b.room),undefined,{numeric:true}));
+    const titulosTipo={ capsula:t('repCapsSectionTitle'), tableta:t('secTabs'), blending:t('secBlend') };
+    TIPOS_PROD.forEach(tp=>{
+      const fs=filas.filter(f=>f.tipo===tp);
+      if(!fs.length) return;
+      fs.sort((a,b)=>String(a.room).localeCompare(String(b.room),undefined,{numeric:true}));
+      const totTp=fs.reduce((acc,f)=>acc+f.hoy,0);
       let rows='';
-      filas.forEach(f=>{
+      fs.forEach(f=>{
         rows+=`<tr>
           <td style="font-weight:700">${String(f.room).replace(/</g,'&lt;')}</td>
           <td style="color:var(--muted)">${f.cod}</td>
           <td>${String(f.prod).replace(/</g,'&lt;')}</td>
-          <td style="text-align:right;font-weight:700">${f.hoy.toLocaleString(loc)}</td>
-          <td style="text-align:right">${f.total.toLocaleString(loc)}</td>
+          <td style="text-align:right;font-weight:700">${fmtCant(f.hoy,tp)}</td>
+          <td style="text-align:right">${fmtCant(f.total,tp)}</td>
           <td style="text-align:center"><span class="est-pill ${f.estCls}" style="font-size:10px">${f.est}</span></td>
         </tr>`;
       });
-      secCaps=`
-        <h4 style="margin:14px 0 6px 0;font-size:13px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px">${t('repCapsSectionTitle')}</h4>
+      secCaps+=`
+        <h4 style="margin:14px 0 6px 0;font-size:13px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px">${titulosTipo[tp]}</h4>
         <div style="overflow-x:auto">
           <table class="rep-table${esHoy?'':' rep-past'}">
             <colgroup>
@@ -4902,8 +5011,8 @@ async function renderReporteDia(fechaKey){
             <tbody>${rows}</tbody>
           </table>
         </div>
-        <div class="rep-total"><span>${esHoy?t('repTotalDay'):t('repTotalDaySel')}</span> <b>${totalHoy.toLocaleString(loc)}</b> ${t('capsUnit')}</div>`;
-    }
+        <div class="rep-total"><span>${esHoy?t('repTotalDay'):t('repTotalDaySel')}</span> <b>${fmtCant(totTp,tp)}</b> ${unidadTipo(tp)}</div>`;
+    });
 
     /* --- Sección Packeting --- */
     let secPk='';
@@ -5780,7 +5889,7 @@ function renderQC(codigos){
   /* El grid principal solo muestra órdenes con el ENCAPSULADO en proceso.
      Las órdenes cuyo encapsulado está cerrado pero con packeting activo NO deben
      aparecer aquí; sí aparecen en renderQcPacketing (sección Packeting abajo). */
-  const codigosCuarto = (codigos||[]).filter(c=> encapsuladoEnProceso(qcDatos[c]));
+  const codigosCuarto = (codigos||[]).filter(c=> encapsuladoEnProceso(qcDatos[c]) && tipoProdDe(qcDatos[c])==='capsula');
   if(!codigosCuarto.length){
     grid.innerHTML=''; empty.style.display='block';
     renderQcPacketing(codigos);
@@ -6211,12 +6320,12 @@ function mostrarKioskoExito(avance){
   if(roomLinkTimer){ clearInterval(roomLinkTimer); roomLinkTimer=null; }
   const badge = escCuarto(roomLinkTarget);
   const codTxt = String(roomLinkOrdenCod||'').replace(/</g,'&lt;');
-  const nfmt = (typeof avance==='number' && isFinite(avance))
-    ? avance.toLocaleString('en-US') : '';
+  const tpK = tipoProdDe(state);
+  const nfmt = (typeof avance==='number' && isFinite(avance)) ? fmtCant(avance,tpK) : '';
   $('roomLinkContent').innerHTML =
     `<div class="rl-badge">${t('roomLinkBadge')} ${badge}</div>
      <div class="rl-title" style="color:var(--ok)">✓ ${t('roomKioskoSaved')}</div>
-     <div class="rl-sub">${t('roomKioskoSavedSub')(nfmt)}</div>
+     <div class="rl-sub">${tpK==='capsula' ? t('roomKioskoSavedSub')(nfmt) : t('roomKioskoSavedSubU')(nfmt, unidadTipo(tpK))}</div>
      <div class="rl-sub" style="opacity:.7">${t('roomKioskoOrderCode')(codTxt)}</div>
      <div class="rl-sub" style="margin-top:8px;font-weight:600">${t('roomKioskoScanAgain')}</div>`;
 }
@@ -6353,6 +6462,38 @@ async function cargarAjustes(){
   }catch(e){ /* tabla aún no creada: se queda en 90 */ }
 }
 
+/* ---------- Tipos de producción: cápsulas · tabletas · blending ----------
+   La orden guarda data.tipoProd ('capsula' | 'tableta' | 'blending').
+   Órdenes sin el campo (todas las anteriores) son cápsulas. */
+const TIPOS_PROD=['capsula','tableta','blending'];
+function tipoProdDe(st){ const v=st && st.tipoProd; return TIPOS_PROD.indexOf(v)>=0 ? v : 'capsula'; }
+function tipoValido(v){ return TIPOS_PROD.indexOf(v)>=0 ? v : 'capsula'; }
+/* unidad corta de producción según el tipo */
+function unidadTipo(tipo){ return tipo==='tableta' ? t('tabsUnit') : (tipo==='blending' ? 'kg' : t('capsUnit')); }
+function unidadDe(st){ return unidadTipo(tipoProdDe(st)); }
+function nombreTipo(tipo){ return tipo==='tableta' ? t('tpTablet') : (tipo==='blending' ? t('tpBlend') : t('tpCapsule')); }
+/* formato de cantidad: kg con hasta 2 decimales, piezas enteras */
+function fmtCant(n, tipo){
+  const v=Number(n||0);
+  return tipo==='blending'
+    ? v.toLocaleString(I18N[lang].locale,{maximumFractionDigits:2})
+    : Math.round(v).toLocaleString(I18N[lang].locale);
+}
+function pillTipo(tipo){ return `<span class="tp-pill tp-${tipo}">${escH(nombreTipo(tipo))}</span>`; }
+/* tipo de producción configurado para un cuarto (tabla accesos.produccion) */
+async function tipoDeCuarto(cuarto){
+  try{
+    const rows=await sbGet('accesos?id=eq.'+encodeURIComponent(idAccesoCuarto(cuarto))+'&select=produccion');
+    return tipoValido(rows && rows[0] && rows[0].produccion);
+  }catch(e){ return 'capsula'; }
+}
+/* clase en <body> para ajustar la vista de orden según el tipo */
+function aplicarClaseTipo(){
+  const tp=tipoProdDe(state);
+  document.body.classList.toggle('prod-tableta', tp==='tableta');
+  document.body.classList.toggle('prod-blending', tp==='blending');
+}
+
 /* Avance de una orden; prodHoy (opcional) sustituye el avance de hoy por un valor tecleado */
 function totalOrdenCon(st, prodHoy){
   const dias=(st&&st.dias)||{}, hoyK=dayKey(new Date());
@@ -6373,7 +6514,7 @@ function pctOrdenCon(st, prodHoy){
 }
 
 /* ---------- QR del cuarto: elegir batch y abrir la orden ---------- */
-let rlBatches=[], rlSel=null;
+let rlBatches=[], rlSel=null, rlTipo='capsula';
 
 async function mostrarSelectorBatch(){
   let lista=[];
@@ -6383,39 +6524,62 @@ async function mostrarSelectorBatch(){
     /* tablas nuevas aún no creadas: comportamiento anterior */
     mostrarSinOrdenActivaEnCuarto(); return;
   }
-  rlBatches = (lista||[]).filter(b=>b && b.productos && (b.productos.tipo||'capsula')==='capsula');
+  /* el cuarto solo ofrece batches de su tipo de producción (cápsulas / tabletas / blending) */
+  rlTipo = await tipoDeCuarto(roomLinkTarget);
+  rlBatches = (lista||[]).filter(b=>b && b.productos && tipoValido(b.productos.tipo)===rlTipo);
   if(!rlBatches.length){ mostrarSinOrdenActivaEnCuarto(t('rlPickNone')); return; }
   const badge = escCuarto(roomLinkTarget);
   const items = rlBatches.map((b,i)=>{
     const p=b.productos;
-    const obj = b.objetivo || objetivoCaps(b.kilos, p.avg_llenado_mg);
     return `<button type="button" class="rl-batch" onclick="rlElegirBatch(${i})">
       <span class="rb-code">${escH(b.batch)}</span>
       <span class="rb-prod">${escH(p.nombre)}</span>
-      <span class="rb-meta">${escH(t('rlPickMeta')(fmtN(b.kilos), fmtN(obj)))}</span>
+      <span class="rb-meta">${escH(metaBatchTxt(b, rlTipo))}</span>
     </button>`;
   }).join('');
   $('roomLinkContent').innerHTML =
-    `<div class="rl-badge">${t('roomLinkBadge')} ${badge}</div>
+    `<div class="rl-badge">${t('roomLinkBadge')} ${badge} · ${escH(nombreTipo(rlTipo))}</div>
      <div class="rl-title">${t('rlPickTitle')}</div>
      <div class="rl-sub">${t('rlPickSub')}</div>
      <div class="rl-list">${items}</div>
      <div class="rl-sub" style="font-size:12px">${t('rlPickHelp')}</div>`;
 }
 
+/* objetivo de un batch según su tipo: cápsulas = kilos ÷ average; tabletas = objetivo directo; blending = kilos recibidos */
+function objetivoBatch(b, tipo){
+  const p=b.productos||{};
+  if(tipo==='tableta') return Number(b.objetivo)||0;
+  if(tipo==='blending') return Number(b.kilos)||Number(b.objetivo)||0;
+  return Number(b.objetivo) || objetivoCaps(b.kilos, p.avg_llenado_mg);
+}
+function metaBatchTxt(b, tipo){
+  const obj=objetivoBatch(b, tipo);
+  if(tipo==='tableta') return t('rlPickMetaTab')(fmtN(obj));
+  if(tipo==='blending') return t('rlPickMetaBl')(fmtCant(obj,'blending'));
+  return t('rlPickMeta')(fmtN(b.kilos), fmtN(obj));
+}
+
 function rlElegirBatch(i){
   rlSel = rlBatches[i]; if(!rlSel) return;
-  const b=rlSel, p=b.productos;
-  const obj = b.objetivo || objetivoCaps(b.kilos, p.avg_llenado_mg);
+  const b=rlSel, p=b.productos, tp=rlTipo;
+  const obj = objetivoBatch(b, tp);
   const badge = escCuarto(roomLinkTarget);
+  let resumen='';
+  if(tp==='capsula'){
+    resumen=`<div><div class="k">${t('rlKilos')}</div><div class="v">${fmtN(b.kilos)} kg</div></div>
+       <div><div class="k">${t('rlTarget')}</div><div class="v">${fmtN(obj)} ${t('capsUnit')}</div></div>
+       <div style="grid-column:1/-1"><div class="k">${t('rlRange')}</div><div class="v">${fmtN(p.peso_min_mg)} – ${fmtN(p.peso_max_mg)} mg</div></div>`;
+  } else if(tp==='tableta'){
+    resumen=`<div style="grid-column:1/-1"><div class="k">${t('rlTarget')}</div><div class="v">${fmtN(obj)} ${t('tabsUnit')}</div></div>`;
+  } else {
+    resumen=`<div style="grid-column:1/-1"><div class="k">${t('blKgRecibidos')}</div><div class="v">${fmtCant(obj,'blending')} kg</div></div>`;
+  }
   $('roomLinkContent').innerHTML =
-    `<div class="rl-badge">${t('roomLinkBadge')} ${badge}</div>
+    `<div class="rl-badge">${t('roomLinkBadge')} ${badge} · ${escH(nombreTipo(tp))}</div>
      <div class="rl-title">${escH(t('rlConfTitle')(b.batch, roomLinkTarget))}</div>
      <div class="rl-sum">
        <div style="grid-column:1/-1"><div class="k">${t('product')}</div><div class="v">${escH(p.nombre)}</div></div>
-       <div><div class="k">${t('rlKilos')}</div><div class="v">${fmtN(b.kilos)} kg</div></div>
-       <div><div class="k">${t('rlTarget')}</div><div class="v">${fmtN(obj)} ${t('capsUnit')}</div></div>
-       <div style="grid-column:1/-1"><div class="k">${t('rlRange')}</div><div class="v">${fmtN(p.peso_min_mg)} – ${fmtN(p.peso_max_mg)} mg</div></div>
+       ${resumen}
      </div>
      <div class="rl-form">
        <div class="alert" id="rlAlert"></div>
@@ -6454,17 +6618,22 @@ async function rlIniciarOrden(){
       await sbSend('PATCH','batches?batch=eq.'+enc,{ estado:'disponible', cuarto:null });
       return showErr(t('admBatchOrderExists'));
     }
-    const p=b.productos, hoyK=dayKey(new Date());
-    const obj = b.objetivo || objetivoCaps(b.kilos, p.avg_llenado_mg);
+    const p=b.productos, hoyK=dayKey(new Date()), tp=rlTipo;
+    const obj = objetivoBatch(b, tp);
+    const esCap = tp==='capsula';
     const dias={}; dias[hoyK]={ closed:false, prod:null, barriles:null, parcial:null, avance:null };
     const data = normalizar({
       orden:{ producto:p.nombre, lote:b.batch, orden:roomLinkTarget,
-              min:String(p.peso_min_mg), max:String(p.peso_max_mg), metaCaps:String(obj) },
+              min: esCap ? String(p.peso_min_mg) : '', max: esCap ? String(p.peso_max_mg) : '',
+              metaCaps:String(obj) },
       registros:[], dias, firmas:{}, incidencias:[], barrilesQR:[]
     });
+    data.tipoProd=tp;
     data.estadoOrden='abierta';
-    data.origenBatch={ batch:b.batch, productoId:p.id, kilos:Number(b.kilos),
-                       avgMg:Number(p.avg_llenado_mg), cuarto:roomLinkTarget, inicioTs:Date.now() };
+    data.origenBatch={ batch:b.batch, productoId:p.id, tipo:tp,
+                       kilos: b.kilos!=null ? Number(b.kilos) : null,
+                       avgMg: esCap ? Number(p.avg_llenado_mg) : null,
+                       cuarto:roomLinkTarget, inicioTs:Date.now() };
     const okW = await escribirOrden(cod, data);
     if(!okW){
       await sbSend('PATCH','batches?batch=eq.'+enc,{ estado:'disponible', cuarto:null });
@@ -6493,9 +6662,16 @@ function abrirTerminar(modo, cod, data){
   tmCtx={ modo, cod, data };
   const o=data.orden||{}, hoyK=dayKey(new Date());
   const dHoy=(data.dias||{})[hoyK]||{};
+  const tp=tipoProdDe(data);
   $('tmSub').textContent = `${cod} · ${o.producto||'—'}`;
   $('tmProd').value = dHoy.avance!=null ? dHoy.avance : '';
-  $('tmBarriles').value=''; $('tmParcial').value=''; $('tmClave').value='';
+  $('tmProd').step = tp==='blending' ? '0.01' : '1';
+  $('tmProdLbl').textContent = tp==='tableta' ? t('tabProdHoy') : (tp==='blending' ? t('blKgHoy') : t('totalCapsDay'));
+  /* barriles solo en cápsulas; kilos de salida + rendimiento solo en blending */
+  $('tmBarrRow').style.display = tp==='capsula' ? '' : 'none';
+  $('tmSalidaRow').style.display = tp==='blending' ? 'block' : 'none';
+  $('tmYieldRow').style.display = tp==='blending' ? 'flex' : 'none';
+  $('tmBarriles').value=''; $('tmParcial').value=''; $('tmClave').value=''; $('tmSalida').value='';
   $('tmClaveRow').style.display = (modo==='kiosko') ? 'block' : 'none';
   $('tmAlert').classList.remove('show'); $('tmAlert').textContent='';
   $('tmSave').disabled=false; $('tmSave').textContent=t('btFinishConfirm');
@@ -6510,7 +6686,20 @@ function actualizarTotalTerminar(){
   const st = (tmCtx.modo==='kiosko') ? state : tmCtx.data;
   const tot = totalOrdenCon(st, v);
   const meta=parseFloat(st.orden && st.orden.metaCaps);
-  $('tmTotal').textContent = fmtN(tot)+' '+t('capsUnit') + (meta>0 ? ' · '+(tot/meta*100).toFixed(1)+'%' : '');
+  const tp=tipoProdDe(st);
+  $('tmTotal').textContent = fmtCant(tot,tp)+' '+unidadTipo(tp) + (meta>0 ? ' · '+(tot/meta*100).toFixed(1)+'%' : '');
+  if(tp==='blending'){
+    const y=calcRendimiento(meta, $('tmSalida').value);
+    $('tmRecib').textContent = meta>0 ? fmtCant(meta,'blending')+' kg' : '—';
+    $('tmMerma').textContent = y ? fmtCant(y.merma,'blending')+' kg' : '—';
+    $('tmRend').textContent  = y ? y.rend.toFixed(1)+'%' : '—';
+  }
+}
+/* Blending: merma = kilos recibidos − kilos de salida; rendimiento = salida ÷ recibidos */
+function calcRendimiento(recibidos, salidaRaw){
+  const r=parseFloat(recibidos), sal=parseFloat(salidaRaw);
+  if(!(r>0) || !(sal>=0) || String(salidaRaw).trim()==='') return null;
+  return { recibidos:r, salida:sal, merma:Math.round((r-sal)*100)/100, rend:sal/r*100 };
 }
 function cerrarTerminar(){ $('modalTerminar').classList.remove('show'); }
 
@@ -6523,9 +6712,18 @@ async function guardarTerminar(){
   const barrRaw=$('tmBarriles').value, parRaw=$('tmParcial').value;
   const barriles = barrRaw!=='' ? parseFloat(barrRaw) : null;
   const parcial  = parRaw!==''  ? parseFloat(parRaw)  : null;
+  const tpT = tipoProdDe((tmCtx.modo==='kiosko') ? state : tmCtx.data);
   if(!(prod>=0)) return showErr(t('btNeedProd'));
-  if(!(barriles>=0)) return showErr(t('alBarrelsInvalid'));
-  if(parRaw!=='' && !(parcial>=0)) return showErr(t('alPartialInvalid'));
+  if(tpT==='capsula'){
+    if(!(barriles>=0)) return showErr(t('alBarrelsInvalid'));
+    if(parRaw!=='' && !(parcial>=0)) return showErr(t('alPartialInvalid'));
+  }
+  let yieldBl=null;
+  if(tpT==='blending'){
+    const metaBl=parseFloat(((tmCtx.modo==='kiosko') ? state : tmCtx.data).orden.metaCaps);
+    yieldBl=calcRendimiento(metaBl, $('tmSalida').value);
+    if(!yieldBl) return showErr(t('blNeedSalida'));
+  }
   $('tmSave').disabled=true; $('tmSave').textContent=t('btFinishing');
   try{
     if(tmCtx.modo==='kiosko'){
@@ -6543,8 +6741,14 @@ async function guardarTerminar(){
       if(k!==hoyK && d && !d.closed){ d.closed=true; d.prod=(d.avance!=null)?Number(d.avance):0; d.autoCerrado=true; }
     });
     const prev=st.dias[hoyK]||{};
-    st.dias[hoyK]={ closed:true, prod, barriles, parcial, avance:prod, avanceTs:nowIso,
+    st.dias[hoyK]={ closed:true, prod, barriles: tpT==='capsula'?barriles:null, parcial: tpT==='capsula'?parcial:null,
+                    avance:prod, avanceTs:nowIso,
                     autoCerrado:false, prevAvance: prev.avance!=null?prev.avance:null };
+    if(yieldBl){
+      st.blendCierre={ recibidosKg:yieldBl.recibidos, procesadosKg:totalOrdenCon(st),
+                       salidaKg:yieldBl.salida, mermaKg:yieldBl.merma,
+                       rendimiento:Math.round(yieldBl.rend*10)/10 };
+    }
     st.estadoOrden='terminada';
     st.terminadaTs=nowIso;
     st.terminadaPor = tmCtx.modo==='kiosko' ? ('cuarto:'+roomLinkTarget) : 'supervisor';
@@ -6560,7 +6764,8 @@ async function guardarTerminar(){
       $('roomLinkContent').innerHTML =
         `<div class="rl-badge">${t('roomLinkBadge')} ${badge}</div>
          <div class="rl-title" style="color:var(--accent)">✓ ${t('btDone')}</div>
-         <div class="rl-sub">${escH(cod)} · ${fmtN(totalOrdenCon(st))} ${t('capsUnit')}</div>
+         <div class="rl-sub">${escH(cod)} · ${fmtCant(totalOrdenCon(st),tpT)} ${unidadTipo(tpT)}</div>
+         ${st.blendCierre?`<div class="rl-sub">${t('blRend')}: <b>${st.blendCierre.rendimiento}%</b> · ${t('blMerma')}: ${fmtCant(st.blendCierre.mermaKg,'blending')} kg</div>`:''}
          <div class="rl-sub">${t('btDoneSub')}</div>
          <div class="rl-sub" style="margin-top:8px;font-weight:600">${t('roomKioskoScanAgain')}</div>`;
     } else {
@@ -6581,6 +6786,7 @@ $('pProd').addEventListener('input',()=>{
   actualizarBtnTerminarKiosko(v==='' ? null : parseFloat(v));
 });
 $('tmProd').addEventListener('input', actualizarTotalTerminar);
+$('tmSalida').addEventListener('input', actualizarTotalTerminar);
 $('tmSave').addEventListener('click', guardarTerminar);
 $('tmCancel').addEventListener('click',()=>{
   const modo = tmCtx && tmCtx.modo;
@@ -6615,6 +6821,7 @@ function iniciarAdmin(){
   $('admBSave').addEventListener('click', admGuardarBatch);
   $('admBCancel').addEventListener('click', admLimpiarBatch);
   ['admBProd','admBKilos'].forEach(id=>{ $(id).addEventListener('input', admCalcObjetivo); $(id).addEventListener('change', admCalcObjetivo); });
+  $('admPTipo').addEventListener('change', admTipoProdUI);
   $('admKSave').addEventListener('click', admGuardarClave);
   $('admUSave').addEventListener('click', admGuardarUmbral);
   admCargar();
@@ -6625,8 +6832,8 @@ async function admCargar(){
   try{
     const r = await Promise.all([
       sbGet('productos?select=*&order=nombre.asc'),
-      sbGet('batches?select=*,productos(nombre,avg_llenado_mg)&order=creado.desc'),
-      sbGet('accesos?tipo=eq.cuarto&select=id,nombre,actualizado'),
+      sbGet('batches?select=*,productos(nombre,avg_llenado_mg,tipo)&order=creado.desc'),
+      sbGet('accesos?tipo=eq.cuarto&select=id,nombre,actualizado,produccion'),
       sbGet('ajustes?clave=eq.umbral_terminar&select=valor')
     ]);
     admProds=r[0]||[]; admBatches=r[1]||[]; admClaves=r[2]||[];
@@ -6644,27 +6851,30 @@ async function admCargar(){
 
 function admRender(){
   /* --- productos --- */
+  const mgTxt=(p,v)=> tipoValido(p.tipo)==='capsula' ? fmtN(v) : '—';
   $('admProdBody').innerHTML = admProds.length ? admProds.map(p=>`<tr>
       <td style="font-weight:600">${escH(p.nombre)}</td>
-      <td class="num">${fmtN(p.peso_min_mg)}</td>
-      <td class="num">${fmtN(p.peso_max_mg)}</td>
-      <td class="num" style="color:var(--accent);font-weight:700">${fmtN(p.avg_llenado_mg)}</td>
+      <td>${pillTipo(tipoValido(p.tipo))}</td>
+      <td class="num">${mgTxt(p,p.peso_min_mg)}</td>
+      <td class="num">${mgTxt(p,p.peso_max_mg)}</td>
+      <td class="num" style="color:var(--accent);font-weight:700">${mgTxt(p,p.avg_llenado_mg)}</td>
       <td><span class="adm-act">
         <button class="mini-btn" onclick="admEditarProducto(${Number(p.id)})">${t('admEdit')}</button>
         <button class="mini-btn" onclick="admBorrarProducto(${Number(p.id)})">${t('admDelete')}</button>
       </span></td></tr>`).join('')
-    : `<tr><td colspan="5" class="empty">${t('admNoProducts')}</td></tr>`;
+    : `<tr><td colspan="6" class="empty">${t('admNoProducts')}</td></tr>`;
 
   /* --- selector de producto del formulario de batch --- */
   const sel=$('admBProd'), prev=sel.value;
   sel.innerHTML = `<option value="">—</option>` + admProds.filter(p=>p.activo!==false)
-    .map(p=>`<option value="${Number(p.id)}">${escH(p.nombre)}</option>`).join('');
+    .map(p=>`<option value="${Number(p.id)}">${escH(p.nombre)} · ${escH(nombreTipo(tipoValido(p.tipo)))}</option>`).join('');
   if(prev) sel.value=prev;
   admCalcObjetivo();
 
   /* --- batches --- */
   $('admBatchBody').innerHTML = admBatches.length ? admBatches.map(b=>{
     const nom = b.productos ? b.productos.nombre : '—';
+    const tpB = tipoValido(b.productos && b.productos.tipo);
     const bEsc = escH(b.batch).replace(/&#39;/g,"\\'");
     let pill='', acts='';
     if(b.estado==='disponible'){
@@ -6684,11 +6894,12 @@ function admRender(){
     return `<tr>
       <td style="font-weight:700">${escH(b.batch)}</td>
       <td>${escH(nom)}</td>
-      <td class="num">${fmtN(b.kilos)}</td>
-      <td class="num">${fmtN(b.objetivo)}</td>
+      <td>${pillTipo(tpB)}</td>
+      <td class="num">${b.kilos!=null && tpB!=='tableta' ? fmtCant(b.kilos,'blending') : '—'}</td>
+      <td class="num">${fmtCant(b.objetivo,tpB)} ${unidadTipo(tpB)}</td>
       <td>${pill}</td>
       <td><span class="adm-act">${acts}</span></td></tr>`;
-  }).join('') : `<tr><td colspan="6" class="empty">${t('admNoBatches')}</td></tr>`;
+  }).join('') : `<tr><td colspan="7" class="empty">${t('admNoBatches')}</td></tr>`;
 
   /* --- claves --- */
   const claves = admClaves.slice().sort((a,b)=>String(a.nombre).localeCompare(String(b.nombre),undefined,{numeric:true}));
@@ -6697,10 +6908,11 @@ function admRender(){
     const nEsc = escH(c.nombre).replace(/&#39;/g,"\\'");
     return `<tr>
       <td style="font-weight:700">${t('admRoomPrefix')} ${escH(c.nombre)}</td>
+      <td>${pillTipo(tipoValido(c.produccion))}</td>
       <td style="letter-spacing:3px;color:var(--muted)">••••</td>
       <td style="color:var(--muted)">${f}</td>
-      <td><button class="mini-btn" onclick="admPrepararClave('${nEsc}')">${t('admChangeKey')}</button></td></tr>`;
-  }).join('') : `<tr><td colspan="4" class="empty">${t('admNoKeys')}</td></tr>`;
+      <td><button class="mini-btn" onclick="admPrepararClave('${nEsc}')">${t('admEdit')}</button></td></tr>`;
+  }).join('') : `<tr><td colspan="5" class="empty">${t('admNoKeys')}</td></tr>`;
 
   $('admUmbral').value = umbralTerminar;
 }
@@ -6712,6 +6924,7 @@ function admSinAlerta(id){ const a=$(id); a.textContent=''; a.classList.remove('
 function admLimpiarProducto(){
   admEditProdId=null;
   ['admPNombre','admPMin','admPMax','admPAvg'].forEach(id=>$(id).value='');
+  $('admPTipo').value='capsula'; admTipoProdUI();
   $('admProdFormTitle').textContent=t('admAddProduct');
   $('admPCancel').style.display='none';
   admSinAlerta('admProdAlert');
@@ -6719,7 +6932,9 @@ function admLimpiarProducto(){
 function admEditarProducto(id){
   const p=admProds.find(x=>Number(x.id)===Number(id)); if(!p) return;
   admEditProdId=p.id;
-  $('admPNombre').value=p.nombre; $('admPMin').value=p.peso_min_mg; $('admPMax').value=p.peso_max_mg; $('admPAvg').value=p.avg_llenado_mg;
+  $('admPTipo').value=tipoValido(p.tipo); admTipoProdUI();
+  $('admPNombre').value=p.nombre;
+  $('admPMin').value=p.peso_min_mg!=null?p.peso_min_mg:''; $('admPMax').value=p.peso_max_mg!=null?p.peso_max_mg:''; $('admPAvg').value=p.avg_llenado_mg!=null?p.avg_llenado_mg:'';
   $('admProdFormTitle').textContent=t('admEditProduct');
   $('admPCancel').style.display='inline-block';
   admSinAlerta('admProdAlert');
@@ -6728,11 +6943,22 @@ function admEditarProducto(id){
 async function admGuardarProducto(){
   admSinAlerta('admProdAlert');
   const nombre=$('admPNombre').value.trim();
+  const tipo=tipoValido($('admPTipo').value);
   const mn=parseFloat($('admPMin').value), mx=parseFloat($('admPMax').value), avg=parseFloat($('admPAvg').value);
   if(!nombre) return admAlerta('admProdAlert', t('admNeedName'));
-  if(!(mn>0) || !(mx>0) || mn>mx) return admAlerta('admProdAlert', t('admNeedRange'));
-  if(!(avg>0)) return admAlerta('admProdAlert', t('admNeedAvg'));
-  const body={ nombre, tipo:'capsula', peso_min_mg:mn, peso_max_mg:mx, avg_llenado_mg:avg };
+  if(tipo==='capsula'){
+    if(!(mn>0) || !(mx>0) || mn>mx) return admAlerta('admProdAlert', t('admNeedRange'));
+    if(!(avg>0)) return admAlerta('admProdAlert', t('admNeedAvg'));
+  }
+  /* no se permite cambiar el tipo de un producto que ya tiene batches */
+  if(admEditProdId!=null){
+    const prev=admProds.find(x=>Number(x.id)===Number(admEditProdId));
+    if(prev && tipoValido(prev.tipo)!==tipo && admBatches.some(b=>Number(b.producto_id)===Number(admEditProdId)))
+      return admAlerta('admProdAlert', t('admTypeLocked'));
+  }
+  const body = tipo==='capsula'
+    ? { nombre, tipo, peso_min_mg:mn, peso_max_mg:mx, avg_llenado_mg:avg }
+    : { nombre, tipo, peso_min_mg:null, peso_max_mg:null, avg_llenado_mg:null };
   try{
     if(admEditProdId!=null) await sbSend('PATCH','productos?id=eq.'+Number(admEditProdId), body);
     else await sbSend('POST','productos', body);
@@ -6749,7 +6975,22 @@ async function admBorrarProducto(id){
 
 /* batches */
 function admProdSel(){ return admProds.find(p=>String(p.id)===String($('admBProd').value)); }
+/* el formulario de batch cambia según el tipo del producto elegido */
+function admTipoBatchUI(){
+  const p=admProdSel(), tp=p ? tipoValido(p.tipo) : 'capsula';
+  $('admBKilosRow').style.display = tp==='tableta' ? 'none' : '';
+  $('admBObjRow').style.display = tp==='tableta' ? '' : 'none';
+  $('admBCalcBox').style.display = tp==='capsula' ? '' : 'none';
+  $('admBKilosLbl').textContent = tp==='blending' ? t('blKgRecibidos') : t('admBatchKilos');
+  return tp;
+}
+function admTipoProdUI(){
+  const tp=tipoValido($('admPTipo').value);
+  $('admPMgBox').style.display = tp==='capsula' ? '' : 'none';
+  $('admPTipoHint').style.display = tp==='capsula' ? 'none' : 'block';
+}
 function admCalcObjetivo(){
+  admTipoBatchUI();
   const p=admProdSel(), kg=$('admBKilos').value;
   const obj = p ? objetivoCaps(kg, p.avg_llenado_mg) : 0;
   $('admBObjetivo').textContent = obj ? fmtN(obj)+' '+t('capsUnit') : '—';
@@ -6757,7 +6998,7 @@ function admCalcObjetivo(){
 }
 function admLimpiarBatch(){
   admEditBatch=null;
-  $('admBBatch').value=''; $('admBKilos').value=''; $('admBProd').value='';
+  $('admBBatch').value=''; $('admBKilos').value=''; $('admBObj').value=''; $('admBProd').value='';
   $('admBBatch').disabled=false;
   $('admBatchFormTitle').textContent=t('admAddBatch');
   $('admBSave').textContent=t('admSaveBatch');
@@ -6769,7 +7010,8 @@ function admEditarBatch(batch){
   const b=admBatches.find(x=>x.batch===batch); if(!b || b.estado!=='disponible') return;
   admEditBatch=b.batch;
   $('admBBatch').value=b.batch; $('admBBatch').disabled=true;
-  $('admBKilos').value=b.kilos; $('admBProd').value=String(b.producto_id);
+  $('admBKilos').value=b.kilos!=null?b.kilos:''; $('admBObj').value=b.objetivo!=null?b.objetivo:'';
+  $('admBProd').value=String(b.producto_id);
   $('admBatchFormTitle').textContent=t('admEditBatch');
   $('admBSave').textContent=t('save');
   $('admBCancel').style.display='inline-block';
@@ -6780,11 +7022,19 @@ async function admGuardarBatch(){
   admSinAlerta('admBatchAlert');
   const p=admProdSel();
   const code=$('admBBatch').value.trim().toUpperCase();
-  const kg=parseFloat($('admBKilos').value);
   if(!p) return admAlerta('admBatchAlert', t('admNeedProduct'));
   if(!code) return admAlerta('admBatchAlert', t('admNeedBatch'));
-  if(!(kg>0)) return admAlerta('admBatchAlert', t('admNeedKilos'));
-  const objetivo=objetivoCaps(kg, p.avg_llenado_mg);
+  const tp=tipoValido(p.tipo);
+  let kg=parseFloat($('admBKilos').value), objetivo;
+  if(tp==='tableta'){
+    objetivo=parseInt($('admBObj').value,10);
+    if(!(objetivo>0)) return admAlerta('admBatchAlert', t('admNeedTabTarget'));
+    kg=null;
+  } else {
+    if(!(kg>0)) return admAlerta('admBatchAlert', t('admNeedKilos'));
+    /* cápsulas: kilos ÷ average · blending: el objetivo son los kilos recibidos */
+    objetivo = tp==='blending' ? kg : objetivoCaps(kg, p.avg_llenado_mg);
+  }
   try{
     if(admEditBatch){
       await sbSend('PATCH','batches?batch=eq.'+encodeURIComponent(admEditBatch)+'&estado=eq.disponible',
@@ -6840,6 +7090,8 @@ async function admCancelarOrden(batch){
 
 /* claves y ajustes */
 function admPrepararClave(nombre){
+  const c=admClaves.find(x=>String(x.nombre)===String(nombre));
+  $('admKTipo').value = tipoValido(c && c.produccion);
   $('admKCuarto').value=nombre; $('admKClave').value='';
   admSinAlerta('admKAlert');
   $('admKClave').focus();
@@ -6848,14 +7100,22 @@ async function admGuardarClave(){
   admSinAlerta('admKAlert');
   const cuarto=$('admKCuarto').value.trim(), clave=$('admKClave').value.trim();
   const norm=normCuarto(cuarto);
+  const produccion=tipoValido($('admKTipo').value);
   if(!norm) return admAlerta('admKAlert', t('admNeedRoom'));
-  if(clave.length<3) return admAlerta('admKAlert', t('admNeedKey'));
+  const existe=admClaves.some(x=>normCuarto(x.nombre)===norm);
+  /* cuarto existente sin clave nueva: solo se cambia el tipo de producción */
+  if(!(existe && clave==='') && clave.length<3) return admAlerta('admKAlert', t('admNeedKey'));
   try{
-    const h=await hashClave(norm, clave);
-    await sbSend('POST','accesos?on_conflict=id',
-      { id:idAccesoCuarto(norm), tipo:'cuarto', nombre:norm, clave_hash:h, actualizado:new Date().toISOString() },
-      'resolution=merge-duplicates,return=minimal');
-    $('admKCuarto').value=''; $('admKClave').value='';
+    if(existe && clave===''){
+      await sbSend('PATCH','accesos?id=eq.'+encodeURIComponent(idAccesoCuarto(norm)),
+        { produccion, actualizado:new Date().toISOString() });
+    } else {
+      const h=await hashClave(norm, clave);
+      await sbSend('POST','accesos?on_conflict=id',
+        { id:idAccesoCuarto(norm), tipo:'cuarto', nombre:norm, clave_hash:h, produccion, actualizado:new Date().toISOString() },
+        'resolution=merge-duplicates,return=minimal');
+    }
+    $('admKCuarto').value=''; $('admKClave').value=''; $('admKTipo').value='capsula';
     await admCargar();
     setAdmConn('ok', t('admSaved'));
   }catch(e){ admAlerta('admKAlert', t('admSaveErr')); }
