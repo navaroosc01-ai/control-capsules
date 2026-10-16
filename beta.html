@@ -590,6 +590,18 @@
   .room-link-panel .rl-sub{font-size:13px;color:var(--muted);max-width:360px;line-height:1.5}
   .room-link-panel .rl-refresh{margin-top:4px}
   .room-link-panel .rl-timer{font-size:11px;color:var(--muted);opacity:.75;margin-top:-4px}
+  /* Manuales del cuarto (opcional, debajo del panel del kiosko) */
+  .rl-manuals{width:100%;max-width:360px;margin-top:10px;padding-top:14px;border-top:1px dashed var(--line);
+    display:flex;flex-direction:column;gap:10px}
+  .rl-manuals:empty{display:none}
+  .rl-man-head{font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:var(--muted)}
+  .rl-man-item{display:flex;align-items:center;justify-content:space-between;gap:10px;text-align:left}
+  .rl-man-title{font-size:13px;font-weight:700;color:var(--ink);line-height:1.35}
+  .rl-man-title small{display:block;font-weight:500;color:var(--muted);font-size:11px}
+  .rl-man-btns{display:flex;gap:6px;flex-shrink:0}
+  .rl-man-btns .btn{padding:8px 12px;font-size:12px;min-width:46px}
+  .rl-man-msg{font-size:12px;color:var(--muted)}
+  .rl-man-msg.err{color:var(--danger)}
   .room-link-panel .rl-warn{padding:10px 14px;background:rgba(255,194,51,.14);
     border:1px solid var(--warn);border-radius:8px;color:var(--warn);font-size:12px;
     max-width:360px;font-weight:700}
@@ -1193,6 +1205,8 @@
        "cargando orden" o "sin orden activa". El contenido se rellena por JS. -->
   <div id="roomLinkPanel" class="room-link-panel">
     <div id="roomLinkContent"></div>
+    <!-- Manuales del cuarto (opcional): se llena desde la tabla documentos de Supabase -->
+    <div id="rlManuales" class="rl-manuals"></div>
   </div>
 
   <!-- Barra de conexión / código de orden -->
@@ -2713,6 +2727,9 @@ const I18N = {
     roomKioskoScanAgain:'Scan the QR again to update.',
     roomKioskoDayClosed:'Day closed by supervisor',
     roomKioskoDayClosedSub:'Production can no longer be updated for today. If the supervisor reopens the day, tap the button below.',
+    /* Manuales del cuarto (kiosko) */
+    manualsTitle:'Room manuals', manualsVersion:v=>`Version ${v}`, manualsOpening:'Opening manual…',
+    manualsErr:'Could not open the manual. Try again.',
     newSample:'New sample', sampleTime:'Sample time', sampleTimeHint:'The system time is used by default. You can change it manually.',
     weight10:'Weight of 10 capsules (g)', weightPerCap:'Weight per capsule (mg)', operatorInitials:'Operator initials', operatorPh:'Ex. JP',
     cancel:'Cancel', saveSample:'Save sample',
@@ -3156,6 +3173,9 @@ const I18N = {
     roomKioskoScanAgain:'Escanee el QR de nuevo para actualizar.',
     roomKioskoDayClosed:'Día cerrado por el supervisor',
     roomKioskoDayClosedSub:'Ya no es posible actualizar la producción de hoy. Si el supervisor reabre el día, presione el botón de abajo.',
+    /* Manuales del cuarto (kiosko) */
+    manualsTitle:'Manuales del cuarto', manualsVersion:v=>`Versión ${v}`, manualsOpening:'Abriendo manual…',
+    manualsErr:'No se pudo abrir el manual. Intente de nuevo.',
     newSample:'Nueva muestra', sampleTime:'Hora de la toma', sampleTimeHint:'Se toma la hora del sistema por defecto. Puede modificarla manualmente.',
     weight10:'Peso de 10 cápsulas (g)', weightPerCap:'Peso por cápsula (mg)', operatorInitials:'Iniciales del operador', operatorPh:'Ej. JP',
     cancel:'Cancelar', saveSample:'Guardar muestra',
@@ -6228,6 +6248,76 @@ function iniciarRoomLink(cuartoParam){
   pintarBuscandoCuarto();
   /* BETA: primero el umbral para "Terminar orden", luego resolver el cuarto */
   cargarAjustes().finally(resolverCuartoAhora);
+  /* Manuales del cuarto: independiente de la orden; si falla, no se muestra nada */
+  cargarManualesCuarto();
+}
+
+/* ---------- Manuales del cuarto (opcional) ----------
+   Tabla documentos (solo filas vigentes). Un documento aplica al cuarto si:
+   - tipo_cuarto es null o igual al tipo de producción del cuarto, y
+   - cuartos es null/vacío o incluye este cuarto.
+   Los PDFs viven en el bucket privado "manuales"; al tocar el botón se pide un
+   enlace firmado de 10 minutos, así no hay un enlace fijo circulando. */
+let rlManualesDocs = [];
+const MANUAL_SIGN_SECONDS = 600;
+
+async function cargarManualesCuarto(){
+  if(!CONFIGURED || !$('rlManuales')) return;
+  try{
+    const [docs, tipo] = await Promise.all([
+      sbGet('documentos?vigente=eq.true&select=codigo,titulo,idioma,version,ruta,tipo_cuarto,cuartos&order=codigo.asc'),
+      tipoDeCuarto(roomLinkTarget)
+    ]);
+    const c = normCuarto(roomLinkTarget);
+    rlManualesDocs = (docs||[]).filter(d=>
+      (!d.tipo_cuarto || d.tipo_cuarto===tipo) &&
+      (!d.cuartos || !d.cuartos.length || d.cuartos.map(normCuarto).indexOf(c)>=0));
+  }catch(e){ rlManualesDocs = []; }   /* tabla aún no creada o sin conexión */
+  pintarManualesCuarto();
+}
+
+function pintarManualesCuarto(msg, esError){
+  const box = $('rlManuales'); if(!box) return;
+  if(!rlManualesDocs.length){ box.innerHTML=''; return; }
+  /* agrupar por código: un renglón por manual, un botón por idioma */
+  const grupos = {};
+  rlManualesDocs.forEach(d=>{ (grupos[d.codigo] = grupos[d.codigo] || []).push(d); });
+  const filas = Object.keys(grupos).map(cod=>{
+    const docs = grupos[cod].sort((a,b)=> (a.idioma===lang?-1:0) - (b.idioma===lang?-1:0));
+    const ref = docs[0];
+    const btns = docs.map(d=>
+      `<button class="btn${d.idioma===lang?' primary':''}" data-ruta="${escH(d.ruta)}">${escH(String(d.idioma||'').toUpperCase())}</button>`).join('');
+    return `<div class="rl-man-item">
+        <div class="rl-man-title">📘 ${escH(ref.titulo)}<small>${escH(t('manualsVersion')(ref.version||'—'))}</small></div>
+        <div class="rl-man-btns">${btns}</div>
+      </div>`;
+  }).join('');
+  box.innerHTML = `<div class="rl-man-head">${escH(t('manualsTitle'))}</div>${filas}` +
+    (msg ? `<div class="rl-man-msg${esError?' err':''}">${escH(msg)}</div>` : '');
+  box.querySelectorAll('button[data-ruta]').forEach(b=>{ b.onclick = ()=>abrirManual(b.getAttribute('data-ruta')); });
+}
+
+async function abrirManual(ruta){
+  /* Abrir la pestaña en el mismo toque (evita el bloqueo de ventanas emergentes)
+     y luego mandarla al enlace firmado. El kiosko se queda abierto detrás. */
+  const win = window.open('', '_blank');
+  pintarManualesCuarto(t('manualsOpening'));
+  try{
+    const r = await fetch(SUPABASE_URL.replace(/\/$/,'') + '/storage/v1/object/sign/manuales/' +
+      ruta.split('/').map(encodeURIComponent).join('/'), {
+      method:'POST', headers: HEADERS, body: JSON.stringify({ expiresIn: MANUAL_SIGN_SECONDS })
+    });
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    const j = await r.json();
+    const firmado = j.signedURL || j.signedUrl;
+    if(!firmado) throw new Error('sin enlace');
+    const url = SUPABASE_URL.replace(/\/$/,'') + '/storage/v1' + firmado;
+    if(win) win.location.href = url; else location.href = url;
+    pintarManualesCuarto();
+  }catch(e){
+    if(win) try{ win.close(); }catch(_){}
+    pintarManualesCuarto(t('manualsErr'), true);
+  }
 }
 
 function pintarBuscandoCuarto(){
@@ -9258,7 +9348,10 @@ function beep(ok){
 /* idioma: por defecto inglés; recuerda la elección en el dispositivo */
 try{ const g=localStorage.getItem(LANG_LS_KEY); if(g==='es'||g==='en') lang=g; }catch(e){}
 $('langSel').value=lang;
-$('langSel').addEventListener('change',e=>setLang(e.target.value));
+$('langSel').addEventListener('change',e=>{
+  setLang(e.target.value);
+  if(roomLinkKiosko) pintarManualesCuarto();   /* manuales del kiosko en el nuevo idioma */
+});
 aplicarIdioma();
 
 initSupabase();
