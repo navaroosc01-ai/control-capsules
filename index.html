@@ -4147,17 +4147,17 @@ $('fCodigo').addEventListener('input',()=>{
 /* ===================== CLAVE DE SUPERVISOR ===================== */
 /* El supervisor entra con un enlace que incluye ?rol=sup&clave=ESTA_CLAVE
    El operador entra con el enlace normal y NO puede cambiar de rol. */
-const CLAVE_SUPERVISOR = "super2026";
-const CLAVE_MECANICO = "mecanico2026";
-const CLAVE_PACKETING = "packeting2026";
-const CLAVE_QC = "qc2026";
+const CLAVE_SUPERVISOR = "sup-PqmFeDdL";
+const CLAVE_MECANICO = "mec-8cgs86mm";
+const CLAVE_PACKETING = "pack-yZJkxD7K";
+const CLAVE_QC = "qc-TR7Aej7G";
 /* ============================================================== */
 
 /* Enlaces:
    - Operador:        ...tusitio.netlify.app/?orden=OP-8891
-   - Supervisor:      ...tusitio.netlify.app/?orden=OP-8891&rol=sup&clave=super2026
-   - Tablero superv.: ...tusitio.netlify.app/?rol=sup&clave=super2026&tablero=1
-   - Manager Mecánico:...tusitio.netlify.app/?rol=mecanico&clave=mecanico2026 */
+   - Supervisor:      ...tusitio.netlify.app/?orden=OP-8891&rol=sup&clave=sup-PqmFeDdL
+   - Tablero superv.: ...tusitio.netlify.app/?rol=sup&clave=sup-PqmFeDdL&tablero=1
+   - Manager Mecánico:...tusitio.netlify.app/?rol=mecanico&clave=mec-8cgs86mm */
 /* ===================== TABLERO MULTI-ORDEN ===================== */
 let tableroOn=false, tabCodigos=[], tabTimer=null, tabDatos={}, tabEfectivos=[];
 const TAB_LS_KEY='qc_tablero_codigos';
@@ -6103,9 +6103,9 @@ function applyURL(){
     return { cod:null, tablero:false, mecanico:false, packeting:true, qc:false };
   }
   /* Rol QC: puede ver dashboard, editar cualquier orden como operador, y usar el escaner packeting.
-     Con ?rol=qc&clave=qc2026 => dashboard
-     Con ?rol=qc&clave=qc2026&orden=CODIGO => entra a esa orden (modo operador con topbar de regreso)
-     Con ?rol=qc&clave=qc2026&pack=1 => modo escaner packeting */
+     Con ?rol=qc&clave=qc-TR7Aej7G => dashboard
+     Con ?rol=qc&clave=qc-TR7Aej7G&orden=CODIGO => entra a esa orden (modo operador con topbar de regreso)
+     Con ?rol=qc&clave=qc-TR7Aej7G&pack=1 => modo escaner packeting */
   if(rol==='qc' && clave===CLAVE_QC){
     qc=true;
     document.body.classList.add('qc');
