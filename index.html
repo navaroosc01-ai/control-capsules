@@ -4151,10 +4151,12 @@ const CLAVE_SUPERVISOR = "sup-PqmFeDdL";
 const CLAVE_MECANICO = "mec-8cgs86mm";
 const CLAVE_PACKETING = "pack-yZJkxD7K";
 const CLAVE_QC = "qc-TR7Aej7G";
+const CLAVE_OPERADOR = "op-Vr9TbFMY";
 /* ============================================================== */
 
 /* Enlaces:
-   - Operador:        ...tusitio.netlify.app/?orden=OP-8891
+   - Operador:        ...tusitio.netlify.app/?rol=op&clave=op-Vr9TbFMY  (opcional &orden=OP-8891)
+   - Cuarto (kiosko): ...tusitio.netlify.app/?cuarto=N
    - Supervisor:      ...tusitio.netlify.app/?orden=OP-8891&rol=sup&clave=sup-PqmFeDdL
    - Tablero superv.: ...tusitio.netlify.app/?rol=sup&clave=sup-PqmFeDdL&tablero=1
    - Manager Mecánico:...tusitio.netlify.app/?rol=mecanico&clave=mec-8cgs86mm */
@@ -6107,9 +6109,13 @@ function applyURL(){
     const claveOk = (rol==='sup' && clave===CLAVE_SUPERVISOR) ||
                     (rol==='mecanico' && clave===CLAVE_MECANICO) ||
                     (rol==='packeting' && clave===CLAVE_PACKETING) ||
-                    (rol==='qc' && clave===CLAVE_QC);
+                    (rol==='qc' && clave===CLAVE_QC) ||
+                    (rol==='op' && clave===CLAVE_OPERADOR);   /* operador: misma vista de siempre */
     if(!claveOk){ bloquearAcceso(); return { bloqueado:true }; }
   }
+  /* Sin rol solo se permite el enlace de cuarto (?cuarto=N). La dirección base
+     y los enlaces de operador por orden (?orden=...) quedan bloqueados. */
+  if(rol===null && !p.get('cuarto')){ bloquearAcceso(); return { bloqueado:true }; }
   /* Enlace independiente por cuarto de encapsulacion (?cuarto=N).
      No requiere clave (es un enlace de operador). Solo se activa si no hay rol
      de supervisor / mecanico / packeting / qc en la URL (esos ganan). */
