@@ -6077,10 +6077,39 @@ function refrescarRol(){
   $('rolTag').textContent = qc ? t('qcTag') : (mecanico ? t('mechTag') : (supervisor ? t('supervisor') : t('operator')));
 }
 
+/* Reemplaza toda la página por un aviso. Se usa cuando la clave del enlace no es válida. */
+function bloquearAcceso(){
+  document.title='Acceso no válido';
+  document.body.className='';
+  /* se ocultan los elementos de la app (no se borran, para que ningún proceso falle) */
+  Array.from(document.body.children).forEach(el=>{ if(el.tagName!=='SCRIPT') el.style.setProperty('display','none','important'); });
+  const aviso=document.createElement('div');
+  aviso.innerHTML=
+    '<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;'+
+    'font-family:system-ui,sans-serif;background:#f4f5f7;padding:24px;text-align:center">'+
+    '<div style="max-width:420px;background:#fff;border-radius:12px;padding:32px 24px;'+
+    'box-shadow:0 2px 12px rgba(0,0,0,.08)">'+
+    '<div style="font-size:48px;line-height:1">&#128274;</div>'+
+    '<h2 style="margin:16px 0 8px;color:#222">Acceso no válido</h2>'+
+    '<p style="margin:0 0 6px;color:#555">Este enlace ya no está vigente. Solicita el enlace actualizado a tu supervisor.</p>'+
+    '<p style="margin:0;color:#888;font-size:14px">Invalid access link. Please request the updated link from your supervisor.</p>'+
+    '</div></div>';
+  document.body.appendChild(aviso);
+}
+
 function applyURL(){
   const p=new URLSearchParams(location.search);
   const cod=p.get('orden');
   const rol=p.get('rol'); const clave=p.get('clave');
+  /* Si el enlace trae un rol, la clave debe ser la vigente. Si no coincide
+     (enlace viejo o rol inventado) no se abre nada: pantalla de acceso no válido. */
+  if(rol!==null){
+    const claveOk = (rol==='sup' && clave===CLAVE_SUPERVISOR) ||
+                    (rol==='mecanico' && clave===CLAVE_MECANICO) ||
+                    (rol==='packeting' && clave===CLAVE_PACKETING) ||
+                    (rol==='qc' && clave===CLAVE_QC);
+    if(!claveOk){ bloquearAcceso(); return { bloqueado:true }; }
+  }
   /* Enlace independiente por cuarto de encapsulacion (?cuarto=N).
      No requiere clave (es un enlace de operador). Solo se activa si no hay rol
      de supervisor / mecanico / packeting / qc en la URL (esos ganan). */
@@ -8195,6 +8224,9 @@ aplicarIdioma();
 
 initSupabase();
 const initInfo=applyURL();
+if(initInfo.bloqueado){
+  /* enlace con clave no válida: no se inicia nada */
+} else {
 fillOrden(); render();
 if(initInfo.qc){
   /* QC: siempre iniciamos el dashboard (registra listeners, timers).
@@ -8218,6 +8250,7 @@ if(initInfo.qc){
   iniciarRoomLink(initInfo.roomTarget);
 } else if(initInfo.cod){
   abrirOrden(initInfo.cod);
+}
 }
 </script>
 </body>
